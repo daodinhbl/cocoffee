@@ -96,9 +96,9 @@ const ui = {
   btnSecondary: 'inline-flex h-10 items-center justify-center gap-2 rounded border border-gray-300 bg-white px-4 text-sm font-medium text-gray-800 hover:bg-gray-50',
   btnDanger: 'inline-flex h-10 items-center justify-center gap-2 rounded bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700',
   btnGhost: 'icon-btn inline-flex h-9 w-9 items-center justify-center rounded text-gray-500 hover:bg-blue-50 hover:text-navy-accent',
-  card: 'rounded border border-gray-200 bg-white',
+  card: 'rounded-xl border border-milk-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,.04)]',
   th: 'px-4 py-3',
-  thead: 'border-b border-gray-200 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500',
+  thead: 'border-b border-milk-200 bg-milk-50 text-xs font-semibold uppercase tracking-wide text-milk-500',
   // <dialog> is a bottom sheet on phones, a centred modal from sm up
   sheet: 'w-[calc(100vw-2rem)] rounded border border-gray-200 bg-white text-gray-900 max-sm:m-0 max-sm:mt-auto max-sm:max-h-[100dvh] max-sm:w-full max-sm:max-w-full max-sm:rounded-b-none max-sm:border-x-0',
   grabber: '<div class="mx-auto mt-2 h-1 w-10 rounded-full bg-gray-300 sm:hidden" aria-hidden="true"></div>',

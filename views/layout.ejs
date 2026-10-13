@@ -31,6 +31,8 @@
               muted: '#94a3b8',    // secondary text on navy
               soft: '#cbd5e1',     // primary text on navy
             },
+            // "Xám sữa": warm milk grey for the page background and quiet surfaces.
+            milk: { 50: '#FAF8F5', 100: '#F4F1EC', 200: '#E8E3DA', 300: '#D6CFC3', 500: '#8C8478' },
           },
           // Times New Roman everywhere (system font, no download). Its digits are fixed-width, so the
           // numeric `font-mono` utility used for prices/quantities maps to the same family. Fallbacks are the
@@ -44,7 +46,7 @@
           height: { header: '64px' },
           maxWidth: { content: '1280px' },
           // flat industrial look: nothing rounder than 4px
-          borderRadius: { DEFAULT: '4px', sm: '2px', md: '4px', lg: '4px' },
+          borderRadius: { DEFAULT: '4px', sm: '2px', md: '4px', lg: '6px', xl: '10px', '2xl': '14px' },
         },
       },
     };
@@ -65,6 +67,8 @@
     :focus-visible { outline: 2px solid #1d4ed8; outline-offset: 2px; }
     html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; touch-action: manipulation; }
     .tnum { font-variant-numeric: tabular-nums; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { scrollbar-width: none; }
     dialog::backdrop { background: rgba(15, 23, 42, 0.55); }
     dialog { padding: 0; }
     @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
@@ -129,7 +133,7 @@
     }
   </style>
 </head>
-<body class="h-full bg-gray-50 font-sans text-gray-900 antialiased">
+<body class="h-full bg-milk-100 font-sans text-gray-900 antialiased">
   <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded focus:bg-amber-400 focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-ink-900">Bỏ qua điều hướng</a>
 
   <div class="flex min-h-full">
@@ -138,7 +142,7 @@
     <div class="flex min-w-0 flex-1 flex-col">
       <%- include('partials/header') %>
 
-      <main id="main" tabindex="-1" class="flex-1 bg-gray-50 p-4 sm:p-6">
+      <main id="main" tabindex="-1" class="flex-1 bg-milk-100 p-4 sm:p-6">
         <div class="mx-auto w-full max-w-content">
           <% if (typeof flash !== 'undefined' && flash) {
                const tone = { success: 'border-green-200 bg-green-50 text-green-800', error: 'border-red-200 bg-red-50 text-red-800', info: 'border-sky-200 bg-sky-50 text-sky-800' }[flash.type] || 'border-gray-200 bg-gray-50 text-gray-800'; %>

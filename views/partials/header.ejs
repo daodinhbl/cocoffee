@@ -7,7 +7,7 @@
   }[zalo.state] || { pill: 'border-gray-200 bg-gray-50 text-gray-600', dot: 'bg-gray-400' };
   const noteTone = { warn: 'bg-amber-500', info: 'bg-sky-500', bad: 'bg-red-500' };
 %>
-<header class="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b border-gray-200 bg-white px-4 md:h-header sm:px-6">
+<header class="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b border-milk-200 bg-white/90 px-4 backdrop-blur md:h-header sm:px-6">
   <!-- Phones: brand mark (navigation lives in the bottom tab bar) -->
   <a href="/admin/dashboard" aria-label="<%= shopName %> — Tổng quan" class="-ml-1 flex h-11 w-11 shrink-0 items-center justify-center md:hidden"><span class="flex h-9 w-9 items-center justify-center rounded bg-[#FBF6EF] p-1 ring-1 ring-[#E9D3B6]"><img src="/brand/mark.png" alt="" width="256" height="200" class="h-full w-full object-contain"></span></a>
 
@@ -33,7 +33,7 @@
     <label for="quick-search" class="sr-only">Tìm nhanh</label>
     <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><%- icon('search', 'h-4 w-4') %></span>
     <input id="quick-search" type="search" autocomplete="off" placeholder="Tìm nhanh…"
-      class="h-10 w-full rounded border border-gray-200 bg-gray-50 pl-9 pr-14 text-sm placeholder:text-gray-400 focus:border-navy-accent focus:bg-white focus:outline-none focus:ring-1 focus:ring-navy-accent">
+      class="h-10 w-full rounded-lg border border-milk-200 bg-milk-50 pl-9 pr-14 text-sm placeholder:text-gray-400 focus:border-navy-accent focus:bg-white focus:outline-none focus:ring-1 focus:ring-navy-accent">
     <kbd class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded-sm border border-gray-200 bg-white px-1.5 py-0.5 font-mono text-[11px] text-gray-500">Ctrl K</kbd>
   </form>
 
