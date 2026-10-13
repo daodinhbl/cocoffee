@@ -1,0 +1,139 @@
+<%
+  const { input, label, btnPrimary, btnSecondary, btnDanger } = ui;
+  const canCancel = ['draft', 'open'].includes(order.status);
+  const canPay = order.status === 'open' || (order.status === 'completed' && order.payment_status === 'unpaid');
+  const canResend = order.source === 'zalo' && order.status === 'completed';
+  const profit = order.total - order.cogs_total;
+%>
+<div class="flex flex-wrap items-start justify-between gap-4">
+  <div>
+    <div class="flex flex-wrap items-center gap-2">
+      <h1 class="font-mono text-xl font-semibold tracking-tight sm:text-2xl"><%= order.order_code %></h1>
+      <%- orderStatusBadge(order) %> <%- sourceBadge(order.source) %>
+    </div>
+    <p class="mt-1 text-sm text-gray-500">
+      Tạo lúc <%= fmtTime(order.created_at) %>
+      <% if (order.table_name) { %> · <%= order.table_name %><% } %>
+      <% if (order.completed_at) { %> · hoàn tất <%= fmtTime(order.completed_at) %><% } %>
+    </p>
+  </div>
+  <a href="/admin/orders" class="<%= btnSecondary %>">← Danh sách đơn</a>
+</div>
+
+<div class="mt-5 grid grid-cols-12 gap-4 sm:gap-6">
+  <section class="col-span-12 rounded border border-gray-200 lg:col-span-8" aria-labelledby="items-title">
+    <h2 id="items-title" class="border-b border-gray-200 px-5 py-4 text-base font-semibold">Món đã gọi</h2>
+    <table class="rtable w-full border-collapse text-left text-sm">
+      <caption class="sr-only">Các món trong đơn</caption>
+      <thead class="<%= ui.thead %>">
+        <tr>
+          <th scope="col" class="px-5 py-3">Món</th>
+          <th scope="col" class="px-3 py-3 text-right">SL</th>
+          <th scope="col" class="px-3 py-3 text-right">Đơn giá</th>
+          <th scope="col" class="px-5 py-3 text-right">Thành tiền</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% order.items.forEach((i) => { %>
+          <tr class="border-b border-gray-200 last:border-b-0">
+            <td data-label="" class="rt-title px-5 py-3">
+              <%= i.product_name %>
+              <% if (i.note) { %><span class="block text-xs text-gray-500">Ghi chú: <%= i.note %></span><% } %>
+            </td>
+            <td data-label="SL" class="px-3 py-3 text-right font-mono tnum"><%= i.quantity %></td>
+            <td data-label="Đơn giá" class="px-3 py-3 text-right font-mono tnum"><%= money(i.unit_price) %></td>
+            <td data-label="Thành tiền" class="px-5 py-3 text-right font-mono tnum"><%= money(i.line_total) %></td>
+          </tr>
+        <% }) %>
+        <% if (!order.items.length) { %><tr><td colspan="4" data-label="" class="px-5 py-8 text-center text-gray-500">Đơn chưa có món.</td></tr><% } %>
+      </tbody>
+    </table>
+    <dl class="space-y-1.5 border-t border-gray-200 px-5 py-4 text-sm">
+      <div class="flex justify-between"><dt class="text-gray-500">Tạm tính</dt><dd class="font-mono tnum"><%= money(order.subtotal) %></dd></div>
+      <% if (order.discount > 0) { %><div class="flex justify-between"><dt class="text-gray-500">Giảm giá</dt><dd class="font-mono tnum">−<%= money(order.discount) %></dd></div><% } %>
+      <div class="flex justify-between text-base font-semibold"><dt>Tổng cộng</dt><dd class="font-mono tnum"><%= money(order.total) %></dd></div>
+      <% if (order.status === 'completed') { %>
+        <div class="flex justify-between text-gray-500"><dt>Giá vốn (COGS)</dt><dd class="font-mono tnum"><%= money(order.cogs_total) %></dd></div>
+        <div class="flex justify-between text-gray-500"><dt>Lãi gộp</dt><dd class="font-mono tnum"><%= money(profit) %><% if (order.total > 0) { %> (<%= pct((profit / order.total) * 100) %>)<% } %></dd></div>
+      <% } %>
+    </dl>
+  </section>
+
+  <div class="col-span-12 space-y-4 sm:space-y-6 lg:col-span-4">
+    <section class="rounded border border-gray-200 p-5" aria-labelledby="info-title">
+      <h2 id="info-title" class="text-base font-semibold">Thông tin</h2>
+      <dl class="mt-3 space-y-2 text-sm">
+        <div class="flex justify-between gap-3"><dt class="text-gray-500">Thanh toán</dt><dd><%= order.payment_status === 'paid' ? `Đã thu (${METHOD_LABEL[order.payment_method] || order.payment_method})` : 'Chưa thu' %></dd></div>
+        <% if (order.paid_at) { %><div class="flex justify-between gap-3"><dt class="text-gray-500">Thu lúc</dt><dd class="tnum"><%= fmtTime(order.paid_at) %></dd></div><% } %>
+        <% if (order.note) { %><div class="flex justify-between gap-3"><dt class="text-gray-500">Ghi chú</dt><dd class="text-right"><%= order.note %></dd></div><% } %>
+        <% if (order.source === 'zalo') { %>
+          <div class="flex justify-between gap-3"><dt class="text-gray-500">Zalo</dt><dd><%= order.zalo_chat_type === 'group' ? 'Nhóm chat' : 'Chat 1:1' %></dd></div>
+          <div class="flex justify-between gap-3"><dt class="text-gray-500">Bill Zalo</dt>
+            <dd><%- order.receipt_sent_at ? badge('Đã gửi ' + fmtTime(order.receipt_sent_at), 'good') : (order.receipt_error ? badge('Gửi lỗi', 'bad') : badge('Chưa gửi', 'neutral')) %></dd></div>
+          <% if (order.receipt_error) { %><p class="rounded border border-red-200 bg-red-50 px-2 py-1.5 text-xs text-red-800">Lỗi: <%= order.receipt_error %></p><% } %>
+        <% } %>
+      </dl>
+      <% if (payments.length) { %>
+        <h3 class="mt-4 text-sm font-semibold">Lịch sử thu tiền</h3>
+        <ul class="mt-2 divide-y divide-gray-100 text-sm">
+          <% payments.forEach((p) => { %>
+            <li class="flex justify-between gap-3 py-2">
+              <span><%= METHOD_LABEL[p.method] || p.method %><span class="block text-xs text-gray-500"><%= fmtTime(p.paid_at) %><% if (p.received_by_name) { %> · <%= p.received_by_name %><% } %><% if (p.reference) { %> · <%= p.reference %><% } %></span></span>
+              <span class="font-mono tnum"><%= money(p.amount) %></span>
+            </li>
+          <% }) %>
+        </ul>
+      <% } %>
+    </section>
+
+    <% if (canPay) { %>
+    <section class="rounded border border-gray-200 p-5" aria-labelledby="pay-title">
+      <h2 id="pay-title" class="text-base font-semibold">Thu tiền</h2>
+      <p class="mt-1 text-xs text-gray-500">
+        <%= order.status === 'open' ? 'Thu tiền sẽ hoàn tất đơn: trừ kho theo định mức và chốt giá vốn.' : 'Đơn Zalo đã trừ kho; chỉ ghi nhận tiền đã thu.' %>
+      </p>
+      <form method="post" action="/admin/orders/<%= order.id %>/pay" class="mt-3 space-y-3"
+        data-confirm="<%= order.status === 'open' ? `Thu tiền và hoàn tất đơn ${order.order_code}? Số tiền = tạm tính − giảm giá đã nhập.` : `Ghi nhận thu ${money(order.total)} cho đơn ${order.order_code}?` %>">
+        <%- include('../partials/csrf') %>
+        <div>
+          <label for="pay-method" class="<%= label %>">Hình thức</label>
+          <select id="pay-method" name="method" class="<%= input %>">
+            <option value="cash">Tiền mặt</option><option value="transfer">Chuyển khoản</option><option value="card">Thẻ</option><option value="other">Khác</option>
+          </select>
+        </div>
+        <% if (order.status === 'open') { %>
+        <div>
+          <label for="pay-discount" class="<%= label %>">Giảm giá (đ)</label>
+          <input id="pay-discount" name="discount" type="number" min="0" max="<%= order.subtotal %>" step="500" inputmode="numeric" value="<%= order.discount %>" class="<%= input %> text-right font-mono">
+        </div>
+        <% } %>
+        <div>
+          <label for="pay-ref" class="<%= label %>">Mã tham chiếu (tùy chọn)</label>
+          <input id="pay-ref" name="reference" maxlength="100" class="<%= input %>" autocomplete="off">
+        </div>
+        <button type="submit" class="<%= btnPrimary %> w-full"><%= order.status === 'open' ? 'Thu tiền & hoàn tất đơn' : `Thu ${money(order.total)}` %></button>
+      </form>
+    </section>
+    <% } %>
+
+    <% if (canResend || canCancel) { %>
+    <section class="rounded border border-gray-200 p-5" aria-labelledby="act-title">
+      <h2 id="act-title" class="text-base font-semibold">Thao tác khác</h2>
+      <div class="mt-3 space-y-3">
+        <% if (canResend) { %>
+          <form method="post" action="/admin/orders/<%= order.id %>/resend-receipt">
+            <%- include('../partials/csrf') %>
+            <button type="submit" class="<%= btnSecondary %> w-full">Gửi lại bill qua Zalo</button>
+          </form>
+        <% } %>
+        <% if (canCancel) { %>
+          <form method="post" action="/admin/orders/<%= order.id %>/cancel" data-confirm="Hủy đơn <%= order.order_code %>? Đơn chưa trừ kho nên không ảnh hưởng tồn kho.">
+            <%- include('../partials/csrf') %>
+            <button type="submit" class="<%= btnDanger %> w-full">Hủy đơn</button>
+          </form>
+        <% } %>
+      </div>
+    </section>
+    <% } %>
+  </div>
+</div>

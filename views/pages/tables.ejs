@@ -1,0 +1,95 @@
+<%
+  const { input, label, btnPrimary, btnSecondary, btnGhost, sheet, grabber } = ui;
+  const serving = tables.filter((t) => t.is_active && t.status === 'serving').length;
+  const activeCount = tables.filter((t) => t.is_active).length;
+%>
+<div class="flex flex-wrap items-start justify-between gap-4">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight sm:text-2xl">Bàn</h1>
+    <p class="mt-1 text-sm text-gray-500"><%= activeCount %> bàn đang dùng · <%= serving %> bàn có khách. Trạng thái bàn do máy POS cập nhật khi mở và thanh toán đơn.</p>
+  </div>
+  <button type="button" data-modal-open="#table-dialog" data-action="/admin/tables" data-title="Thêm bàn" class="<%= btnPrimary %>">+ Thêm bàn</button>
+</div>
+
+<div class="mt-5 rounded border border-gray-200">
+  <table class="rtable w-full border-collapse text-left text-sm lg:min-w-[640px]">
+    <caption class="sr-only">Danh sách bàn</caption>
+    <thead class="<%= ui.thead %>">
+      <tr>
+        <th scope="col" class="px-4 py-3">Bàn</th>
+        <th scope="col" class="px-4 py-3">Sức chứa</th>
+        <th scope="col" class="px-4 py-3">Trạng thái</th>
+        <th scope="col" class="px-4 py-3">Đơn hiện tại</th>
+        <th scope="col" class="px-4 py-3 text-right"><span class="sr-only">Hành động</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% tables.forEach((t) => {
+           const fill = { code: t.code, name: t.name, capacity: t.capacity, is_active: Boolean(t.is_active) }; %>
+        <tr class="border-b border-gray-200 last:border-b-0 hover:bg-gray-50 <%= t.is_active ? '' : 'text-gray-400' %>">
+          <td data-label="" class="rt-title px-4 py-3">
+            <span class="font-medium"><%= t.name %></span>
+            <span class="ml-2 font-mono text-xs text-gray-500"><%= t.code %></span>
+          </td>
+          <td data-label="Sức chứa" class="px-4 py-3 font-mono tnum"><%= t.capacity %> chỗ</td>
+          <td data-label="Trạng thái" class="px-4 py-3">
+            <% if (!t.is_active) { %><%- badge('Ngừng sử dụng', 'neutral') %>
+            <% } else if (t.status === 'serving') { %><%- badge('Có khách', 'warn') %>
+            <% } else { %><%- badge('Trống', 'good') %><% } %>
+          </td>
+          <td data-label="Đơn hiện tại" class="px-4 py-3">
+            <% if (t.current_order_id) { %>
+              <a href="/admin/orders/<%= t.current_order_id %>" class="font-mono text-[13px] hover:underline"><%= t.current_order_code %></a>
+              <span class="ml-1 font-mono text-xs text-gray-500 tnum"><%= money(t.current_order_total) %></span>
+            <% } else { %>—<% } %>
+          </td>
+          <td data-label="" class="rt-actions px-4 py-3 text-right">
+            <div class="inline-flex items-center gap-1">
+              <button type="button" class="<%= btnGhost %>" aria-label="Sửa <%= t.name %>" title="Sửa"
+                data-modal-open="#table-dialog" data-action="/admin/tables/<%= t.id %>" data-title="Sửa bàn" data-fill="<%= safeJson(fill) %>">
+                <%- icon('pencil', 'h-4 w-4') %><span class="btn-label">Sửa</span>
+              </button>
+              <% if (!(t.is_active && t.status === 'serving')) { %>
+              <form method="post" action="/admin/tables/<%= t.id %>" <% if (t.is_active) { %>data-confirm="Ngừng sử dụng <%= t.name %>? Bàn sẽ ẩn khỏi sơ đồ POS."<% } %>>
+                <%- include('../partials/csrf') %>
+                <input type="hidden" name="is_active" value="<%= t.is_active ? 0 : 1 %>">
+                <button type="submit" class="<%= btnGhost %> w-auto px-2 text-xs font-medium"><%= t.is_active ? 'Ngừng dùng' : 'Dùng lại' %></button>
+              </form>
+              <% } %>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+      <% if (!tables.length) { %><tr><td colspan="5" data-label="" class="px-4 py-12 text-center text-sm text-gray-500">Chưa có bàn nào. Bấm “Thêm bàn” để bắt đầu.</td></tr><% } %>
+    </tbody>
+  </table>
+</div>
+
+<dialog id="table-dialog" aria-labelledby="table-title" class="max-w-md <%= sheet %>">
+  <form method="post" action="/admin/tables" class="flex flex-col">
+    <%- include('../partials/csrf') %>
+    <%- grabber %>
+    <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4">
+      <h2 id="table-title" data-dialog-title class="text-lg font-semibold">Thêm bàn</h2>
+      <button type="button" data-modal-close aria-label="Đóng" class="<%= btnGhost %>"><%- icon('x', 'h-5 w-5') %></button>
+    </div>
+    <div class="space-y-4 px-4 py-4 sm:px-6 sm:py-5">
+      <div>
+        <label for="t-code" class="<%= label %>">Mã bàn</label>
+        <input id="t-code" name="code" required maxlength="20" class="<%= input %> font-mono" placeholder="B01" autocomplete="off">
+      </div>
+      <div>
+        <label for="t-name" class="<%= label %>">Tên bàn</label>
+        <input id="t-name" name="name" required maxlength="60" class="<%= input %>" placeholder="Bàn 1" autocomplete="off">
+      </div>
+      <div>
+        <label for="t-capacity" class="<%= label %>">Sức chứa</label>
+        <input id="t-capacity" name="capacity" type="number" min="1" max="100" step="1" value="4" inputmode="numeric" class="<%= input %> font-mono">
+      </div>
+    </div>
+    <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-4 py-3 max-sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
+      <button type="button" data-modal-close class="<%= btnSecondary %> max-sm:flex-1">Hủy</button>
+      <button type="submit" class="<%= btnPrimary %> max-sm:flex-[2]">Lưu</button>
+    </div>
+  </form>
+</dialog>

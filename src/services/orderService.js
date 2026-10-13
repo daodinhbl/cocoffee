@@ -83,6 +83,7 @@ async function payOrder(orderId, { method, tendered, reference, discount, userId
     if (order.status === 'open') {
       if (discount !== undefined && discount !== null) {
         if (!(Number(discount) >= 0)) throw new AppError(400, 'VALIDATION', 'discount must be >= 0');
+        if (Number(discount) > Number(order.subtotal)) throw new AppError(400, 'VALIDATION', 'Giảm giá không được lớn hơn tạm tính của đơn.');
         await orderModel.setDiscount(orderId, Number(discount), conn);
         order = await orderModel.getById(orderId, conn, { forUpdate: true });
       }

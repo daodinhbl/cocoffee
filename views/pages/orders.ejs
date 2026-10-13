@@ -1,0 +1,102 @@
+<%
+  const { input, btnPrimary, btnSecondary } = ui;
+  const sel = (a, b) => (a === b ? 'selected' : '');
+  const from = (page - 1) * pageSize + 1;
+  const to = Math.min(total, page * pageSize);
+%>
+<div class="flex flex-wrap items-start justify-between gap-4">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight sm:text-2xl">Đơn hàng</h1>
+    <p class="mt-1 text-sm text-gray-500">Đơn từ máy POS và chatbot Zalo. Bấm vào mã đơn để xem món, thu tiền hoặc hủy.</p>
+  </div>
+</div>
+
+<!-- Filters are plain GET parameters, so every view is linkable and survives a refresh -->
+<form method="get" action="/admin/orders" class="mt-5 grid grid-cols-2 gap-3 rounded border border-gray-200 p-3 sm:p-4 md:grid-cols-6">
+  <div class="col-span-2 md:col-span-2">
+    <label for="o-q" class="sr-only">Mã đơn</label>
+    <input id="o-q" name="q" type="search" value="<%= filters.q %>" placeholder="Tìm mã đơn (VD: CF261013)" maxlength="30" class="<%= input %>" autocomplete="off">
+  </div>
+  <div>
+    <label for="o-status" class="sr-only">Trạng thái</label>
+    <select id="o-status" name="status" class="<%= input %>">
+      <option value="">Mọi trạng thái</option>
+      <option value="draft" <%= sel(filters.status, 'draft') %>>Chờ khách xác nhận</option>
+      <option value="open" <%= sel(filters.status, 'open') %>>Đang phục vụ</option>
+      <option value="completed" <%= sel(filters.status, 'completed') %>>Hoàn tất</option>
+      <option value="cancelled" <%= sel(filters.status, 'cancelled') %>>Đã hủy</option>
+    </select>
+  </div>
+  <div>
+    <label for="o-source" class="sr-only">Kênh</label>
+    <select id="o-source" name="source" class="<%= input %>">
+      <option value="">Mọi kênh</option>
+      <option value="pos" <%= sel(filters.source, 'pos') %>>POS</option>
+      <option value="zalo" <%= sel(filters.source, 'zalo') %>>Zalo</option>
+    </select>
+  </div>
+  <div>
+    <label for="o-payment" class="sr-only">Thanh toán</label>
+    <select id="o-payment" name="payment" class="<%= input %>">
+      <option value="">Mọi thanh toán</option>
+      <option value="unpaid" <%= sel(filters.payment, 'unpaid') %>>Chưa thu</option>
+      <option value="paid" <%= sel(filters.payment, 'paid') %>>Đã thu</option>
+    </select>
+  </div>
+  <div class="md:col-span-1"></div>
+  <div>
+    <label for="o-from" class="mb-1 block text-xs text-gray-500">Từ ngày</label>
+    <input id="o-from" name="from" type="date" value="<%= filters.from %>" class="<%= input %>">
+  </div>
+  <div>
+    <label for="o-to" class="mb-1 block text-xs text-gray-500">Đến ngày</label>
+    <input id="o-to" name="to" type="date" value="<%= filters.to %>" class="<%= input %>">
+  </div>
+  <div class="col-span-2 flex items-end gap-2 md:col-span-4 md:justify-end">
+    <% if (hasFilter) { %><a href="/admin/orders" class="<%= btnSecondary %>">Xóa lọc</a><% } %>
+    <button type="submit" class="<%= btnPrimary %>">Lọc</button>
+  </div>
+</form>
+
+<p class="mt-4 text-sm text-gray-500" aria-live="polite">
+  <% if (total) { %>Hiển thị <span class="font-mono font-medium text-gray-900 tnum"><%= from %>–<%= to %></span> / <span class="font-mono tnum"><%= total %></span> đơn<% } else { %>Không có đơn phù hợp.<% } %>
+</p>
+
+<div class="mt-3 rounded border border-gray-200 max-lg:border-0">
+  <table class="rtable w-full border-collapse text-left text-sm lg:min-w-[760px]">
+    <caption class="sr-only">Danh sách đơn hàng</caption>
+    <thead class="<%= ui.thead %>">
+      <tr>
+        <th scope="col" class="px-4 py-3">Mã đơn</th>
+        <th scope="col" class="px-4 py-3">Kênh</th>
+        <th scope="col" class="px-4 py-3">Bàn</th>
+        <th scope="col" class="px-4 py-3 text-right">Tổng tiền</th>
+        <th scope="col" class="px-4 py-3">Trạng thái</th>
+        <th scope="col" class="px-4 py-3">Thời gian</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% orders.forEach((o) => { %>
+        <tr class="border-b border-gray-200 last:border-b-0 hover:bg-gray-50">
+          <td data-label="" class="rt-title px-4 py-3"><a href="/admin/orders/<%= o.id %>" class="font-mono text-[13px] font-medium hover:underline"><%= o.order_code %></a></td>
+          <td data-label="Kênh" class="px-4 py-3"><%- sourceBadge(o.source) %></td>
+          <td data-label="Bàn" class="px-4 py-3 font-mono text-[13px]"><%= o.table_code || '—' %></td>
+          <td data-label="Tổng tiền" class="px-4 py-3 text-right font-mono tnum"><%= money(o.total) %></td>
+          <td data-label="Trạng thái" class="px-4 py-3">
+            <%- orderStatusBadge(o) %>
+            <% if (o.receipt_error) { %><span class="ml-1"><%- badge('Bill lỗi', 'bad') %></span><% } %>
+          </td>
+          <td data-label="Thời gian" class="px-4 py-3 text-gray-600 tnum"><%= fmtTime(o.created_at) %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<% if (pages > 1) { %>
+  <nav aria-label="Phân trang" class="mt-4 flex items-center justify-between gap-3">
+    <% if (page > 1) { %><a href="<%= pageUrl(page - 1) %>" rel="prev" class="<%= btnSecondary %>">← Trước</a><% } else { %><span></span><% } %>
+    <span class="text-sm text-gray-500">Trang <span class="font-mono tnum"><%= page %></span> / <span class="font-mono tnum"><%= pages %></span></span>
+    <% if (page < pages) { %><a href="<%= pageUrl(page + 1) %>" rel="next" class="<%= btnSecondary %>">Sau →</a><% } else { %><span></span><% } %>
+  </nav>
+<% } %>

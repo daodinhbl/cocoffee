@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const mysql = require('mysql2/promise');
+const bcrypt = require('bcryptjs');
 const env = require('./env');
 const logger = require('../utils/logger');
 
@@ -12,9 +14,13 @@ const DB_DIR = path.join(env.rootDir, 'database');
  *
  * Safety contract:
  *   - does nothing unless AUTO_BOOTSTRAP_DB=true;
- *   - runs ONLY when the target database has ZERO tables. schema.sql starts with DROP TABLE IF EXISTS,
- *     so the emptiness check is what guarantees a redeploy can never wipe real data;
- *   - SEED_DEMO=true additionally loads seed.sql (demo menu/BOM/tables + the default admin account).
+ *   - runs ONLY when the target database holds no data. schema.sql starts with DROP TABLE IF EXISTS, so the
+ *     emptiness check is what guarantees a redeploy can never wipe real data. "No data" means zero tables, or
+ *     a previous bootstrap that stopped half-way (DDL cannot be rolled back): only our own tables, every one
+ *     of them empty, and either some missing or the requested seed absent. Then it is simply re-run;
+ *   - SEED_DEMO=true additionally loads seed.sql (demo menu/BOM/tables + the admin account). The seeded
+ *     admin/admin is never left live: BOOTSTRAP_ADMIN_PASSWORD replaces it, or a random password is
+ *     generated and written to the log once (fail closed on a public host).
  * Failures are logged, never thrown: the API still starts and /health reports the database state.
  *
  * @returns {Promise<'disabled'|'skipped-not-empty'|'applied'|'failed'>}
@@ -28,18 +34,32 @@ async function bootstrapIfEmpty() {
       host: env.db.host, port: env.db.port, user: env.db.user, password: env.db.password,
       database: env.db.name, multipleStatements: true, charset: 'utf8mb4',
     });
-    const [[{ tables }]] = await conn.query(
-      'SELECT COUNT(*) AS tables FROM information_schema.tables WHERE table_schema = DATABASE()'
+    const [existing] = await conn.query(
+      'SELECT table_name AS name FROM information_schema.tables WHERE table_schema = DATABASE()'
     );
-    if (tables > 0) {
-      logger.info(`DB bootstrap skipped: database already has ${tables} table(s)`);
+    if (existing.length > 0 && !(await isUnfinishedBootstrap(conn, existing.map((r) => r.name || r.NAME || r.TABLE_NAME)))) {
+      logger.info(`DB bootstrap skipped: database already has ${existing.length} table(s)`);
       return 'skipped-not-empty';
     }
+    if (existing.length > 0) logger.warn('DB bootstrap: resuming an unfinished bootstrap (our tables only, all empty)');
 
     const files = ['schema.sql', ...(env.db.seedDemo ? ['seed.sql'] : [])];
     for (const f of files) {
       await conn.query(fs.readFileSync(path.join(DB_DIR, f), 'utf8'));
       logger.info(`DB bootstrap applied ${f}`);
+    }
+
+    // seed.sql ships admin/admin; replace it before the site takes its first request.
+    if (env.db.seedDemo) {
+      let pw = env.db.bootstrapAdminPassword;
+      if (!pw || pw.length < 10) {
+        if (pw) logger.warn('BOOTSTRAP_ADMIN_PASSWORD ignored: it must be at least 10 characters');
+        pw = crypto.randomBytes(12).toString('base64url');
+        logger.warn(`DB bootstrap generated the admin password (shown once, change it after login): admin / ${pw}`);
+      } else {
+        logger.info('DB bootstrap set the admin password from BOOTSTRAP_ADMIN_PASSWORD');
+      }
+      await conn.query("UPDATE users SET password_hash = ? WHERE username = 'admin'", [bcrypt.hashSync(pw, 12)]);
     }
     return 'applied';
   } catch (err) {
@@ -48,6 +68,25 @@ async function bootstrapIfEmpty() {
   } finally {
     if (conn) await conn.end().catch(() => {});
   }
+}
+
+/** Table names created by schema.sql (read from the file, so the list never drifts). */
+function schemaTables() {
+  const sql = fs.readFileSync(path.join(DB_DIR, 'schema.sql'), 'utf8');
+  return [...sql.matchAll(/CREATE TABLE\s+`?(\w+)`?/gi)].map((m) => m[1].toLowerCase());
+}
+
+/** True only for a half-applied bootstrap: nothing but our tables, all empty, and something still missing. */
+async function isUnfinishedBootstrap(conn, names) {
+  const ours = new Set(schemaTables());
+  const lower = names.map((n) => String(n).toLowerCase());
+  if (!lower.every((n) => ours.has(n))) return false;              // a foreign table: not our database
+  for (const n of lower) {
+    const [[row]] = await conn.query(`SELECT EXISTS(SELECT 1 FROM \`${n}\`) AS has_rows`);
+    if (Number(row.has_rows)) return false;                         // real data: never touch
+  }
+  const missingTables = [...ours].some((t) => !lower.includes(t));
+  return missingTables || env.db.seedDemo;                          // all tables there but the seed never ran
 }
 
 module.exports = { bootstrapIfEmpty };

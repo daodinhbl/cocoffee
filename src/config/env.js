@@ -47,6 +47,9 @@ module.exports = {
     // First-boot setup for hosts without SQL import (see src/config/bootstrapDb.js). Both default off.
     autoBootstrap: bool('AUTO_BOOTSTRAP_DB', false),
     seedDemo: bool('SEED_DEMO', false),
+    // Replaces the factory admin/admin password during the first-boot seed, so a public site is never
+    // reachable with a known password. Only read while bootstrapping an EMPTY database; remove it afterwards.
+    bootstrapAdminPassword: optional('BOOTSTRAP_ADMIN_PASSWORD'),
   },
 
   jwt: {

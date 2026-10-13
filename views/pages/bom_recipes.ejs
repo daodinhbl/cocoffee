@@ -1,31 +1,21 @@
 <%
   const tabs = [
-    { id: 'drinks', kind: 'drink', label: 'Đồ uống pha chế', rows: drinks },
-    { id: 'combo', kind: 'combo', label: 'Combo', rows: combos },
+    { id: 'drinks', label: 'Đồ uống pha chế', rows: drinks, editable: true },
+    { id: 'retail', label: 'Hàng bán lẻ', rows: retail, editable: false },
   ];
   const badgeTone = { good: 'border-green-200 bg-green-50 text-green-700', warn: 'border-amber-200 bg-amber-50 text-amber-800', bad: 'border-red-200 bg-red-50 text-red-700' };
   const barTone = { good: 'bg-green-500', warn: 'bg-amber-400', bad: 'bg-red-500' };
   const MAX_BADGES = 4;
-  const btnGhost = 'icon-btn inline-flex h-9 w-9 items-center justify-center rounded text-gray-500 hover:bg-gray-100 hover:text-gray-900';
-  const input = 'h-10 w-full rounded border border-gray-300 bg-white px-3 text-sm placeholder:text-gray-400 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400';
-  const btnSecondary = 'inline-flex h-10 items-center justify-center gap-2 rounded border border-gray-300 bg-white px-4 text-sm font-medium text-gray-800 hover:bg-gray-50';
-  // <dialog> becomes a bottom sheet on phones, a centred modal from sm up
-  const sheet = 'w-[calc(100vw-2rem)] rounded border border-gray-200 bg-white text-gray-900 max-sm:m-0 max-sm:mt-auto max-sm:max-h-[100dvh] max-sm:w-full max-sm:max-w-full max-sm:rounded-b-none max-sm:border-x-0';
-  const grabber = '<div class="mx-auto mt-2 h-1 w-10 rounded-full bg-gray-300 sm:hidden" aria-hidden="true"></div>';
-  // JSON that is safe inside an HTML attribute / <script type="application/json">
-  const safeJson = (v) => JSON.stringify(v).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
+  const { input, btnGhost, btnSecondary, sheet, grabber } = ui;
 %>
 
-<!-- ===== Page header (phones: title only; both actions move into the sticky toolbar below) ===== -->
+<!-- ===== Page header (phones: title only; the add button moves into the sticky toolbar below) ===== -->
 <div class="flex flex-wrap items-start justify-between gap-4">
   <div>
     <h1 class="text-xl font-semibold tracking-tight sm:text-2xl">Quản lý định mức (BOM)</h1>
-    <p class="mt-1 max-w-xl text-sm text-gray-500">Công thức nguyên liệu, giá vốn (COGS) và tỷ lệ lợi nhuận của từng món. Kho tự trừ theo định mức khi đơn hoàn tất.</p>
+    <p class="mt-1 max-w-xl text-sm text-gray-500">Công thức nguyên liệu, giá vốn (COGS) và tỷ lệ lợi nhuận của từng món. Kho tự trừ theo định mức khi đơn hoàn tất; giá vốn tính theo giá bình quân hiện tại của nguyên liệu.</p>
   </div>
   <div class="hidden gap-3 md:flex">
-    <button type="button" data-modal-open="#import-dialog" class="<%= btnSecondary %>">
-      <%- icon('upload', 'h-4 w-4') %> Nhập File Excel
-    </button>
     <button type="button" data-recipe-open="create"
       class="inline-flex h-10 items-center gap-2 rounded bg-amber-400 px-4 text-sm font-semibold text-ink-900 hover:bg-amber-500 active:bg-amber-600">
       + Thêm Công thức
@@ -36,12 +26,12 @@
 <!-- ===== Summary strip ===== -->
 <section aria-label="Tóm tắt" class="mt-5 grid grid-cols-12 gap-3 sm:mt-6 sm:gap-6">
   <div class="col-span-4 rounded border border-gray-200 p-3 sm:p-4">
-    <p class="text-[10px] font-semibold uppercase leading-tight tracking-wide text-gray-500 sm:text-xs">Tổng công thức</p>
+    <p class="text-[10px] font-semibold uppercase leading-tight tracking-wide text-gray-500 sm:text-xs">Tổng món</p>
     <p class="mt-2 font-mono text-lg font-semibold tnum sm:text-xl"><%= stats.total %></p>
   </div>
   <div class="col-span-4 rounded border border-gray-200 p-3 sm:p-4">
     <p class="text-[10px] font-semibold uppercase leading-tight tracking-wide text-gray-500 sm:text-xs">Thiếu định mức</p>
-    <p class="mt-2 font-mono text-lg font-semibold tnum sm:text-xl"><%= stats.missing %></p>
+    <p class="mt-2 font-mono text-lg font-semibold tnum sm:text-xl <%= stats.missing ? 'text-red-700' : '' %>"><%= stats.missing %></p>
   </div>
   <div class="col-span-4 rounded border border-gray-200 p-3 sm:p-4">
     <p class="text-[10px] font-semibold uppercase leading-tight tracking-wide text-gray-500 sm:text-xs">Lợi nhuận TB</p>
@@ -51,9 +41,9 @@
 
 <!-- ===== Tabs (phones: segmented control that sticks under the header) ===== -->
 <div data-tabs class="border-b border-gray-200 max-md:sticky max-md:top-14 max-md:z-10 max-md:-mx-4 max-md:mt-4 max-md:border-b-0 max-md:bg-white max-md:px-4 max-md:py-2 md:mt-8">
-  <div role="tablist" aria-label="Loại công thức" class="-mb-px flex gap-6 overflow-x-auto max-md:mb-0 max-md:gap-1 max-md:rounded max-md:border max-md:border-gray-200 max-md:bg-gray-100 max-md:p-1">
+  <div role="tablist" aria-label="Loại món" class="-mb-px flex gap-6 overflow-x-auto max-md:mb-0 max-md:gap-1 max-md:rounded max-md:border max-md:border-gray-200 max-md:bg-gray-100 max-md:p-1">
     <% tabs.forEach((tab, i) => { %>
-      <button type="button" role="tab" id="tab-<%= tab.id %>" data-kind="<%= tab.kind %>" aria-controls="panel-<%= tab.id %>"
+      <button type="button" role="tab" id="tab-<%= tab.id %>" aria-controls="panel-<%= tab.id %>"
         aria-selected="<%= i === 0 ? 'true' : 'false' %>" tabindex="<%= i === 0 ? '0' : '-1' %>"
         class="inline-flex h-12 shrink-0 items-center gap-2 border-b-2 border-transparent px-1 text-sm font-medium text-gray-500 hover:text-gray-900 aria-selected:border-amber-400 aria-selected:text-gray-900
                max-md:h-10 max-md:flex-1 max-md:justify-center max-md:rounded-sm max-md:border-b-0 aria-selected:max-md:bg-white aria-selected:max-md:shadow-sm">
@@ -67,24 +57,25 @@
 <!-- ===== Tab panels ===== -->
 <% tabs.forEach((tab, i) => { %>
   <section role="tabpanel" id="panel-<%= tab.id %>" aria-labelledby="tab-<%= tab.id %>" tabindex="0" <%- i === 0 ? '' : 'hidden' %> class="pt-4 md:pt-6">
-    <!-- phones: search stays pinned below the tabs; the Excel import is one tap away at its right -->
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3 max-md:sticky max-md:top-28 max-md:z-10 max-md:-mx-4 max-md:flex-nowrap max-md:bg-white max-md:px-4 max-md:pb-2">
       <div class="relative w-full sm:w-80">
         <label for="filter-<%= tab.id %>" class="sr-only">Tìm trong <%= tab.label %></label>
         <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><%- icon('search', 'h-4 w-4') %></span>
         <input id="filter-<%= tab.id %>" type="search" data-filter-input autocomplete="off" enterkeyhint="search" placeholder="Tìm theo tên món, nguyên liệu…" class="<%= input %> pl-9">
       </div>
-      <button type="button" data-modal-open="#import-dialog" aria-label="Nhập File Excel" title="Nhập File Excel" class="<%= btnSecondary %> h-11 w-11 shrink-0 !px-0 md:hidden"><%- icon('upload', 'h-5 w-5') %></button>
       <button type="button" data-recipe-open="create" aria-label="Thêm công thức" title="Thêm công thức"
         class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded bg-amber-400 text-ink-900 hover:bg-amber-500 active:bg-amber-600 md:hidden"><%- icon('plus', 'h-6 w-6') %></button>
-      <p class="text-sm text-gray-500 max-md:hidden" aria-live="polite">Hiển thị <span data-count class="font-mono font-medium text-gray-900"><%= tab.rows.length %></span> / <span data-total class="font-mono"><%= tab.rows.length %></span> công thức</p>
+      <p class="text-sm text-gray-500 max-md:hidden" aria-live="polite">Hiển thị <span data-count class="font-mono font-medium text-gray-900"><%= tab.rows.length %></span> / <span data-total class="font-mono"><%= tab.rows.length %></span> món</p>
     </div>
-    <p class="mb-3 text-xs text-gray-500 md:hidden" aria-live="polite">Hiển thị <span data-count class="font-mono font-medium text-gray-900"><%= tab.rows.length %></span> / <span data-total class="font-mono"><%= tab.rows.length %></span> công thức</p>
+    <p class="mb-3 text-xs text-gray-500 md:hidden" aria-live="polite">Hiển thị <span data-count class="font-mono font-medium text-gray-900"><%= tab.rows.length %></span> / <span data-total class="font-mono"><%= tab.rows.length %></span> món</p>
+    <% if (!tab.editable) { %>
+      <p class="mb-3 text-sm text-gray-600">Hàng bán lẻ trừ kho 1:1 theo một mặt hàng; giá vốn lấy từ giá bình quân của mặt hàng đó. Chỉnh giá và liên kết kho ở <a href="/admin/menu" class="font-medium underline">Thực đơn</a>.</p>
+    <% } %>
 
     <div class="relative overflow-x-auto rounded border border-gray-200 max-lg:border-0 max-lg:overflow-visible">
       <table class="rtable rtable-bom w-full border-collapse text-left text-sm lg:min-w-[840px] xl:min-w-[920px]" data-filterable>
         <caption class="sr-only">Danh sách công thức — <%= tab.label %></caption>
-        <thead class="border-b border-gray-200 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
+        <thead class="<%= ui.thead %>">
           <tr>
             <th scope="col" class="px-4 py-3">Tên món</th>
             <th scope="col" class="px-4 py-3">Nguyên liệu thành phần</th>
@@ -99,25 +90,29 @@
                const tone = marginTone(r.margin);
                const shown = r.ingredients.slice(0, MAX_BADGES);
                const rest = r.ingredients.slice(MAX_BADGES);
-               const payload = { id: r.id, kind: tab.kind, name: r.name, sku: r.sku, price: r.price, lines: r.ingredients.map((g) => ({ ref: g.ref, qty: g.qty })) };
+               const payload = { id: r.id, name: r.name, sku: r.sku, price: r.price, category_id: r.category_id, lines: r.ingredients.map((g) => ({ ref: g.ref, qty: g.qty })) };
           %>
             <tr data-row class="border-b border-gray-200 hover:bg-gray-50">
               <td data-label="" class="rt-title px-4 py-3 align-top">
                 <p class="font-medium text-gray-900 max-lg:text-base"><%= r.name %></p>
-                <p class="mt-0.5 font-mono text-xs text-gray-500"><%= r.sku %></p>
+                <p class="mt-0.5 font-mono text-xs text-gray-500"><%= r.sku %> · <%= r.category_name %></p>
               </td>
               <td data-label="Nguyên liệu" class="rt-ingredients px-4 py-3 align-top">
+                <% if (!r.ingredients.length) { %>
+                  <span class="inline-flex items-center rounded-sm border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">Chưa có định mức</span>
+                <% } else { %>
                 <ul class="flex flex-wrap gap-1.5" aria-label="Nguyên liệu của <%= r.name %>">
                   <% shown.forEach((g) => { %>
                     <li class="inline-flex items-center gap-1 rounded-sm border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs text-gray-700">
-                      <%= g.name %> <span class="font-mono text-gray-500"><%= g.qty %><%= g.unit %></span>
+                      <%= g.name %> <span class="font-mono text-gray-500"><%= num(g.qty) %><%= g.unit %></span>
                     </li>
                   <% }) %>
                   <% if (rest.length) { %>
-                    <li title="<%= rest.map((g) => `${g.name} ${g.qty}${g.unit}`).join(', ') %>"
+                    <li title="<%= rest.map((g) => `${g.name} ${num(g.qty)}${g.unit}`).join(', ') %>"
                       class="inline-flex items-center rounded-sm border border-dashed border-gray-300 px-2 py-0.5 text-xs text-gray-500">+<%= rest.length %> nữa</li>
                   <% } %>
                 </ul>
+                <% } %>
               </td>
               <td data-label="Giá vốn (COGS)" class="rt-cogs px-4 py-3 text-right align-top font-mono tnum max-lg:text-base max-lg:font-semibold"><%= money(r.cogs) %></td>
               <td data-label="Giá bán" class="rt-price px-4 py-3 text-right align-top font-mono tnum max-lg:text-base max-lg:font-semibold"><%= money(r.price) %></td>
@@ -128,19 +123,26 @@
                 </div>
               </td>
               <td data-label="" class="rt-actions px-4 py-3 text-right align-top">
+                <% if (tab.editable) { %>
                 <div class="inline-flex items-center gap-1">
                   <button type="button" data-recipe-open="edit" data-recipe="<%= safeJson(payload) %>" class="<%= btnGhost %>" aria-label="Sửa <%= r.name %>" title="Sửa">
                     <%- icon('pencil', 'h-4 w-4') %><span class="btn-label">Sửa</span>
                   </button>
-                  <button type="button" data-delete data-name="<%= r.name %>" class="<%= btnGhost %> hover:!bg-red-50 hover:!text-red-600" aria-label="Xóa <%= r.name %>" title="Xóa">
-                    <%- icon('trash', 'h-4 w-4') %><span class="btn-label">Xóa</span>
-                  </button>
+                  <form method="post" action="/admin/bom-recipes/<%= r.id %>/delete" data-confirm="Ngừng bán “<%= r.name %>”? Món sẽ biến mất khỏi POS và chatbot Zalo, lịch sử đơn vẫn được giữ. Có thể bật lại ở trang Thực đơn.">
+                    <%- include('../partials/csrf') %>
+                    <button type="submit" class="<%= btnGhost %> hover:!bg-red-50 hover:!text-red-600" aria-label="Ngừng bán <%= r.name %>" title="Ngừng bán">
+                      <%- icon('trash', 'h-4 w-4') %><span class="btn-label">Ngừng bán</span>
+                    </button>
+                  </form>
                 </div>
+                <% } else { %>
+                  <a href="/admin/menu" class="<%= btnGhost %> w-auto px-2 text-xs font-medium">Thực đơn</a>
+                <% } %>
               </td>
             </tr>
           <% }) %>
-          <tr data-empty hidden>
-            <td colspan="6" data-label="" class="px-4 py-12 text-center text-sm text-gray-500">Không có công thức phù hợp.</td>
+          <tr data-empty <%- tab.rows.length ? 'hidden' : '' %>>
+            <td colspan="6" data-label="" class="px-4 py-12 text-center text-sm text-gray-500"><%= tab.rows.length ? 'Không có công thức phù hợp.' : 'Chưa có món nào.' %></td>
           </tr>
         </tbody>
       </table>
@@ -151,7 +153,9 @@
 
 <!-- ===== Dialog: add / edit recipe (bottom sheet on phones) ===== -->
 <dialog id="recipe-dialog" aria-labelledby="recipe-title" class="max-w-2xl max-sm:h-[94dvh] <%= sheet %>">
-  <form id="recipe-form" method="dialog" novalidate class="flex max-h-[calc(100dvh-2rem)] flex-col max-sm:h-full max-sm:max-h-none">
+  <form id="recipe-form" method="post" action="/admin/bom-recipes" novalidate class="flex max-h-[calc(100dvh-2rem)] flex-col max-sm:h-full max-sm:max-h-none">
+    <%- include('../partials/csrf') %>
+    <input type="hidden" name="recipe" id="f-recipe" value="[]">
     <%- grabber %>
     <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4">
       <h2 id="recipe-title" class="text-lg font-semibold">Thêm công thức</h2>
@@ -166,11 +170,17 @@
         </div>
         <div class="col-span-6 sm:col-span-3">
           <label for="f-sku" class="mb-1 block text-sm font-medium">Mã (SKU)</label>
-          <input id="f-sku" name="sku" required maxlength="40" class="<%= input %> font-mono" placeholder="CF-SUA-DA" autocomplete="off" autocapitalize="characters">
+          <input id="f-sku" name="sku" required maxlength="40" class="<%= input %> font-mono read-only:bg-gray-50 read-only:text-gray-500" placeholder="CF-SUA-DA" autocomplete="off" autocapitalize="characters">
         </div>
         <div class="col-span-6 sm:col-span-3">
           <label for="f-price" class="mb-1 block text-sm font-medium">Giá bán (đ)</label>
           <input id="f-price" name="price" type="number" min="0" step="500" required inputmode="numeric" class="<%= input %> text-right font-mono">
+        </div>
+        <div class="col-span-12 sm:col-span-6">
+          <label for="f-category" class="mb-1 block text-sm font-medium">Nhóm món</label>
+          <select id="f-category" name="category_id" required class="<%= input %>">
+            <% categories.forEach((c) => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %>
+          </select>
         </div>
       </div>
 
@@ -214,41 +224,5 @@
   </div>
 </template>
 
-<!-- ===== Dialog: import Excel ===== -->
-<dialog id="import-dialog" aria-labelledby="import-title" class="max-w-lg <%= sheet %>">
-  <form id="import-form" method="dialog" class="flex flex-col">
-    <%- grabber %>
-    <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4">
-      <h2 id="import-title" class="text-lg font-semibold">Nhập công thức từ Excel</h2>
-      <button type="button" data-modal-close aria-label="Đóng" class="<%= btnGhost %>"><%- icon('x', 'h-5 w-5') %></button>
-    </div>
-    <div class="px-4 py-4 sm:px-6 sm:py-5">
-      <label for="import-file" class="flex cursor-pointer flex-col items-center gap-2 rounded border border-dashed border-gray-300 bg-gray-50 px-4 py-8 text-center hover:border-amber-400 hover:bg-amber-50">
-        <span class="text-gray-500"><%- icon('upload', 'h-6 w-6') %></span>
-        <span class="text-sm font-medium" data-file-name>Chọn file .xlsx / .csv</span>
-        <span class="text-xs text-gray-500">Cột bắt buộc: Tên món · Nguyên liệu · Định lượng · Đơn vị</span>
-      </label>
-      <input id="import-file" type="file" accept=".xlsx,.xls,.csv" class="sr-only">
-    </div>
-    <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-4 py-3 max-sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
-      <button type="button" data-modal-close class="inline-flex h-10 items-center justify-center rounded border border-gray-300 bg-white px-4 text-sm font-medium hover:bg-gray-50 max-sm:flex-1">Hủy</button>
-      <button type="submit" data-import-submit disabled class="inline-flex h-10 items-center justify-center rounded bg-amber-400 px-5 text-sm font-semibold text-ink-900 hover:bg-amber-500 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400 max-sm:flex-[2]">Nhập dữ liệu</button>
-    </div>
-  </form>
-</dialog>
-
-<!-- ===== Dialog: confirm delete ===== -->
-<dialog id="delete-dialog" aria-labelledby="delete-title" class="max-w-md <%= sheet %>">
-  <%- grabber %>
-  <div class="px-4 py-4 sm:px-6 sm:py-5">
-    <h2 id="delete-title" class="text-lg font-semibold">Xóa công thức?</h2>
-    <p class="mt-2 text-sm text-gray-600">Công thức <strong data-delete-name class="font-semibold text-gray-900"></strong> sẽ bị xóa khỏi danh sách. Thao tác này không thể hoàn tác.</p>
-  </div>
-  <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-4 py-3 max-sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
-    <button type="button" data-modal-close class="inline-flex h-10 items-center justify-center rounded border border-gray-300 bg-white px-4 text-sm font-medium hover:bg-gray-50 max-sm:flex-1">Hủy</button>
-    <button type="button" data-delete-confirm class="inline-flex h-10 items-center justify-center rounded bg-red-600 px-5 text-sm font-semibold text-white hover:bg-red-700 max-sm:flex-1">Xóa</button>
-  </div>
-</dialog>
-
-<!-- Catalog for the dialog (data block, never executed): ingredients for drinks, finished drinks for combos -->
+<!-- Catalog for the dialog (data block, never executed): raw materials with their current average cost -->
 <script type="application/json" id="recipe-catalog"><%- safeJson(catalog) %></script>

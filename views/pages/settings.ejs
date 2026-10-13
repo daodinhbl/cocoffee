@@ -1,0 +1,140 @@
+<%
+  const { input, label, btnPrimary, btnSecondary, btnGhost, sheet, grabber } = ui;
+  const ROLE = { admin: 'Quản trị viên', cashier: 'Thu ngân' };
+  const onOff = (v) => (v ? badge('Bật', 'good') : badge('Tắt', 'neutral'));
+%>
+<div>
+  <h1 class="text-xl font-semibold tracking-tight sm:text-2xl">Cài đặt</h1>
+  <p class="mt-1 text-sm text-gray-500">Tài khoản của bạn, nhân sự và cấu hình hệ thống.</p>
+</div>
+
+<div class="mt-5 grid grid-cols-12 gap-4 sm:gap-6">
+  <section class="col-span-12 rounded border border-gray-200 p-5 lg:col-span-5" aria-labelledby="pw-title">
+    <h2 id="pw-title" class="text-base font-semibold">Đổi mật khẩu</h2>
+    <% if (forced) { %>
+      <p class="mt-2 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">Mật khẩu hiện tại quá yếu (ví dụ mật khẩu mặc định). Đặt mật khẩu mới để tiếp tục sử dụng trang quản trị.</p>
+    <% } %>
+    <form method="post" action="/admin/settings/password" class="mt-4 space-y-4">
+      <%- include('../partials/csrf') %>
+      <div>
+        <label for="pw-cur" class="<%= label %>">Mật khẩu hiện tại</label>
+        <input id="pw-cur" name="current_password" type="password" required autocomplete="current-password" maxlength="200" class="<%= input %>">
+      </div>
+      <div>
+        <label for="pw-new" class="<%= label %>">Mật khẩu mới (tối thiểu 10 ký tự)</label>
+        <input id="pw-new" name="new_password" type="password" required minlength="10" autocomplete="new-password" maxlength="200" class="<%= input %>">
+      </div>
+      <div>
+        <label for="pw-cfm" class="<%= label %>">Nhập lại mật khẩu mới</label>
+        <input id="pw-cfm" name="confirm_password" type="password" required minlength="10" autocomplete="new-password" maxlength="200" class="<%= input %>">
+      </div>
+      <button type="submit" class="<%= btnPrimary %> w-full sm:w-auto">Đổi mật khẩu</button>
+    </form>
+  </section>
+
+  <% if (!forced) { %>
+  <section class="col-span-12 rounded border border-gray-200 p-5 lg:col-span-7" aria-labelledby="cfg-title">
+    <h2 id="cfg-title" class="text-base font-semibold">Cấu hình hệ thống</h2>
+    <p class="mt-1 text-xs text-gray-500">Chỉ đọc. Thay đổi trong biến môi trường của ứng dụng (hPanel) rồi khởi động lại.</p>
+    <dl class="mt-3 space-y-2 text-sm">
+      <div class="flex justify-between gap-3"><dt class="text-gray-500">Tên quán (SHOP_NAME)</dt><dd><%= shopName %></dd></div>
+      <div class="flex justify-between gap-3"><dt class="text-gray-500">Tên miền công khai</dt><dd class="break-all text-right font-mono text-xs"><%= config.publicBaseUrl %></dd></div>
+      <div class="flex justify-between gap-3"><dt class="text-gray-500">Cho phép bán khi âm kho</dt><dd><%- onOff(config.allowNegativeStock) %></dd></div>
+      <div class="flex justify-between gap-3"><dt class="text-gray-500">Đơn nháp Zalo hết hạn sau</dt><dd><%= config.draftTtlMinutes %> phút</dd></div>
+      <div class="flex justify-between gap-3"><dt class="text-gray-500">Xác thực chữ ký Zalo</dt><dd><%- onOff(config.verifySignature) %></dd></div>
+      <div class="flex justify-between gap-3"><dt class="text-gray-500">Bill dạng hình ảnh</dt><dd><%- onOff(config.receiptImage) %></dd></div>
+      <div class="flex justify-between gap-3"><dt class="text-gray-500">Múi giờ cơ sở dữ liệu</dt><dd class="font-mono"><%= config.timezone %></dd></div>
+      <div class="flex justify-between gap-3"><dt class="text-gray-500">Phiên đăng nhập</dt><dd class="font-mono"><%= config.sessionHours %></dd></div>
+    </dl>
+  </section>
+
+  <section class="col-span-12 rounded border border-gray-200 max-lg:border-0" aria-labelledby="users-title">
+    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-5 py-4 max-lg:border-b-0 max-lg:px-0">
+      <h2 id="users-title" class="text-base font-semibold">Tài khoản nhân viên (<%= users.length %>)</h2>
+      <button type="button" data-modal-open="#user-dialog" class="<%= btnPrimary %>">+ Thêm tài khoản</button>
+    </div>
+    <table class="rtable w-full border-collapse text-left text-sm lg:min-w-[640px]">
+      <caption class="sr-only">Tài khoản nhân viên</caption>
+      <thead class="<%= ui.thead %>"><tr><th scope="col" class="px-4 py-3">Tài khoản</th><th scope="col" class="px-4 py-3">Vai trò</th><th scope="col" class="px-4 py-3">Trạng thái</th><th scope="col" class="px-4 py-3 text-right"><span class="sr-only">Hành động</span></th></tr></thead>
+      <tbody>
+        <% users.forEach((u) => { const me = u.id === currentUser.id; %>
+          <tr class="border-b border-gray-200 last:border-b-0 hover:bg-gray-50 <%= u.is_active ? '' : 'text-gray-400' %>">
+            <td data-label="" class="rt-title px-4 py-3"><span class="font-medium"><%= u.full_name %></span><span class="ml-2 font-mono text-xs text-gray-500"><%= u.username %></span><% if (me) { %> <%- badge('Bạn', 'info') %><% } %></td>
+            <td data-label="Vai trò" class="px-4 py-3"><%= ROLE[u.role] || u.role %></td>
+            <td data-label="Trạng thái" class="px-4 py-3"><%- u.is_active ? badge('Hoạt động', 'good') : badge('Đã khóa', 'neutral') %></td>
+            <td data-label="" class="rt-actions px-4 py-3 text-right">
+              <div class="inline-flex items-center gap-1">
+                <% if (!me) { %>
+                  <button type="button" class="<%= btnGhost %> w-auto px-2 text-xs font-medium" data-modal-open="#reset-dialog" data-action="/admin/settings/users/<%= u.id %>/password" data-title="Đặt lại mật khẩu — <%= u.username %>">Đặt lại mật khẩu</button>
+                  <form method="post" action="/admin/settings/users/<%= u.id %>/active" <% if (u.is_active) { %>data-confirm="Khóa tài khoản <%= u.username %>? Người này sẽ không đăng nhập được nữa."<% } %>>
+                    <%- include('../partials/csrf') %>
+                    <input type="hidden" name="active" value="<%= u.is_active ? 0 : 1 %>">
+                    <button type="submit" class="<%= btnGhost %> w-auto px-2 text-xs font-medium"><%= u.is_active ? 'Khóa' : 'Mở khóa' %></button>
+                  </form>
+                <% } %>
+              </div>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </section>
+  <% } %>
+</div>
+
+<% if (!forced) { %>
+<dialog id="user-dialog" aria-labelledby="user-title" class="max-w-md <%= sheet %>">
+  <form method="post" action="/admin/settings/users" class="flex flex-col">
+    <%- include('../partials/csrf') %>
+    <%- grabber %>
+    <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4">
+      <h2 id="user-title" class="text-lg font-semibold">Thêm tài khoản</h2>
+      <button type="button" data-modal-close aria-label="Đóng" class="<%= btnGhost %>"><%- icon('x', 'h-5 w-5') %></button>
+    </div>
+    <div class="space-y-4 px-4 py-4 sm:px-6 sm:py-5">
+      <div>
+        <label for="u-name" class="<%= label %>">Họ tên</label>
+        <input id="u-name" name="full_name" required maxlength="100" class="<%= input %>" autocomplete="off">
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label for="u-user" class="<%= label %>">Tên đăng nhập</label>
+          <input id="u-user" name="username" required minlength="3" maxlength="50" pattern="[a-z0-9][a-z0-9._\-]{2,49}" class="<%= input %> font-mono" autocomplete="off" autocapitalize="none" spellcheck="false">
+        </div>
+        <div>
+          <label for="u-role" class="<%= label %>">Vai trò</label>
+          <select id="u-role" name="role" class="<%= input %>"><option value="cashier">Thu ngân</option><option value="admin">Quản trị viên</option></select>
+        </div>
+      </div>
+      <div>
+        <label for="u-pass" class="<%= label %>">Mật khẩu (tối thiểu 10 ký tự)</label>
+        <input id="u-pass" name="password" type="password" required minlength="10" maxlength="200" autocomplete="new-password" class="<%= input %>">
+      </div>
+      <p class="text-xs text-gray-500">Thu ngân đăng nhập bằng ứng dụng POS; chỉ quản trị viên vào được trang quản trị này.</p>
+    </div>
+    <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-4 py-3 max-sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
+      <button type="button" data-modal-close class="<%= btnSecondary %> max-sm:flex-1">Hủy</button>
+      <button type="submit" class="<%= btnPrimary %> max-sm:flex-[2]">Tạo tài khoản</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="reset-dialog" aria-labelledby="reset-title" class="max-w-md <%= sheet %>">
+  <form method="post" action="#" class="flex flex-col">
+    <%- include('../partials/csrf') %>
+    <%- grabber %>
+    <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4">
+      <h2 id="reset-title" data-dialog-title class="text-lg font-semibold">Đặt lại mật khẩu</h2>
+      <button type="button" data-modal-close aria-label="Đóng" class="<%= btnGhost %>"><%- icon('x', 'h-5 w-5') %></button>
+    </div>
+    <div class="px-4 py-4 sm:px-6 sm:py-5">
+      <label for="rs-pass" class="<%= label %>">Mật khẩu mới (tối thiểu 10 ký tự)</label>
+      <input id="rs-pass" name="password" type="password" required minlength="10" maxlength="200" autocomplete="new-password" class="<%= input %>">
+    </div>
+    <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-4 py-3 max-sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
+      <button type="button" data-modal-close class="<%= btnSecondary %> max-sm:flex-1">Hủy</button>
+      <button type="submit" class="<%= btnPrimary %> max-sm:flex-[2]">Đặt lại</button>
+    </div>
+  </form>
+</dialog>
+<% } %>

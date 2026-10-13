@@ -13,6 +13,16 @@ async function list({ lowStockOnly = false } = {}, conn) {
   return rows;
 }
 
+/** Admin view: every item (inactive included) with the stock value at moving-average cost. */
+async function listAll(conn) {
+  const [rows] = await db(conn).query(
+    `SELECT id, sku, name, unit, quantity_on_hand, avg_cost, min_stock, is_active,
+            (quantity_on_hand <= min_stock) AS is_low, ROUND(quantity_on_hand * avg_cost, 2) AS stock_value
+       FROM inventory_items ORDER BY is_active DESC, name`
+  );
+  return rows;
+}
+
 async function getById(id, conn, { forUpdate = false } = {}) {
   const [rows] = await db(conn).query(
     `SELECT * FROM inventory_items WHERE id = ? LIMIT 1${forUpdate ? ' FOR UPDATE' : ''}`,
@@ -32,11 +42,11 @@ async function lockByIds(ids, conn) {
   return new Map(rows.map((r) => [r.id, r]));
 }
 
-async function create({ sku, name, unit, quantity_on_hand, avg_cost, min_stock }, conn) {
+async function create({ sku, name, unit, quantity_on_hand, avg_cost, min_stock, is_active }, conn) {
   const [res] = await db(conn).query(
-    `INSERT INTO inventory_items (sku, name, unit, quantity_on_hand, avg_cost, min_stock)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [sku, name, unit, quantity_on_hand || 0, avg_cost || 0, min_stock || 0]
+    `INSERT INTO inventory_items (sku, name, unit, quantity_on_hand, avg_cost, min_stock, is_active)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [sku, name, unit, quantity_on_hand || 0, avg_cost || 0, min_stock || 0, is_active ?? 1]
   );
   return res.insertId;
 }
@@ -77,4 +87,4 @@ async function movements(itemId, limit = 100, conn) {
   return rows;
 }
 
-module.exports = { list, getById, lockByIds, create, update, setStock, addMovement, movements };
+module.exports = { list, listAll, getById, lockByIds, create, update, setStock, addMovement, movements };

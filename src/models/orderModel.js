@@ -105,14 +105,42 @@ async function markReceipt(orderId, error, conn) {
   }
 }
 
-async function list({ status, source, tableId, from, to, limit = 50, offset = 0 } = {}, conn) {
+/** WHERE clause shared by list() and count(). `q` matches the order code (LIKE wildcards escaped). */
+function buildFilter({ status, excludeStatuses, source, paymentStatus, tableId, from, to, q } = {}) {
   const where = [];
   const params = [];
   if (status) { where.push('o.status = ?'); params.push(status); }
+  if (excludeStatuses?.length) { where.push('o.status NOT IN (?)'); params.push(excludeStatuses); }
   if (source) { where.push('o.source = ?'); params.push(source); }
+  if (paymentStatus) { where.push('o.payment_status = ?'); params.push(paymentStatus); }
   if (tableId) { where.push('o.table_id = ?'); params.push(tableId); }
   if (from) { where.push('o.created_at >= ?'); params.push(from); }
   if (to) { where.push('o.created_at < ?'); params.push(to); }
+  if (q) { where.push("o.order_code LIKE ? ESCAPE '\\\\'"); params.push(`%${String(q).replace(/[\\%_]/g, '\\$&')}%`); }
+  return { where, params };
+}
+
+async function count(filter = {}, conn) {
+  const { where, params } = buildFilter(filter);
+  const [rows] = await db(conn).query(
+    `SELECT COUNT(*) AS n FROM orders o ${where.length ? `WHERE ${where.join(' AND ')}` : ''}`,
+    params
+  );
+  return rows[0].n;
+}
+
+async function getPayments(orderId, conn) {
+  const [rows] = await db(conn).query(
+    `SELECT p.id, p.method, p.amount, p.reference, p.paid_at, u.full_name AS received_by_name
+       FROM payments p LEFT JOIN users u ON u.id = p.received_by
+      WHERE p.order_id = ? ORDER BY p.id`,
+    [orderId]
+  );
+  return rows;
+}
+
+async function list({ limit = 50, offset = 0, ...filter } = {}, conn) {
+  const { where, params } = buildFilter(filter);
   const [rows] = await db(conn).query(
     `SELECT o.id, o.order_code, o.source, o.status, o.payment_status, o.payment_method, o.total,
             o.cogs_total, o.table_id, t.code AS table_code, o.zalo_user_id, o.zalo_chat_type, o.note,
@@ -139,5 +167,5 @@ async function summary(from, to, conn) {
 
 module.exports = {
   insert, getById, getItems, replaceItems, recalcTotals, setDiscount, setItemCogs, markCompleted, markPaid,
-  markCancelled, insertPayment, markReceipt, list, summary,
+  markCancelled, insertPayment, markReceipt, list, count, getPayments, summary,
 };

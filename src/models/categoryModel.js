@@ -10,10 +10,10 @@ async function list({ activeOnly = true } = {}, conn) {
   return rows;
 }
 
-async function create({ code, name, sort_order }, conn) {
+async function create({ code, name, sort_order, is_active }, conn) {
   const [res] = await db(conn).query(
-    'INSERT INTO categories (code, name, sort_order) VALUES (?, ?, ?)',
-    [code, name, sort_order || 0]
+    'INSERT INTO categories (code, name, sort_order, is_active) VALUES (?, ?, ?, ?)',
+    [code, name, sort_order || 0, is_active ?? 1]
   );
   return res.insertId;
 }

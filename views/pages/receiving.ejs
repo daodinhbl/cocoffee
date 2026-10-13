@@ -1,0 +1,71 @@
+<%
+  const { input, label, btnPrimary } = ui;
+%>
+<div>
+  <h1 class="text-xl font-semibold tracking-tight sm:text-2xl">Nhập kho</h1>
+  <p class="mt-1 max-w-2xl text-sm text-gray-500">Ghi nhận hàng mới về. Giá vốn bình quân của mặt hàng được tính lại theo số lượng và đơn giá nhập, và là cơ sở tính giá vốn (COGS) của các đơn sau.</p>
+</div>
+
+<div class="mt-5 grid grid-cols-12 gap-4 sm:gap-6">
+  <section class="col-span-12 rounded border border-gray-200 p-5 lg:col-span-4" aria-labelledby="recv-title">
+    <h2 id="recv-title" class="text-base font-semibold">Phiếu nhập</h2>
+    <form method="post" action="/admin/receiving" class="mt-4 space-y-4" id="receive-form">
+      <%- include('../partials/csrf') %>
+      <div>
+        <label for="r-item" class="<%= label %>">Nguyên liệu</label>
+        <select id="r-item" name="inventory_item_id" required class="<%= input %>">
+          <option value="">— chọn —</option>
+          <% items.forEach((i) => { %>
+            <option value="<%= i.id %>" <%= i.id === preselect ? 'selected' : '' %>><%= i.name %> (tồn <%= num(i.quantity_on_hand) %> <%= i.unit %>)</option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label for="r-qty" class="<%= label %>">Số lượng</label>
+          <input id="r-qty" name="quantity" type="number" min="0.001" step="any" required inputmode="decimal" class="<%= input %> text-right font-mono">
+        </div>
+        <div>
+          <label for="r-cost" class="<%= label %>">Đơn giá nhập (đ / đơn vị)</label>
+          <input id="r-cost" name="unit_cost" type="number" min="0" step="any" required inputmode="decimal" class="<%= input %> text-right font-mono">
+        </div>
+      </div>
+      <div>
+        <label for="r-note" class="<%= label %>">Ghi chú (nhà cung cấp, số hóa đơn…)</label>
+        <input id="r-note" name="note" maxlength="255" class="<%= input %>" autocomplete="off">
+      </div>
+      <button type="submit" class="<%= btnPrimary %> w-full">Nhập kho</button>
+    </form>
+  </section>
+
+  <section class="col-span-12 rounded border border-gray-200 max-lg:border-0 lg:col-span-8" aria-labelledby="recent-title">
+    <h2 id="recent-title" class="border-b border-gray-200 px-5 py-4 text-base font-semibold max-lg:border-b-0 max-lg:px-0">Lần nhập gần đây</h2>
+    <table class="rtable w-full border-collapse text-left text-sm lg:min-w-[560px]">
+      <caption class="sr-only">Các lần nhập kho gần đây</caption>
+      <thead class="<%= ui.thead %>">
+        <tr>
+          <th scope="col" class="px-4 py-3">Thời gian</th>
+          <th scope="col" class="px-4 py-3">Nguyên liệu</th>
+          <th scope="col" class="px-4 py-3 text-right">Số lượng</th>
+          <th scope="col" class="px-4 py-3 text-right">Đơn giá</th>
+          <th scope="col" class="px-4 py-3">Người nhập</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% recent.forEach((m) => { %>
+          <tr class="border-b border-gray-200 last:border-b-0 hover:bg-gray-50">
+            <td data-label="" class="rt-title px-4 py-3 tnum"><%= fmtTime(m.created_at) %></td>
+            <td data-label="Nguyên liệu" class="px-4 py-3">
+              <a href="/admin/inventory/<%= m.inventory_item_id %>" class="hover:underline"><%= m.item_name %></a>
+              <% if (m.note) { %><span class="block text-xs text-gray-500"><%= m.note %></span><% } %>
+            </td>
+            <td data-label="Số lượng" class="px-4 py-3 text-right font-mono tnum">+<%= num(m.quantity_change) %> <span class="text-gray-500"><%= m.unit %></span></td>
+            <td data-label="Đơn giá" class="px-4 py-3 text-right font-mono tnum"><%= money(m.unit_cost) %></td>
+            <td data-label="Người nhập" class="px-4 py-3 text-gray-600"><%= m.user_name || '—' %></td>
+          </tr>
+        <% }) %>
+        <% if (!recent.length) { %><tr><td colspan="5" data-label="" class="px-4 py-10 text-center text-gray-500">Chưa có lần nhập nào.</td></tr><% } %>
+      </tbody>
+    </table>
+  </section>
+</div>

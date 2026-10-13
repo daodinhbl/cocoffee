@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Đăng nhập · <%= shopName %> Admin</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script nonce="<%= nonce %>">
+    tailwind.config = {
+      theme: { extend: {
+        colors: { ink: { 950: '#16181A', 900: '#1B1D1F', 800: '#25282B', 700: '#2F3337', 600: '#3D4247', 500: '#6B737A', 400: '#8A9097', 300: '#B9BEC3' } },
+        fontFamily: { sans: ['"Times New Roman"', 'Times', '"Liberation Serif"', 'Tinos', 'serif'] },
+        borderRadius: { DEFAULT: '4px', sm: '2px', md: '4px', lg: '4px' },
+      } },
+    };
+  </script>
+  <style>
+    :focus-visible { outline: 2px solid #fbbf24; outline-offset: 2px; }
+    @media (max-width: 767px) { input { font-size: 16px !important; } }
+  </style>
+</head>
+<body class="h-full bg-ink-900 font-sans text-gray-900 antialiased">
+  <main class="flex min-h-full items-center justify-center p-4">
+    <div class="w-full max-w-sm rounded border border-ink-700 bg-white p-6 sm:p-8">
+      <div class="flex items-center gap-3">
+        <span class="flex h-9 w-9 items-center justify-center rounded-sm bg-amber-400 text-base font-bold text-ink-900" aria-hidden="true">C</span>
+        <div class="leading-tight">
+          <h1 class="text-lg font-semibold"><%= shopName %></h1>
+          <p class="text-sm text-gray-500">Đăng nhập quản trị</p>
+        </div>
+      </div>
+
+      <% if (error) { %>
+        <div role="alert" class="mt-5 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"><%= error %></div>
+      <% } %>
+
+      <form method="post" action="/admin/login" class="mt-5 space-y-4">
+        <input type="hidden" name="next" value="<%= next %>">
+        <div>
+          <label for="username" class="mb-1 block text-sm font-medium">Tên đăng nhập</label>
+          <input id="username" name="username" value="<%= username %>" required maxlength="50" autocomplete="username" autocapitalize="none" spellcheck="false" autofocus
+            class="h-11 w-full rounded border border-gray-300 px-3 text-sm focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400">
+        </div>
+        <div>
+          <label for="password" class="mb-1 block text-sm font-medium">Mật khẩu</label>
+          <input id="password" name="password" type="password" required maxlength="200" autocomplete="current-password"
+            class="h-11 w-full rounded border border-gray-300 px-3 text-sm focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400">
+        </div>
+        <button type="submit" class="inline-flex h-11 w-full items-center justify-center rounded bg-amber-400 text-sm font-semibold text-ink-900 hover:bg-amber-500 active:bg-amber-600">Đăng nhập</button>
+      </form>
+      <p class="mt-5 text-xs text-gray-500">Chỉ tài khoản quản trị mới vào được trang này. Thu ngân dùng ứng dụng POS.</p>
+    </div>
+  </main>
+</body>
+</html>

@@ -9,7 +9,8 @@ async function findByUsername(username, conn) {
 
 async function findById(id, conn) {
   const [rows] = await db(conn).query(
-    'SELECT id, username, full_name, role, is_active FROM users WHERE id = ? LIMIT 1',
+    // pw_stamp: fingerprint of the password hash, so admin sessions die when the password changes (never the hash itself)
+    'SELECT id, username, full_name, role, is_active, LEFT(SHA2(password_hash, 256), 16) AS pw_stamp FROM users WHERE id = ? LIMIT 1',
     [id]
   );
   return rows[0] || null;
@@ -27,4 +28,20 @@ async function setPassword(id, passwordHash, conn) {
   await db(conn).query('UPDATE users SET password_hash = ? WHERE id = ?', [passwordHash, id]);
 }
 
-module.exports = { findByUsername, findById, create, setPassword };
+async function list(conn) {
+  const [rows] = await db(conn).query(
+    'SELECT id, username, full_name, role, is_active, created_at FROM users ORDER BY is_active DESC, role, username'
+  );
+  return rows;
+}
+
+async function setActive(id, active, conn) {
+  await db(conn).query('UPDATE users SET is_active = ? WHERE id = ?', [active ? 1 : 0, id]);
+}
+
+async function countActiveAdmins(conn) {
+  const [rows] = await db(conn).query("SELECT COUNT(*) AS n FROM users WHERE role = 'admin' AND is_active = 1");
+  return rows[0].n;
+}
+
+module.exports = { findByUsername, findById, create, setPassword, list, setActive, countActiveAdmins };

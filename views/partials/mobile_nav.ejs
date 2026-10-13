@@ -1,9 +1,11 @@
 <%
   // Thumb-zone navigation, phones only (<768px). Tablets/desktops use the sidebar rail instead.
-  // Only built pages appear here; the "Menu" button opens the full drawer (planned modules included).
+  // Main modules only; the "Menu" button opens the full drawer.
   const tabs = [
     { key: 'dashboard', label: 'Tổng quan', icon: 'grid', href: '/admin/dashboard' },
-    { key: 'bom', label: 'Định mức', icon: 'flask', href: '/admin/bom-recipes' },
+    { key: 'orders', label: 'Đơn hàng', icon: 'receipt', href: '/admin/orders' },
+    { key: 'inventory', label: 'Kho', icon: 'box', href: '/admin/inventory' },
+    { key: 'reports', label: 'Báo cáo', icon: 'chart', href: '/admin/reports' },
   ];
   const base = 'relative flex h-14 flex-1 flex-col items-center justify-center gap-0.5 text-[11px] font-medium';
 %>

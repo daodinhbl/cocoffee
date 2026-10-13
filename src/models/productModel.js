@@ -43,11 +43,11 @@ async function getManyByIds(ids, conn) {
   return rows;
 }
 
-async function create({ category_id, sku, name, price, stock_mode, inventory_item_id }, conn) {
+async function create({ category_id, sku, name, price, stock_mode, inventory_item_id, is_active }, conn) {
   const [res] = await db(conn).query(
-    `INSERT INTO products (category_id, sku, name, price, stock_mode, inventory_item_id)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [category_id, sku, name, price, stock_mode, inventory_item_id ?? null]
+    `INSERT INTO products (category_id, sku, name, price, stock_mode, inventory_item_id, is_active)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [category_id, sku, name, price, stock_mode, inventory_item_id ?? null, is_active ?? 1]
   );
   invalidateCatalog();
   return res.insertId;
@@ -62,6 +62,63 @@ async function update(id, { category_id, name, price, stock_mode, inventory_item
     [category_id ?? null, name ?? null, price ?? null, stock_mode ?? null, inventory_item_id ?? null, is_active ?? null, id]
   );
   invalidateCatalog();
+}
+
+async function setActive(id, active, conn) {
+  await db(conn).query('UPDATE products SET is_active = ? WHERE id = ?', [active ? 1 : 0, id]);
+  invalidateCatalog();
+}
+
+/** Admin view of the whole menu (inactive included) with the stock link name and chat keywords. */
+async function listForAdmin(conn) {
+  const [rows] = await db(conn).query(
+    `SELECT p.id, p.category_id, c.name AS category_name, p.sku, p.name, p.price, p.stock_mode,
+            p.inventory_item_id, i.name AS inventory_item_name, p.is_active
+       FROM products p
+       JOIN categories c ON c.id = p.category_id
+       LEFT JOIN inventory_items i ON i.id = p.inventory_item_id
+      ORDER BY p.is_active DESC, c.sort_order, p.name`
+  );
+  const [aliases] = await db(conn).query('SELECT product_id, alias FROM product_aliases ORDER BY id');
+  const byProduct = new Map();
+  for (const a of aliases) {
+    if (!byProduct.has(a.product_id)) byProduct.set(a.product_id, []);
+    byProduct.get(a.product_id).push(a.alias);
+  }
+  return rows.map((r) => ({ ...r, aliases: byProduct.get(r.id) || [] }));
+}
+
+/**
+ * BOM screen data. Every ACTIVE product with its cost lines at the current moving-average cost:
+ * 'bom' products -> one line per recipe row; 'direct' products -> the single linked inventory item (qty 1).
+ */
+async function listWithCost(conn) {
+  const [products] = await db(conn).query(
+    `SELECT p.id, p.category_id, c.name AS category_name, p.sku, p.name, p.price, p.stock_mode, p.inventory_item_id
+       FROM products p JOIN categories c ON c.id = p.category_id
+      WHERE p.is_active = 1 ORDER BY c.sort_order, p.name`
+  );
+  const [lines] = await db(conn).query(
+    `SELECT r.product_id, r.inventory_item_id, i.name, i.unit, i.avg_cost, r.quantity
+       FROM recipes r JOIN inventory_items i ON i.id = r.inventory_item_id
+       JOIN products p ON p.id = r.product_id AND p.is_active = 1
+      ORDER BY r.id`
+  );
+  const [direct] = await db(conn).query(
+    `SELECT p.id AS product_id, i.id AS inventory_item_id, i.name, i.unit, i.avg_cost
+       FROM products p JOIN inventory_items i ON i.id = p.inventory_item_id
+      WHERE p.is_active = 1 AND p.stock_mode = 'direct'`
+  );
+  const byProduct = new Map(products.map((p) => [p.id, []]));
+  for (const l of lines) byProduct.get(l.product_id)?.push(l);
+  for (const d of direct) byProduct.get(d.product_id)?.push({ ...d, quantity: 1 });
+  return products.map((p) => {
+    const ingredients = (byProduct.get(p.id) || []).map((l) => ({
+      ref: l.inventory_item_id, name: l.name, unit: l.unit, qty: l.quantity, cost: l.quantity * l.avg_cost,
+    }));
+    const cogs = ingredients.reduce((s, g) => s + g.cost, 0);
+    return { ...p, ingredients, cogs, margin: p.price > 0 ? ((p.price - cogs) / p.price) * 100 : 0 };
+  });
 }
 
 /** Replace the BOM of a product. lines: [{ inventory_item_id, quantity }] */
@@ -128,6 +185,6 @@ async function listForMatching(conn) {
 }
 
 module.exports = {
-  list, getById, getManyByIds, create, update, setRecipe, setAliases,
+  list, listForAdmin, listWithCost, getById, getManyByIds, create, update, setActive, setRecipe, setAliases,
   getStockSpecs, listForMatching, invalidateCatalog,
 };

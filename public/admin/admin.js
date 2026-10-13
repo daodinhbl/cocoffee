@@ -150,7 +150,7 @@
       var shown = 0;
       var rows = $$('tbody tr[data-row]', table);
       rows.forEach(function (tr) {
-        if (tr._s === undefined) tr._s = norm(tr.textContent);
+        if (tr._s === undefined) tr._s = norm($$('td:not(.rt-actions)', tr).map(function (td) { return td.textContent; }).join(' '));   // action labels ("Sửa") are not searchable
         var hit = !q || tr._s.indexOf(q) !== -1;
         tr.hidden = !hit;
         if (hit) shown += 1;
@@ -173,15 +173,13 @@
   try { catalog = catalogEl ? JSON.parse(catalogEl.textContent) : null; } catch (e) { catalog = null; }
   var recipeDlg = $('#recipe-dialog');
 
-  function currentKind() {
-    var tab = $('[role="tab"][aria-selected="true"]');
-    return (tab && tab.getAttribute('data-kind')) || 'drink';
-  }
-  function lineOptions(select, kind) {
+  // Inactive items are offered only to the line that already uses one, so editing never drops it silently.
+  function lineOptions(select, kind, keepRef) {
     (catalog && catalog[kind] || []).forEach(function (item) {
+      if (item.active === false && String(item.id) !== String(keepRef)) return;
       var opt = document.createElement('option');
       opt.value = String(item.id);
-      opt.textContent = item.name;
+      opt.textContent = item.active === false ? item.name + ' (ngưng dùng)' : item.name;
       opt.setAttribute('data-cost', String(item.unitCost));
       opt.setAttribute('data-unit', item.unit);
       select.appendChild(opt);
@@ -192,7 +190,7 @@
     if (!tpl || !recipeDlg) return;
     var node = tpl.content.firstElementChild.cloneNode(true);
     var select = $('[data-line-ref]', node);
-    lineOptions(select, recipeDlg.getAttribute('data-kind'));
+    lineOptions(select, recipeDlg.getAttribute('data-kind'), line && line.ref);
     if (line && line.ref != null) select.value = String(line.ref);
     $('[data-line-qty]', node).value = line && line.qty != null ? String(line.qty) : '';
     $('#recipe-lines').appendChild(node);
@@ -224,13 +222,16 @@
   }
   function openRecipe(mode, recipe) {
     if (!recipeDlg) return;
-    var kind = recipe ? recipe.kind : currentKind();
+    var kind = 'drink';
     recipeDlg.setAttribute('data-kind', kind);
-    $('#recipe-title').textContent = (mode === 'edit' ? 'Sửa' : 'Thêm') + (kind === 'combo' ? ' combo' : ' công thức');
-    $('[data-lines-title]', recipeDlg).textContent = kind === 'combo' ? 'Món trong combo' : 'Nguyên liệu';
+    $('#recipe-form').setAttribute('action', '/admin/bom-recipes' + (mode === 'edit' && recipe ? '/' + encodeURIComponent(recipe.id) : ''));
+    $('#recipe-title').textContent = mode === 'edit' ? 'Sửa công thức' : 'Thêm công thức';
     $('#f-name').value = recipe ? recipe.name : '';
     $('#f-sku').value = recipe ? recipe.sku : '';
+    $('#f-sku').readOnly = mode === 'edit';
     $('#f-price').value = recipe ? recipe.price : '';
+    var cat = $('#f-category');
+    if (cat) cat.value = recipe && recipe.category_id != null ? String(recipe.category_id) : (cat.options[0] ? cat.options[0].value : '');
     $('#recipe-lines').textContent = '';
     (recipe && recipe.lines.length ? recipe.lines : [{}]).forEach(addLine);
     recalc();
@@ -238,8 +239,35 @@
     $('#f-name').focus();
   }
 
-  /* ---------------------------------------------------------- delete dialog */
-  var pendingRow = null;
+  /* ------------------------------------------- generic dialogs + confirmation */
+  // <button data-modal-open="#dlg" data-action="/url" data-title="..." data-fill='{"name":"x"}'> opens a form dialog:
+  // the form is reset, its action/title are set, and fields are filled by name (checkbox pairs: hidden "0" + checkbox "1").
+  function prepareDialog(dlg, trigger) {
+    var form = $('form', dlg);
+    if (form && form.reset) form.reset();
+    var action = trigger.getAttribute('data-action');
+    if (form && action) form.setAttribute('action', action);
+    var title = trigger.getAttribute('data-title');
+    var heading = $('[data-dialog-title]', dlg);
+    if (title && heading) heading.textContent = title;
+    var raw = trigger.getAttribute('data-fill');
+    if (form) $$('[data-create-only]', form).forEach(function (el) { el.readOnly = !!raw; });   // identifiers are fixed once created
+    if (form) $$('[data-new-only]', form).forEach(function (el) { el.style.display = raw ? 'none' : ''; });   // opening balance exists only when creating
+    if (!form || !raw) return;
+    var data = {};
+    try { data = JSON.parse(raw) || {}; } catch (err) { data = {}; }
+    Object.keys(data).forEach(function (name) {
+      var group = $$('[name="' + name + '"]', form);
+      var hasCheckbox = group.some(function (el) { return el.type === 'checkbox'; });
+      var value = data[name];
+      group.forEach(function (el) {
+        if (el.type === 'checkbox') el.checked = value === true || value === 1 || value === '1';
+        else if (el.type === 'hidden' && hasCheckbox) { /* the "0" companion of a checkbox */ }
+        else el.value = value == null ? '' : String(value);
+      });
+    });
+  }
+  var pendingConfirm = null;
 
   /* ------------------------------------------------------------------ clicks */
   document.addEventListener('click', function (e) {
@@ -272,7 +300,12 @@
     }
     if ((el = t.closest('[data-modal-open]'))) {
       var dlg = $(el.getAttribute('data-modal-open'));
-      if (dlg) dlg.showModal();
+      if (dlg) {
+        prepareDialog(dlg, el);
+        dlg.showModal();
+        var firstField = $('input:not([type="hidden"]):not([readonly]), select, textarea', dlg);
+        if (firstField && firstField.focus) firstField.focus();
+      }
       return;
     }
     if ((el = t.closest('[data-modal-close]'))) { var d = el.closest('dialog'); if (d) d.close(); return; }
@@ -290,16 +323,11 @@
       return;
     }
 
-    if ((el = t.closest('[data-delete]'))) {
-      pendingRow = el.closest('tr');
-      $('[data-delete-name]').textContent = el.getAttribute('data-name');
-      $('#delete-dialog').showModal();
-      return;
-    }
-    if (t.closest('[data-delete-confirm]')) {
-      if (pendingRow) { pendingRow.remove(); pendingRow = null; var fi = visibleFilterInput(); applyFilter(fi ? fi.value : ''); }
-      $('#delete-dialog').close();
-      toast('Đã xóa công thức (bản demo, chưa ghi vào CSDL).', 'success');
+    if (t.closest('[data-confirm-ok]')) {
+      var form = pendingConfirm;
+      pendingConfirm = null;
+      $('#confirm-dialog').close();
+      if (form) { form._confirmed = true; if (form.requestSubmit) form.requestSubmit(); else form.submit(); }
     }
   });
 
@@ -322,11 +350,6 @@
   document.addEventListener('change', function (e) {
     var t = e.target;
     if (recipeDlg && recipeDlg.contains(t) && t.matches('[data-line-ref]')) recalc();
-    if (t.matches('#import-file')) {
-      var f = t.files && t.files[0];
-      $('[data-file-name]').textContent = f ? f.name : 'Chọn file .xlsx / .csv';
-      $('[data-import-submit]').disabled = !f;
-    }
   });
 
   /* ------------------------------------------------------------------ submits */
@@ -334,19 +357,37 @@
     var form = e.target;
     if (form.matches('[data-no-submit]')) { e.preventDefault(); return; }
     if (form.id === 'recipe-form') {
-      e.preventDefault();
-      if (!form.reportValidity()) return;
-      recipeDlg.close();
-      toast('Đã ghi nhận công thức (bản demo, chưa ghi vào CSDL).', 'success');
+      if (!form.reportValidity()) { e.preventDefault(); return; }
+      var lines = $$('[data-line]', recipeDlg).map(function (row) {
+        return { inventory_item_id: parseInt($('[data-line-ref]', row).value, 10), quantity: parseFloat($('[data-line-qty]', row).value) };
+      }).filter(function (l) { return l.inventory_item_id > 0 && l.quantity > 0; });
+      if (!lines.length) { e.preventDefault(); toast('Cần ít nhất một nguyên liệu có định lượng.', 'warn'); return; }
+      $('#f-recipe').value = JSON.stringify(lines);       // validated again (and merged) on the server
+      lockSubmit(form, e);                                 // let the browser POST it (once)
+      return;
     }
-    if (form.id === 'import-form') {
+    if (form.hasAttribute('data-confirm') && !form._confirmed) {
       e.preventDefault();
-      $('#import-dialog').close();
-      toast('Đã nhận file Excel (bản demo, chưa xử lý).', 'success');
-      $('#import-file').value = '';
-      $('[data-file-name]').textContent = 'Chọn file .xlsx / .csv';
-      $('[data-import-submit]').disabled = true;
+      pendingConfirm = form;
+      $('[data-confirm-text]').textContent = form.getAttribute('data-confirm');
+      $('#confirm-dialog').showModal();
+      return;
     }
+    form._confirmed = false;
+    lockSubmit(form, e);
+  });
+
+  // A double-click (or Enter twice) must not POST twice: e.g. the same stock receipt booked two times.
+  function lockSubmit(form, e) {
+    if ((form.method || '').toLowerCase() !== 'post') return;
+    if (form._submitting) { e.preventDefault(); return; }
+    form._submitting = true;
+    setTimeout(function () { $('button[type="submit"], button:not([type])', form).forEach(function (b) { b.disabled = true; b.setAttribute('aria-busy', 'true'); }); }, 0);
+  }
+  // Back/forward cache restores the page with the form still locked.
+  window.addEventListener('pageshow', function (ev) {
+    if (!ev.persisted) return;
+    $('form').forEach(function (f) { f._submitting = false; $('button[aria-busy="true"]', f).forEach(function (b) { b.disabled = false; b.removeAttribute('aria-busy'); }); });
   });
 
   /* --------------------------------------------------------------- keyboard */

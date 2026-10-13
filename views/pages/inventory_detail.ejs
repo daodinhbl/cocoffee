@@ -1,0 +1,65 @@
+<%
+  const { btnPrimary, btnSecondary } = ui;
+  const TYPE = { purchase: ['Nhập kho', 'good'], sale: ['Bán hàng', 'info'], adjustment: ['Kiểm kê', 'warn'], waste: ['Hao hụt', 'bad'], return: ['Trả hàng', 'neutral'] };
+%>
+<div class="flex flex-wrap items-start justify-between gap-4">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight sm:text-2xl"><%= item.name %></h1>
+    <p class="mt-1 text-sm text-gray-500"><span class="font-mono"><%= item.sku %></span> · đơn vị <%= item.unit %> <%- item.is_active ? '' : badge('Ngừng dùng', 'neutral') %></p>
+  </div>
+  <div class="flex gap-3">
+    <a href="/admin/inventory" class="<%= btnSecondary %>">← Nguyên liệu</a>
+    <a href="/admin/receiving?item=<%= item.id %>" class="<%= btnPrimary %>">Nhập kho</a>
+  </div>
+</div>
+
+<section aria-label="Tóm tắt" class="mt-5 grid grid-cols-12 gap-3 sm:gap-6">
+  <div class="col-span-6 rounded border border-gray-200 p-3 sm:col-span-3 sm:p-4">
+    <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 sm:text-xs">Tồn kho</p>
+    <p class="mt-2 font-mono text-xl font-semibold tnum"><%= num(item.quantity_on_hand) %> <span class="text-sm font-normal text-gray-500"><%= item.unit %></span></p>
+  </div>
+  <div class="col-span-6 rounded border border-gray-200 p-3 sm:col-span-3 sm:p-4">
+    <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 sm:text-xs">Tối thiểu</p>
+    <p class="mt-2 font-mono text-xl font-semibold tnum"><%= num(item.min_stock) %></p>
+  </div>
+  <div class="col-span-6 rounded border border-gray-200 p-3 sm:col-span-3 sm:p-4">
+    <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 sm:text-xs">Giá vốn bình quân</p>
+    <p class="mt-2 font-mono text-xl font-semibold tnum"><%= money(item.avg_cost) %></p>
+  </div>
+  <div class="col-span-6 rounded border border-gray-200 p-3 sm:col-span-3 sm:p-4">
+    <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 sm:text-xs">Giá trị tồn</p>
+    <p class="mt-2 font-mono text-xl font-semibold tnum"><%= money(item.quantity_on_hand * item.avg_cost) %></p>
+  </div>
+</section>
+
+<section class="mt-6 rounded border border-gray-200 max-lg:border-0" aria-labelledby="mv-title">
+  <h2 id="mv-title" class="border-b border-gray-200 px-4 py-4 text-base font-semibold max-lg:border-b-0 max-lg:px-0">Lịch sử xuất nhập (200 dòng gần nhất)</h2>
+  <table class="rtable w-full border-collapse text-left text-sm lg:min-w-[720px]">
+    <caption class="sr-only">Lịch sử biến động kho</caption>
+    <thead class="<%= ui.thead %>">
+      <tr>
+        <th scope="col" class="px-4 py-3">Thời gian</th>
+        <th scope="col" class="px-4 py-3">Loại</th>
+        <th scope="col" class="px-4 py-3 text-right">Thay đổi</th>
+        <th scope="col" class="px-4 py-3 text-right">Tồn sau</th>
+        <th scope="col" class="px-4 py-3 text-right">Đơn giá</th>
+        <th scope="col" class="px-4 py-3">Ghi chú</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% movements.forEach((m) => { const [label, tone] = TYPE[m.movement_type] || [m.movement_type, 'neutral']; %>
+        <tr class="border-b border-gray-200 last:border-b-0">
+          <td data-label="" class="rt-title px-4 py-3 tnum"><%= fmtTime(m.created_at) %></td>
+          <td data-label="Loại" class="px-4 py-3"><%- badge(label, tone) %></td>
+          <td data-label="Thay đổi" class="px-4 py-3 text-right font-mono tnum <%= m.quantity_change < 0 ? 'text-red-700' : 'text-green-700' %>"><%= m.quantity_change > 0 ? '+' : '' %><%= num(m.quantity_change) %></td>
+          <td data-label="Tồn sau" class="px-4 py-3 text-right font-mono tnum"><%= num(m.balance_after) %></td>
+          <td data-label="Đơn giá" class="px-4 py-3 text-right font-mono tnum"><%= money(m.unit_cost) %></td>
+          <td data-label="Ghi chú" class="px-4 py-3 text-gray-600">
+            <% if (m.order_id) { %><a href="/admin/orders/<%= m.order_id %>" class="font-mono text-[13px] hover:underline"><%= m.note || ('#' + m.order_id) %></a><% } else { %><%= m.note || '—' %><% } %>
+          </td>
+        </tr>
+      <% }) %>
+      <% if (!movements.length) { %><tr><td colspan="6" data-label="" class="px-4 py-10 text-center text-gray-500">Chưa có biến động nào.</td></tr><% } %>
+    </tbody>
+  </table>
+</section>

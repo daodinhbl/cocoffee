@@ -125,6 +125,10 @@
 
       <main id="main" tabindex="-1" class="flex-1 bg-white p-4 sm:p-6">
         <div class="mx-auto w-full max-w-content">
+          <% if (typeof flash !== 'undefined' && flash) {
+               const tone = { success: 'border-green-200 bg-green-50 text-green-800', error: 'border-red-200 bg-red-50 text-red-800', info: 'border-sky-200 bg-sky-50 text-sky-800' }[flash.type] || 'border-gray-200 bg-gray-50 text-gray-800'; %>
+            <div role="<%= flash.type === 'error' ? 'alert' : 'status' %>" class="mb-4 rounded border px-4 py-3 text-sm <%= tone %>"><%= flash.message %></div>
+          <% } %>
           <%- body %>
         </div>
       </main>
@@ -134,5 +138,18 @@
   </div>
 
   <%- include('partials/mobile_nav') %>
+
+  <!-- Generic confirmation for destructive forms: <form data-confirm="Hủy đơn này?"> -->
+  <dialog id="confirm-dialog" aria-labelledby="confirm-title" class="max-w-md <%= ui.sheet %>">
+    <%- ui.grabber %>
+    <div class="px-4 py-4 sm:px-6 sm:py-5">
+      <h2 id="confirm-title" class="text-lg font-semibold">Xác nhận</h2>
+      <p data-confirm-text class="mt-2 text-sm text-gray-600"></p>
+    </div>
+    <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-4 py-3 max-sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
+      <button type="button" data-modal-close class="<%= ui.btnSecondary %> max-sm:flex-1">Quay lại</button>
+      <button type="button" data-confirm-ok class="<%= ui.btnDanger %> max-sm:flex-1">Đồng ý</button>
+    </div>
+  </dialog>
 </body>
 </html>

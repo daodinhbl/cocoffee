@@ -1,23 +1,23 @@
 <%
-  // Navigation model. Items without `href` are planned modules and render as disabled (no dead links).
+  // Navigation model. An item without `href` renders disabled (planned module); every current module is live.
   const nav = [
     { heading: 'Vận hành', items: [
       { key: 'dashboard', label: 'Tổng quan', icon: 'grid', href: '/admin/dashboard' },
-      { key: 'tables', label: 'Bàn', icon: 'table' },
-      { key: 'orders', label: 'Đơn hàng', icon: 'receipt' },
-      { key: 'menu', label: 'Thực đơn', icon: 'cup' },
+      { key: 'tables', label: 'Bàn', icon: 'table', href: '/admin/tables' },
+      { key: 'orders', label: 'Đơn hàng', icon: 'receipt', href: '/admin/orders' },
+      { key: 'menu', label: 'Thực đơn', icon: 'cup', href: '/admin/menu' },
     ] },
     { heading: 'Kho & Định mức', items: [
-      { key: 'inventory', label: 'Nguyên liệu', icon: 'box' },
+      { key: 'inventory', label: 'Nguyên liệu', icon: 'box', href: '/admin/inventory' },
       { key: 'bom', label: 'Công thức (BOM)', icon: 'flask', href: '/admin/bom-recipes' },
-      { key: 'receiving', label: 'Nhập kho', icon: 'upload' },
+      { key: 'receiving', label: 'Nhập kho', icon: 'upload', href: '/admin/receiving' },
     ] },
     { heading: 'Phân tích', items: [
-      { key: 'reports', label: 'Báo cáo', icon: 'chart' },
-      { key: 'zalo', label: 'Zalo OA', icon: 'chat' },
+      { key: 'reports', label: 'Báo cáo', icon: 'chart', href: '/admin/reports' },
+      { key: 'zalo', label: 'Zalo OA', icon: 'chat', href: '/admin/zalo' },
     ] },
     { heading: 'Hệ thống', items: [
-      { key: 'settings', label: 'Cài đặt', icon: 'sliders' },
+      { key: 'settings', label: 'Cài đặt', icon: 'sliders', href: '/admin/settings' },
     ] },
   ];
   const itemBase = 'relative flex h-12 items-center gap-3 pl-[26px] pr-4 text-sm font-medium';
@@ -71,6 +71,15 @@
       </div>
     <% }) %>
   </nav>
+
+  <!-- Sign out -->
+  <form method="post" action="/admin/logout" class="shrink-0 border-t border-ink-700">
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <button type="submit" title="Đăng xuất" class="flex h-12 w-full items-center gap-3 pl-[26px] pr-4 text-sm font-medium text-ink-300 hover:bg-ink-800 hover:text-white">
+      <span class="shrink-0"><%- icon('logout', 'h-5 w-5') %></span>
+      <span class="truncate md:group-data-[sb=collapsed]/sb:hidden">Đăng xuất</span>
+    </button>
+  </form>
 
   <!-- Collapse (desktop only) -->
   <div class="hidden shrink-0 border-t border-ink-700 lg:block">

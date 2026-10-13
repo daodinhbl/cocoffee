@@ -1,0 +1,182 @@
+<%
+  const { input, label, btnPrimary, btnSecondary, btnGhost, sheet, grabber } = ui;
+  const MODE = { bom: 'Pha chế (BOM)', direct: 'Bán lẻ' };
+%>
+<div class="flex flex-wrap items-start justify-between gap-4">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight sm:text-2xl">Thực đơn</h1>
+    <p class="mt-1 max-w-2xl text-sm text-gray-500">Giá bán, nhóm món và từ khóa đặt món qua Zalo. Đồ uống pha chế được tạo và chỉnh nguyên liệu ở <a href="/admin/bom-recipes" class="font-medium underline">Công thức (BOM)</a>; hàng bán lẻ (thuốc lá, nước đóng chai) thêm tại đây.</p>
+  </div>
+  <div class="flex gap-3">
+    <button type="button" data-modal-open="#category-dialog" data-action="/admin/menu/categories" data-title="Thêm nhóm món" class="<%= btnSecondary %>">+ Nhóm món</button>
+    <button type="button" data-modal-open="#product-dialog" data-action="/admin/menu/products" data-title="Thêm hàng bán lẻ" class="<%= btnPrimary %>">+ Hàng bán lẻ</button>
+  </div>
+</div>
+
+<!-- Categories -->
+<section class="mt-5" aria-labelledby="cat-title">
+  <h2 id="cat-title" class="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500">Nhóm món</h2>
+  <ul class="flex flex-wrap gap-2">
+    <% categories.forEach((c) => { %>
+      <li>
+        <button type="button" data-modal-open="#category-dialog" data-action="/admin/menu/categories/<%= c.id %>" data-title="Sửa nhóm món"
+          data-fill="<%= safeJson({ code: c.code, name: c.name, sort_order: c.sort_order, is_active: Boolean(c.is_active) }) %>"
+          class="inline-flex min-h-9 items-center gap-2 rounded border px-3 text-sm hover:bg-gray-50 <%= c.is_active ? 'border-gray-300' : 'border-dashed border-gray-300 text-gray-400' %>">
+          <%= c.name %> <span class="font-mono text-xs text-gray-500">#<%= c.sort_order %></span>
+          <% if (!c.is_active) { %><span class="text-xs">(ẩn)</span><% } %>
+        </button>
+      </li>
+    <% }) %>
+  </ul>
+</section>
+
+<!-- Products -->
+<section class="mt-6" aria-labelledby="prod-title">
+  <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+    <h2 id="prod-title" class="text-sm font-semibold uppercase tracking-wide text-gray-500">Món (<%= products.length %>)</h2>
+    <div class="relative w-full sm:w-80">
+      <label for="menu-filter" class="sr-only">Tìm món</label>
+      <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><%- icon('search', 'h-4 w-4') %></span>
+      <input id="menu-filter" type="search" data-filter-input autocomplete="off" placeholder="Tìm theo tên, SKU, từ khóa…" class="<%= input %> pl-9">
+    </div>
+  </div>
+  <div class="rounded border border-gray-200 max-lg:border-0">
+    <table class="rtable w-full border-collapse text-left text-sm lg:min-w-[800px]" data-filterable>
+      <caption class="sr-only">Danh sách món</caption>
+      <thead class="<%= ui.thead %>">
+        <tr>
+          <th scope="col" class="px-4 py-3">Món</th>
+          <th scope="col" class="px-4 py-3">Nhóm</th>
+          <th scope="col" class="px-4 py-3">Trừ kho</th>
+          <th scope="col" class="px-4 py-3 text-right">Giá bán</th>
+          <th scope="col" class="px-4 py-3">Trạng thái</th>
+          <th scope="col" class="px-4 py-3 text-right"><span class="sr-only">Hành động</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <% products.forEach((p) => {
+             const extra = p.aliases.filter((a) => a !== p.name);
+             const fill = { sku: p.sku, name: p.name, price: p.price, category_id: p.category_id, inventory_item_id: p.inventory_item_id || '', aliases: extra.join('\n'), is_active: Boolean(p.is_active) };
+        %>
+          <tr data-row class="border-b border-gray-200 last:border-b-0 hover:bg-gray-50 <%= p.is_active ? '' : 'text-gray-400' %>">
+            <td data-label="" class="rt-title px-4 py-3">
+              <p class="font-medium"><%= p.name %></p>
+              <p class="mt-0.5 font-mono text-xs text-gray-500"><%= p.sku %><% if (extra.length) { %> · <span class="font-sans"><%= extra.join(', ') %></span><% } %></p>
+            </td>
+            <td data-label="Nhóm" class="px-4 py-3"><%= p.category_name %></td>
+            <td data-label="Trừ kho" class="px-4 py-3"><%= MODE[p.stock_mode] %><% if (p.inventory_item_name) { %><span class="block text-xs text-gray-500"><%= p.inventory_item_name %></span><% } %></td>
+            <td data-label="Giá bán" class="px-4 py-3 text-right font-mono tnum"><%= money(p.price) %></td>
+            <td data-label="Trạng thái" class="px-4 py-3"><%- p.is_active ? badge('Đang bán', 'good') : badge('Ngừng bán', 'neutral') %></td>
+            <td data-label="" class="rt-actions px-4 py-3 text-right">
+              <div class="inline-flex items-center gap-1">
+                <button type="button" class="<%= btnGhost %>" aria-label="Sửa <%= p.name %>" title="Sửa"
+                  data-modal-open="#product-dialog" data-action="/admin/menu/products/<%= p.id %>" data-title="Sửa <%= p.name %>" data-fill="<%= safeJson(fill) %>">
+                  <%- icon('pencil', 'h-4 w-4') %><span class="btn-label">Sửa</span>
+                </button>
+                <% if (p.stock_mode === 'bom') { %><a href="/admin/bom-recipes" class="<%= btnGhost %> w-auto px-2 text-xs font-medium">Công thức</a><% } %>
+              </div>
+            </td>
+          </tr>
+        <% }) %>
+        <tr data-empty <%- products.length ? 'hidden' : '' %>>
+          <td colspan="6" data-label="" class="px-4 py-12 text-center text-sm text-gray-500"><%= products.length ? 'Không có món phù hợp.' : 'Chưa có món nào.' %></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- Dialog: product (create retail / edit any) -->
+<dialog id="product-dialog" aria-labelledby="product-title" class="max-w-lg max-sm:h-[94dvh] <%= sheet %>">
+  <form method="post" action="/admin/menu/products" class="flex max-h-[calc(100dvh-2rem)] flex-col max-sm:h-full max-sm:max-h-none">
+    <%- include('../partials/csrf') %>
+    <%- grabber %>
+    <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4">
+      <h2 id="product-title" data-dialog-title class="text-lg font-semibold">Món</h2>
+      <button type="button" data-modal-close aria-label="Đóng" class="<%= btnGhost %>"><%- icon('x', 'h-5 w-5') %></button>
+    </div>
+    <div class="space-y-4 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+      <div>
+        <label for="p-name" class="<%= label %>">Tên món</label>
+        <input id="p-name" name="name" required maxlength="150" class="<%= input %>" autocomplete="off">
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label for="p-sku" class="<%= label %>">Mã (SKU)</label>
+          <input id="p-sku" name="sku" maxlength="40" class="<%= input %> font-mono read-only:bg-gray-50 read-only:text-gray-500" autocomplete="off" autocapitalize="characters" data-create-only>
+          <p class="mt-1 text-xs text-gray-500">Chỉ nhập khi thêm mới.</p>
+        </div>
+        <div>
+          <label for="p-price" class="<%= label %>">Giá bán (đ)</label>
+          <input id="p-price" name="price" type="number" min="0" step="500" required inputmode="numeric" class="<%= input %> text-right font-mono">
+        </div>
+      </div>
+      <div>
+        <label for="p-category" class="<%= label %>">Nhóm món</label>
+        <select id="p-category" name="category_id" required class="<%= input %>">
+          <% categories.forEach((c) => { %><option value="<%= c.id %>"><%= c.name %><%= c.is_active ? '' : ' (ẩn)' %></option><% }) %>
+        </select>
+      </div>
+      <div>
+        <label for="p-item" class="<%= label %>">Hàng trong kho (chỉ hàng bán lẻ)</label>
+        <select id="p-item" name="inventory_item_id" class="<%= input %>">
+          <option value="">— không áp dụng —</option>
+          <% items.forEach((i) => { %><option value="<%= i.id %>"><%= i.name %> (<%= i.unit %>)</option><% }) %>
+        </select>
+        <p class="mt-1 text-xs text-gray-500">Hàng bán lẻ trừ kho 1:1 theo mặt hàng này. Đồ uống pha chế bỏ qua ô này.</p>
+      </div>
+      <div>
+        <label for="p-aliases" class="<%= label %>">Từ khóa đặt món qua Zalo</label>
+        <textarea id="p-aliases" name="aliases" rows="3" maxlength="1500" class="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400" placeholder="Mỗi từ khóa một dòng, VD: cf sữa&#10;ca phe sua"></textarea>
+        <p class="mt-1 text-xs text-gray-500">Tên món luôn là một từ khóa. Mỗi từ khóa chỉ thuộc về một món.</p>
+      </div>
+      <label class="flex items-center gap-2 text-sm" data-edit-only>
+        <input type="hidden" name="is_active" value="0">
+        <input type="checkbox" name="is_active" value="1" checked class="h-4 w-4 rounded border-gray-300 accent-amber-400">
+        Đang bán (hiện trên POS và chatbot)
+      </label>
+    </div>
+    <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-4 py-3 max-sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
+      <button type="button" data-modal-close class="<%= btnSecondary %> max-sm:flex-1">Hủy</button>
+      <button type="submit" class="<%= btnPrimary %> max-sm:flex-[2]">Lưu</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Dialog: category -->
+<dialog id="category-dialog" aria-labelledby="category-title" class="max-w-md <%= sheet %>">
+  <form method="post" action="/admin/menu/categories" class="flex flex-col">
+    <%- include('../partials/csrf') %>
+    <%- grabber %>
+    <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4">
+      <h2 id="category-title" data-dialog-title class="text-lg font-semibold">Nhóm món</h2>
+      <button type="button" data-modal-close aria-label="Đóng" class="<%= btnGhost %>"><%- icon('x', 'h-5 w-5') %></button>
+    </div>
+    <div class="space-y-4 px-4 py-4 sm:px-6 sm:py-5">
+      <div>
+        <label for="c-name" class="<%= label %>">Tên nhóm</label>
+        <input id="c-name" name="name" required maxlength="100" class="<%= input %>" autocomplete="off">
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label for="c-code" class="<%= label %>">Mã nhóm</label>
+          <input id="c-code" name="code" maxlength="30" class="<%= input %> font-mono read-only:bg-gray-50" placeholder="mixed_drink" autocomplete="off" autocapitalize="none" data-create-only>
+          <p class="mt-1 text-xs text-gray-500">Chỉ nhập khi thêm mới.</p>
+        </div>
+        <div>
+          <label for="c-sort" class="<%= label %>">Thứ tự</label>
+          <input id="c-sort" name="sort_order" type="number" min="-1000" max="1000" step="1" value="0" class="<%= input %> text-right font-mono">
+        </div>
+      </div>
+      <label class="flex items-center gap-2 text-sm">
+        <input type="hidden" name="is_active" value="0">
+        <input type="checkbox" name="is_active" value="1" checked class="h-4 w-4 rounded border-gray-300 accent-amber-400">
+        Hiển thị nhóm này
+      </label>
+    </div>
+    <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-4 py-3 max-sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
+      <button type="button" data-modal-close class="<%= btnSecondary %> max-sm:flex-1">Hủy</button>
+      <button type="submit" class="<%= btnPrimary %> max-sm:flex-[2]">Lưu</button>
+    </div>
+  </form>
+</dialog>

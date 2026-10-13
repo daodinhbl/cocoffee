@@ -14,6 +14,17 @@ async function list(conn) {
   return rows;
 }
 
+/** Admin view: inactive tables included. */
+async function listAll(conn) {
+  const [rows] = await db(conn).query(
+    `SELECT t.id, t.code, t.name, t.capacity, t.status, t.current_order_id, t.is_active,
+            o.order_code AS current_order_code, o.total AS current_order_total
+       FROM dining_tables t LEFT JOIN orders o ON o.id = t.current_order_id
+      ORDER BY t.is_active DESC, t.code`
+  );
+  return rows;
+}
+
 async function getById(id, conn, { forUpdate = false } = {}) {
   const [rows] = await db(conn).query(
     `SELECT * FROM dining_tables WHERE id = ? LIMIT 1${forUpdate ? ' FOR UPDATE' : ''}`,
@@ -54,4 +65,4 @@ async function release(id, conn) {
   );
 }
 
-module.exports = { list, getById, create, update, setServing, release };
+module.exports = { list, listAll, getById, create, update, setServing, release };

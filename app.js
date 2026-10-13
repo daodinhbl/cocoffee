@@ -19,10 +19,7 @@ const { notFound, errorHandler } = require('./src/middlewares/errorHandler');
 const app = express();
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
-app.locals.icon = viewHelpers.icon;
-app.locals.money = viewHelpers.money;
-app.locals.pct = viewHelpers.pct;
-app.locals.marginTone = viewHelpers.marginTone;
+Object.assign(app.locals, viewHelpers);          // icon, money, pct, num, badge, ui, safeJson, ... available in every template
 app.disable('x-powered-by');
 app.set('trust proxy', 1);                     // Apache/LiteSpeed in front of Passenger
 app.use(helmet());
@@ -70,7 +67,8 @@ async function start() {
 
   const isPassenger = typeof PhusionPassenger !== 'undefined'; // eslint-disable-line no-undef
   const port = process.env.PORT || 3000;
-  app.listen(isPassenger ? 'passenger' : port, () => {
+  app.listen(isPassenger ? 'passenger' : port, (err) => {
+    if (err) { logger.error('Startup failed: could not listen', err); process.exit(1); }   // Express 5 passes listen errors here
     logger.info(`CoCoffee API up (${env.nodeEnv}, ${isPassenger ? 'passenger' : `port ${port}`}, bootstrap=${bootstrap})`);
   });
 }

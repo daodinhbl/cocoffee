@@ -1,18 +1,20 @@
 <%
   const kpiTone = { good: 'text-green-700', warn: 'text-amber-700', neutral: 'text-gray-500' };
-  const statusTone = { good: 'border-green-200 bg-green-50 text-green-700', warn: 'border-amber-200 bg-amber-50 text-amber-800' };
 %>
 <div class="flex flex-wrap items-end justify-between gap-4 border-b border-gray-200 pb-5">
   <div>
     <h1 class="text-2xl font-semibold tracking-tight">Tổng quan</h1>
-    <p class="mt-1 text-sm text-gray-500">Hoạt động trong ngày · cập nhật lúc 14:05</p>
+    <p class="mt-1 text-sm text-gray-500">Hoạt động trong ngày · <%= ordersToday %> đơn hoàn tất · cập nhật lúc <%= fmtTime(new Date()) %></p>
   </div>
-  <a href="/admin/bom-recipes" class="inline-flex h-10 items-center rounded border border-gray-300 bg-white px-4 text-sm font-medium text-gray-800 hover:bg-gray-50 max-sm:hidden">Quản lý định mức</a>
+  <div class="flex gap-3 max-sm:hidden">
+    <a href="/admin/orders" class="<%= ui.btnSecondary %>">Xem đơn hàng</a>
+    <a href="/admin/reports" class="<%= ui.btnSecondary %>">Báo cáo</a>
+  </div>
 </div>
 
 <!-- KPI strip: 12-col grid, 24px gutter -->
 <section aria-label="Chỉ số chính" class="mt-5 grid grid-cols-12 gap-3 sm:mt-6 sm:gap-6">
-  <% data.kpis.forEach((k) => { %>
+  <% kpis.forEach((k) => { %>
     <div class="col-span-6 rounded border border-gray-200 p-3 sm:p-5 xl:col-span-3">
       <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 sm:text-xs"><%= k.label %></p>
       <p class="mt-2 font-mono text-xl font-semibold tnum sm:mt-3 sm:text-2xl"><%= k.plain ? k.value : money(k.value) %></p>
@@ -26,12 +28,15 @@
   <section aria-labelledby="recent-title" class="col-span-12 rounded border border-gray-200 xl:col-span-7">
     <div class="flex items-center justify-between border-b border-gray-200 px-5 py-4">
       <h2 id="recent-title" class="text-base font-semibold">Đơn gần đây</h2>
-      <span class="text-xs text-gray-500">5 đơn mới nhất</span>
+      <a href="/admin/orders" class="text-xs font-medium text-gray-600 hover:text-gray-900">Tất cả đơn →</a>
     </div>
+    <% if (!recentOrders.length) { %>
+      <p class="px-5 py-10 text-center text-sm text-gray-500">Chưa có đơn hàng nào.</p>
+    <% } else { %>
     <div class="relative overflow-x-auto">
       <table class="rtable w-full border-collapse text-left text-sm lg:min-w-[520px]">
         <caption class="sr-only">Đơn hàng gần đây</caption>
-        <thead class="border-b border-gray-200 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
+        <thead class="<%= ui.thead %>">
           <tr>
             <th scope="col" class="px-5 py-3">Mã đơn</th>
             <th scope="col" class="px-3 py-3">Kênh</th>
@@ -40,37 +45,38 @@
           </tr>
         </thead>
         <tbody>
-          <% data.recentOrders.forEach((o) => { %>
+          <% recentOrders.forEach((o) => { %>
             <tr class="border-b border-gray-200 last:border-b-0 hover:bg-gray-50">
-              <td data-label="" class="rt-title px-5 py-3"><span class="font-mono text-[13px]"><%= o.code %></span><span class="ml-2 text-xs text-gray-500"><%= o.time %></span></td>
-              <td data-label="Kênh" class="px-3 py-3">
-                <% if (o.channel === 'zalo') { %>
-                  <span class="inline-flex items-center rounded-sm border border-sky-200 bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">Zalo</span>
-                <% } else { %>
-                  <span class="inline-flex items-center rounded-sm border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-700">POS</span>
-                <% } %>
+              <td data-label="" class="rt-title px-5 py-3">
+                <a href="/admin/orders/<%= o.id %>" class="font-mono text-[13px] font-medium hover:underline"><%= o.order_code %></a>
+                <span class="ml-2 text-xs text-gray-500"><%= fmtTime(o.created_at) %></span>
               </td>
+              <td data-label="Kênh" class="px-3 py-3"><%- sourceBadge(o.source) %></td>
               <td data-label="Tổng tiền" class="px-3 py-3 text-right font-mono tnum"><%= money(o.total) %></td>
-              <td data-label="Trạng thái" class="px-5 py-3"><span class="inline-flex items-center rounded-sm border px-2 py-0.5 text-xs font-medium <%= statusTone[o.tone] %>"><%= o.status %></span></td>
+              <td data-label="Trạng thái" class="px-5 py-3"><%- orderStatusBadge(o) %></td>
             </tr>
           <% }) %>
         </tbody>
       </table>
     </div>
+    <% } %>
   </section>
 
   <!-- Low stock -->
   <section aria-labelledby="stock-title" class="col-span-12 rounded border border-gray-200 xl:col-span-5">
     <div class="flex items-center justify-between border-b border-gray-200 px-5 py-4">
       <h2 id="stock-title" class="text-base font-semibold">Cảnh báo tồn kho thấp</h2>
-      <span class="rounded-sm border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800"><%= data.lowStock.length %> mục</span>
+      <% if (lowStock.length) { %><a href="/admin/inventory?low=1" class="rounded-sm border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800"><%= lowStock.length %> mục</a><% } %>
     </div>
+    <% if (!lowStock.length) { %>
+      <p class="px-5 py-10 text-center text-sm text-gray-500">Mọi nguyên liệu đều trên mức tối thiểu.</p>
+    <% } %>
     <ul>
-      <% data.lowStock.forEach((s) => { const ratio = Math.min(100, Math.round((s.onHand / s.min) * 100)); %>
+      <% lowStock.forEach((s) => { const ratio = s.min_stock > 0 ? Math.max(0, Math.min(100, Math.round((s.quantity_on_hand / s.min_stock) * 100))) : 0; %>
         <li class="border-b border-gray-200 px-5 py-4 last:border-b-0">
           <div class="flex items-baseline justify-between gap-3">
-            <span class="text-sm font-medium"><%= s.name %></span>
-            <span class="font-mono text-xs text-gray-600 tnum"><%= s.onHand %> / <%= s.min %> <%= s.unit %></span>
+            <a href="/admin/receiving?item=<%= s.id %>" class="text-sm font-medium hover:underline" title="Nhập kho"><%= s.name %></a>
+            <span class="font-mono text-xs text-gray-600 tnum"><%= num(s.quantity_on_hand) %> / <%= num(s.min_stock) %> <%= s.unit %></span>
           </div>
           <div class="mt-2 h-1.5 w-full rounded-sm bg-gray-100" role="img" aria-label="Tồn kho bằng <%= ratio %>% mức tối thiểu">
             <div class="h-1.5 rounded-sm <%= ratio < 60 ? 'bg-red-500' : 'bg-amber-400' %>" style="width: <%= ratio %>%"></div>
