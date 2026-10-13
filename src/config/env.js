@@ -37,7 +37,8 @@ module.exports = {
   publicBaseUrl: optional('PUBLIC_BASE_URL').replace(/\/+$/, ''),
 
   db: {
-    host: optional('DB_HOST', '127.0.0.1'),
+    // Hostinger writes DB_HOST=localhost, which Node may resolve to ::1 (no grant there): force IPv4 loopback.
+    host: optional('DB_HOST', '127.0.0.1') === 'localhost' ? '127.0.0.1' : optional('DB_HOST', '127.0.0.1'),
     port: int('DB_PORT', 3306),
     name: required('DB_NAME'),
     user: required('DB_USER'),

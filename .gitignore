@@ -7,3 +7,4 @@ assets/fonts/*.ttf
 .idea/
 .vscode/
 .claude/
+.admin-credentials.txt
