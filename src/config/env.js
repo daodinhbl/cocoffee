@@ -67,9 +67,13 @@ module.exports = {
   },
 
   zalo: {
-    // 'bot' (default): a personal Zalo account driven by an external Bot Client that POSTs each message to
-    // /api/zalo/webhook with BOT_WEBHOOK_SECRET and relays the replies. 'oa': legacy Official Account mode.
-    mode: optional('ZALO_MODE', 'bot') === 'oa' ? 'oa' : 'bot',
+    // 'platform': official Zalo Bot Platform (ZALO_BOT_TOKEN; Zalo calls our webhook, we answer with sendMessage).
+    // 'bot': personal account driven by an external Bot Client that POSTs messages and relays our replies.
+    // 'oa': legacy Official Account. Default: 'platform' when ZALO_BOT_TOKEN is set, otherwise 'bot'.
+    mode: ['platform', 'bot', 'oa'].includes(optional('ZALO_MODE')) ? optional('ZALO_MODE') : (optional('ZALO_BOT_TOKEN') ? 'platform' : 'bot'),
+    botToken: optional('ZALO_BOT_TOKEN'),
+    // platform: the secret_token given to setWebhook (8-256 chars, sent back in X-Bot-Api-Secret-Token);
+    // bot: the Bearer token of the Bot Client.
     botWebhookSecret: optional('BOT_WEBHOOK_SECRET'),
     // legacy OA settings (ZALO_MODE=oa only)
     appId: optional('ZALO_APP_ID'),

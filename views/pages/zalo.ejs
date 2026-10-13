@@ -1,9 +1,9 @@
 <%
   const { btnSecondary } = ui;
   const EVENT = { received: ['Đang xử lý', 'info'], processed: ['Đã xử lý', 'good'], ignored: ['Bỏ qua', 'neutral'], failed: ['Lỗi', 'bad'] };
-  const isBot = conn.mode === 'bot';
+  const isBot = conn.mode !== 'oa';
   const lastAgo = stats.lastEventAt ? Math.round((Date.now() - new Date(stats.lastEventAt).getTime()) / 60000) : null;
-  const botState = !conn.configured ? ['Chưa cấu hình', 'neutral', 'Đặt BOT_WEBHOOK_SECRET trong biến môi trường (hPanel) rồi cấu hình cùng giá trị đó ở Bot Client.']
+  const botState = !conn.configured ? ['Chưa cấu hình', 'neutral', conn.platform ? 'Đặt ZALO_BOT_TOKEN và BOT_WEBHOOK_SECRET trong hPanel, rồi chạy: node scripts/zalo-bot-setup.js' : 'Đặt BOT_WEBHOOK_SECRET trong biến môi trường (hPanel) rồi cấu hình cùng giá trị đó ở Bot Client.']
     : lastAgo === null ? ['Chưa nhận tin', 'warn', 'Bot Client chưa gửi tin nhắn nào tới webhook.']
     : lastAgo > 60 * 24 ? ['Không hoạt động', 'warn', 'Hơn 24 giờ chưa nhận tin từ Bot Client: kiểm tra máy chạy bot.']
     : ['Đang hoạt động', 'good', null];
@@ -14,7 +14,7 @@
 %>
 <div class="flex flex-wrap items-start justify-between gap-4">
   <div>
-    <h1 class="text-xl font-semibold tracking-tight sm:text-2xl"><%= isBot ? 'Zalo bot (tài khoản cá nhân)' : 'Zalo OA' %></h1>
+    <h1 class="text-xl font-semibold tracking-tight sm:text-2xl"><%= conn.platform ? 'Zalo Bot (Zalo Bot Platform)' : isBot ? 'Zalo bot (tài khoản cá nhân)' : 'Zalo OA' %></h1>
     <p class="mt-1 max-w-2xl text-sm text-gray-500">Giám sát chatbot đặt món: kết nối, sự kiện webhook 24 giờ qua, đơn nháp đang chờ khách xác nhận và các bill gửi lỗi.</p>
   </div>
 </div>
@@ -29,7 +29,12 @@
     <dl class="mt-3 space-y-2 text-sm">
       <div class="flex justify-between gap-3"><dt class="text-gray-500">Webhook URL</dt><dd class="break-all text-right font-mono text-xs"><%= conn.webhookUrl %></dd></div>
       <% if (isBot) { %>
+        <% if (conn.platform) { %>
+        <div class="flex justify-between gap-3"><dt class="text-gray-500">Bot token (ZALO_BOT_TOKEN)</dt><dd><%- conn.tokenSet ? badge('Đã đặt', 'good') : badge('Chưa đặt', 'bad') %></dd></div>
+        <div class="flex justify-between gap-3"><dt class="text-gray-500">Secret token webhook</dt><dd class="text-right">X-Bot-Api-Secret-Token <%- conn.configured ? badge('Đã đặt', 'good') : badge('Chưa đặt', 'bad') %></dd></div>
+        <% } else { %>
         <div class="flex justify-between gap-3"><dt class="text-gray-500">Xác thực</dt><dd class="text-right">Authorization: Bearer BOT_WEBHOOK_SECRET <%- conn.configured ? badge('Đã đặt', 'good') : badge('Chưa đặt', 'bad') %></dd></div>
+        <% } %>
         <div class="flex justify-between gap-3"><dt class="text-gray-500">Tin nhắn gần nhất</dt><dd><%= stats.lastEventAt ? fmtTime(stats.lastEventAt) : '—' %></dd></div>
       <% } else { %>
       <div class="flex justify-between gap-3"><dt class="text-gray-500">Xác thực chữ ký</dt><dd><%- conn.verifySignature ? badge('Bật', 'good') : badge('TẮT — chỉ dùng khi thử nghiệm', 'bad') %></dd></div>

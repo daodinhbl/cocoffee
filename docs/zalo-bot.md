@@ -1,4 +1,27 @@
-# Zalo chatbot với tài khoản cá nhân (Bot Client + webhook)
+# Zalo chatbot
+
+Có 2 cách nối chatbot đặt món với Zalo. **Nên dùng cách 1.**
+
+## 1. Zalo Bot Platform (chính thức, khuyến nghị)
+
+Bot tạo tại [bot.zaloplatforms.com](https://bot.zaloplatforms.com). Zalo gọi thẳng webhook trên Hostinger, server trả lời bằng API `sendMessage`, nên **không cần máy chạy bot riêng** và không có rủi ro khóa tài khoản cá nhân. Tài liệu API: [bot.zapps.me/docs](https://bot.zapps.me/docs).
+
+1. Trên bot.zaloplatforms.com, mở bot của quán và sao chép **Bot Token**.
+2. Trên hPanel (Node.js → Environment variables, thêm **từng biến**):
+   - `ZALO_BOT_TOKEN` = token vừa sao chép;
+   - `BOT_WEBHOOK_SECRET` = chuỗi bí mật 8–256 ký tự;
+   - `PUBLIC_BASE_URL` đã có sẵn.
+3. Deploy bản code mới. Có token thì app tự chạy ở chế độ `platform`.
+4. Đăng ký webhook (chạy được trên máy của bạn, chỉ gọi API Zalo):
+   ```bash
+   ZALO_BOT_TOKEN=<token> BOT_WEBHOOK_SECRET=<secret> PUBLIC_BASE_URL=https://cocoffee.tasotek-giaiphapso.com node scripts/zalo-bot-setup.js
+   ```
+   Kết quả phải báo `Verification: OK webhook.ok`.
+5. Mời bot vào nhóm của quán bằng link mời nhóm của bot. Chat nhóm đang ở giai đoạn **Beta** phía Zalo. Có thể nhắn kèm `@tên bot`, server tự bỏ phần nhắc tên trước khi đọc món.
+
+Luồng xử lý: Zalo gửi `message.text.received` kèm header `X-Bot-Api-Secret-Token`. Server kiểm tra secret, lưu sự kiện (một `message_id` chỉ được xử lý một lần), trả 200 ngay, rồi xử lý đơn và gửi `sendMessage` vào `chat.id`. Đơn tạm, chốt đơn trong một transaction và gửi bill dùng chung lõi với cách 2 (xem phần "Đảm bảo khi khách chốt đơn" bên dưới). Nút "Gửi lại bill" trong admin hoạt động ở chế độ này.
+
+## 2. Tài khoản Zalo cá nhân + Bot Client (dự phòng)
 
 Hostinger (Passenger) không giữ được kết nối WebSocket hay trình duyệt ẩn để đăng nhập Zalo cá nhân. Vì vậy hệ thống tách làm hai phần:
 

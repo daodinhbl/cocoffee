@@ -1,6 +1,6 @@
 # CoCoffee F&B — POS & Management
 
-Node.js (Express 5, MVC) · MySQL · Zalo chatbot ordering (personal account via a Bot Client, see [docs/zalo-bot.md](docs/zalo-bot.md)) · REST API for the Flutter tablet POS · EJS + Tailwind Web Admin.
+Node.js (Express 5, MVC) · MySQL · Zalo chatbot ordering (official Zalo Bot Platform, or a personal account via a Bot Client; see [docs/zalo-bot.md](docs/zalo-bot.md)) · REST API for the Flutter tablet POS · EJS + Tailwind Web Admin.
 UI/UX spec: [docs/UI-UX-SPEC.md](docs/UI-UX-SPEC.md) · tokens: [docs/design-tokens.json](docs/design-tokens.json)
 
 ## Structure
@@ -59,7 +59,7 @@ npm test                        # unit + admin/UI tests (no DB needed); add RUN_
 1. Create the database for the site with **Setup website database** (name `cocoffee`; Hostinger prefixes it, e.g. `u123456789_cocoffee`). The platform generates the password and writes `DB_HOST/PORT/NAME/USER/PASSWORD` into the app's environment — nobody has to see or paste it.
 2. Set `AUTO_BOOTSTRAP_DB=true`, `SEED_DEMO=true` and `BOOTSTRAP_ADMIN_PASSWORD=<strong password>` for the first boot (the last one replaces the factory `admin/admin`; delete it afterwards — if it is missing or shorter than 10 characters a random admin password is generated and printed once in the app log, so `admin/admin` is never live). Set these variables **before** "Setup website database": that call keeps existing variables and appends `DB_*`, whereas the API's replace call would wipe the unreadable `DB_PASSWORD`. The app builds the schema **only if the database holds no data** (zero tables, or a half-finished bootstrap: only our tables, all empty), so later redeploys never touch data. Turn `SEED_DEMO` off afterwards if you do not want demo data on a fresh database.
 3. Upload the source (no `node_modules`, no `.env`) and run the Node.js build: Express, entry file `app.js`.
-4. Zalo chatbot: set `BOT_WEBHOOK_SECRET` in hPanel (edit single variables there; the API's replace call wipes the ones you leave out) and run the Bot Client on a PC/VPS with the same secret. Payload/response contract: [docs/zalo-bot.md](docs/zalo-bot.md). The legacy Zalo OA receiver is still available with `ZALO_MODE=oa`.
+4. Zalo chatbot: recommended is the official Zalo Bot Platform: set `ZALO_BOT_TOKEN` and `BOT_WEBHOOK_SECRET` in hPanel, deploy, then run `node scripts/zalo-bot-setup.js` once. Fallback: set `BOT_WEBHOOK_SECRET` in hPanel (edit single variables there; the API's replace call wipes the ones you leave out) and run the Bot Client on a PC/VPS with the same secret. Payload/response contract: [docs/zalo-bot.md](docs/zalo-bot.md). The legacy Zalo OA receiver is still available with `ZALO_MODE=oa`.
 
 ## Security checklist
 

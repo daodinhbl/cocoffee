@@ -9,8 +9,10 @@ const orders = require('./orders');
 async function connection() {
   if (env.zalo.mode !== 'oa') {
     return {
-      mode: 'bot',
-      configured: Boolean(env.zalo.botWebhookSecret),
+      mode: env.zalo.mode,
+      platform: env.zalo.mode === 'platform',
+      tokenSet: Boolean(env.zalo.botToken),
+      configured: Boolean(env.zalo.botWebhookSecret) && (env.zalo.mode !== 'platform' || Boolean(env.zalo.botToken)),
       webhookUrl: `${env.publicBaseUrl || 'https://<tên-miền-của-bạn>'}/api/zalo/webhook`,
       draftTtlMinutes: env.zalo.draftTtlMinutes,
     };

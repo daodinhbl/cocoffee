@@ -14,7 +14,7 @@ const logger = require('../../utils/logger');
  */
 async function zaloStatus() {
   if (env.zalo.mode !== 'oa') {
-    if (!env.zalo.botWebhookSecret) return { state: 'off', label: 'Zalo bot: chưa cấu hình' };
+    if (!env.zalo.botWebhookSecret || (env.zalo.mode === 'platform' && !env.zalo.botToken)) return { state: 'off', label: 'Zalo bot: chưa cấu hình' };
     try {
       const { lastEventAt } = await adminModel.zaloEventStats(24);
       const fresh = lastEventAt && Date.now() - new Date(lastEventAt).getTime() < 24 * 3600 * 1000;
