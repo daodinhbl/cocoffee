@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0f172a">
+  <title>Bán hàng · CoCoffee POS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: { darker: '#0f172a', DEFAULT: '#1e3a8a', accent: '#1d4ed8', 50: '#eff6ff', 100: '#dbeafe' },
+            amber: { 300: '#fcd34d', 400: '#fbbf24', 500: '#f59e0b' },
+            dark: '#1f2937',
+          },
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+          boxShadow: { cta: '0 12px 28px -8px rgba(245,158,11,.65)', card: '0 1px 2px rgba(15,23,42,.06), 0 4px 12px -4px rgba(15,23,42,.08)' },
+        },
+      },
+    };
+  </script>
+  <style>
+    html, body { -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
+    .tnum { font-variant-numeric: tabular-nums; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { scrollbar-width: none; }
+    .thin-scroll::-webkit-scrollbar { width: 6px; }
+    .thin-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+    :focus-visible { outline: 3px solid #1d4ed8; outline-offset: 2px; }
+    @keyframes pop { 0% { transform: scale(1); } 40% { transform: scale(1.06); } 100% { transform: scale(1); } }
+    .pop { animation: pop .22s ease-out; }
+    @keyframes slidein { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .slidein { animation: slidein .18s ease-out; }
+    dialog::backdrop { background: rgba(15, 23, 42, .55); backdrop-filter: blur(2px); }
+    @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+  </style>
+</head>
+<body class="h-screen overflow-hidden bg-gray-50 font-sans text-dark antialiased select-none">
+<div class="flex h-full flex-col">
+
+  <!-- ============================== TOP HEADER ============================== -->
+  <header class="relative z-20 flex h-16 shrink-0 items-center gap-4 bg-navy-darker px-4 text-white shadow-lg sm:px-6">
+    <!-- Brand + system status -->
+    <div class="flex min-w-0 items-center gap-3">
+      <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-400 text-xl shadow-md" aria-hidden="true">☕</span>
+      <div class="min-w-0 leading-tight">
+        <p class="truncate text-base font-bold tracking-tight">CoCoffee</p>
+        <p class="flex items-center gap-1.5 text-xs text-slate-400">
+          <span class="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_0_3px_rgba(52,211,153,.25)]" aria-hidden="true"></span>
+          Zalo OK
+        </p>
+      </div>
+    </div>
+
+    <!-- App switcher (segmented control) -->
+    <nav aria-label="Chuyển ứng dụng" class="absolute left-1/2 -translate-x-1/2">
+      <div role="tablist" class="flex rounded-xl bg-white/10 p-1 ring-1 ring-white/10">
+        <a href="/admin/dashboard" role="tab" aria-selected="false"
+           class="flex h-12 min-w-[120px] items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white">
+          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+          Quản lý
+        </a>
+        <span role="tab" aria-selected="true"
+           class="flex h-12 min-w-[140px] items-center justify-center gap-2 rounded-lg bg-amber-400 px-4 text-sm font-bold text-navy-darker shadow">
+          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7h18l-2 11H5L3 7z"/><path d="M8 7V5a4 4 0 0 1 8 0v2"/></svg>
+          Bán hàng POS
+        </span>
+      </div>
+    </nav>
+
+    <!-- Cashier + clock -->
+    <div class="ml-auto flex items-center gap-3">
+      <div class="hidden text-right leading-tight md:block">
+        <p class="font-mono text-lg font-semibold tnum" id="clock">--:--</p>
+        <p class="text-xs text-slate-400" id="date">—</p>
+      </div>
+      <div class="flex items-center gap-2 rounded-xl bg-white/5 py-1.5 pl-1.5 pr-3 ring-1 ring-white/10">
+        <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-navy text-sm font-bold">TN</span>
+        <div class="hidden leading-tight lg:block">
+          <p class="text-sm font-semibold">Thu Ngân</p>
+          <p class="text-xs text-slate-400">Ca sáng</p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============================== BODY (65 / 35) ============================== -->
+  <div class="flex min-h-0 flex-1">
+
+    <!-- ---------- LEFT: menu & products ---------- -->
+    <main class="flex min-w-0 basis-[65%] flex-col bg-gray-50">
+      <div class="shrink-0 space-y-3 px-4 pt-4 sm:px-6">
+        <!-- search -->
+        <label class="relative block">
+          <span class="sr-only">Tìm món</span>
+          <svg class="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="search" type="search" placeholder="Tìm món… (phím /)" autocomplete="off"
+                 class="h-12 w-full rounded-xl border border-slate-200 bg-white pl-12 pr-4 text-base shadow-sm placeholder:text-slate-400 focus:border-navy-accent focus:outline-none focus:ring-2 focus:ring-navy-accent/30 select-text">
+        </label>
+        <!-- categories -->
+        <div id="categories" role="tablist" aria-label="Danh mục" class="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1"></div>
+      </div>
+
+      <div class="thin-scroll min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-3 sm:px-6">
+        <div id="grid" class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4"></div>
+        <p id="empty-grid" hidden class="py-16 text-center text-slate-400">Không tìm thấy món phù hợp.</p>
+      </div>
+    </main>
+
+    <!-- ---------- RIGHT: order / cart ---------- -->
+    <aside class="relative z-10 flex min-w-[320px] basis-[35%] flex-col border-l border-slate-200 bg-white shadow-xl" aria-label="Đơn hàng">
+
+      <!-- Order header -->
+      <div class="shrink-0 space-y-3 border-b border-slate-100 p-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-bold text-navy-darker">Đơn hiện tại</h2>
+          <span id="order-code" class="rounded-md bg-slate-100 px-2 py-1 font-mono text-xs font-semibold text-slate-600 tnum">#—</span>
+        </div>
+        <label class="block">
+          <span class="sr-only">Chọn bàn</span>
+          <select id="table" class="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-base font-semibold text-dark focus:border-navy-accent focus:outline-none focus:ring-2 focus:ring-navy-accent/30"></select>
+        </label>
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" id="btn-customer" class="flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 transition hover:border-navy-accent hover:text-navy-accent active:scale-[.98]">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M19 8v6M16 11h6"/></svg>
+            <span id="customer-label">Khách hàng</span>
+          </button>
+          <button type="button" id="btn-note" class="flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 transition hover:border-navy-accent hover:text-navy-accent active:scale-[.98]">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 20h4L20 8l-4-4L4 16v4z"/></svg>
+            <span id="note-label">Ghi chú</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Zalo drafts widget -->
+      <button type="button" id="zalo-banner"
+        class="mx-4 mt-3 flex shrink-0 items-center gap-3 rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-amber-50 px-4 py-3 text-left transition hover:border-emerald-300 active:scale-[.99]">
+        <span class="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-lg text-white" aria-hidden="true">🔔
+          <span class="absolute -right-0.5 -top-0.5 h-3 w-3 animate-ping rounded-full bg-amber-400"></span>
+        </span>
+        <span class="min-w-0 flex-1">
+          <span class="block text-sm font-bold text-emerald-900">Có <span id="zalo-count">2</span> đơn Zalo đang chờ xác nhận</span>
+          <span class="block text-xs text-emerald-800/80">Chạm để xem và nhận đơn</span>
+        </span>
+        <svg class="h-5 w-5 shrink-0 text-emerald-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+      </button>
+
+      <!-- Cart items -->
+      <div class="thin-scroll min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        <ul id="cart" class="space-y-2" aria-live="polite"></ul>
+        <div id="cart-empty" class="flex h-full flex-col items-center justify-center py-10 text-center text-slate-400">
+          <span class="text-5xl" aria-hidden="true">🧾</span>
+          <p class="mt-3 font-semibold text-slate-500">Chưa có món nào</p>
+          <p class="text-sm">Chạm vào món bên trái để thêm vào đơn</p>
+        </div>
+      </div>
+
+      <!-- Checkout footer -->
+      <div class="shrink-0 border-t border-slate-200 bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <dl class="space-y-1.5 text-sm">
+          <div class="flex justify-between text-slate-600"><dt>Tạm tính</dt><dd class="font-semibold tnum" id="subtotal">0đ</dd></div>
+          <div class="flex justify-between text-slate-600"><dt>Thuế VAT (8%)</dt><dd class="font-semibold tnum" id="tax">0đ</dd></div>
+          <div class="flex items-center justify-between text-slate-600">
+            <dt>Giảm giá</dt>
+            <dd class="flex items-center gap-1">
+              <button type="button" id="btn-discount" class="flex h-12 min-w-[48px] items-center justify-center rounded-lg border border-dashed border-slate-300 px-3 text-sm font-semibold text-navy-accent hover:bg-navy-50">
+                <span id="discount">0đ</span>
+              </button>
+            </dd>
+          </div>
+        </dl>
+        <div class="mt-3 flex items-end justify-between border-t border-dashed border-slate-200 pt-3">
+          <span class="text-sm font-semibold uppercase tracking-wide text-slate-500">Tổng thanh toán</span>
+          <span id="total" class="text-4xl font-extrabold leading-none text-navy-darker tnum">0đ</span>
+        </div>
+        <button type="button" id="btn-pay" disabled
+          class="mt-4 flex min-h-[72px] w-full items-center justify-center gap-3 rounded-2xl bg-amber-400 text-xl font-extrabold tracking-wide text-navy-darker shadow-cta transition hover:bg-amber-500 active:scale-[.98] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none">
+          <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20M6 15h4"/></svg>
+          THANH TOÁN <span class="text-base font-semibold opacity-70">(Enter)</span>
+        </button>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- ============================== DIALOGS ============================== -->
+<!-- Payment -->
+<dialog id="pay-dialog" class="w-[min(560px,calc(100vw-2rem))] rounded-2xl p-0 shadow-2xl">
+  <form method="dialog" class="p-6">
+    <div class="flex items-start justify-between">
+      <div>
+        <h3 class="text-xl font-bold text-navy-darker">Thanh toán</h3>
+        <p class="text-sm text-slate-500" id="pay-sub">—</p>
+      </div>
+      <button value="cancel" class="flex h-12 w-12 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100" aria-label="Đóng">✕</button>
+    </div>
+    <p class="mt-4 text-center text-5xl font-extrabold text-navy-darker tnum" id="pay-total">0đ</p>
+    <div class="mt-5 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Hình thức">
+      <button type="button" data-method="cash" class="method h-14 rounded-xl border-2 text-base font-bold">💵 Tiền mặt</button>
+      <button type="button" data-method="transfer" class="method h-14 rounded-xl border-2 text-base font-bold">🏦 Chuyển khoản</button>
+      <button type="button" data-method="card" class="method h-14 rounded-xl border-2 text-base font-bold">💳 Thẻ</button>
+    </div>
+    <div id="cash-box" class="mt-4">
+      <p class="mb-2 text-sm font-semibold text-slate-600">Khách đưa</p>
+      <div class="grid grid-cols-4 gap-2" id="quick-cash"></div>
+      <div class="mt-3 flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
+        <span class="font-semibold text-slate-600">Tiền thối</span>
+        <span class="text-2xl font-extrabold text-emerald-600 tnum" id="change">0đ</span>
+      </div>
+    </div>
+    <button type="button" id="pay-confirm" class="mt-5 flex min-h-[64px] w-full items-center justify-center rounded-2xl bg-amber-400 text-lg font-extrabold text-navy-darker shadow-cta hover:bg-amber-500 active:scale-[.98]">XÁC NHẬN THANH TOÁN</button>
+  </form>
+</dialog>
+
+<!-- Zalo drafts -->
+<dialog id="zalo-dialog" class="w-[min(520px,calc(100vw-2rem))] rounded-2xl p-0 shadow-2xl">
+  <div class="p-6">
+    <div class="flex items-center justify-between">
+      <h3 class="text-xl font-bold text-navy-darker">Đơn Zalo chờ xác nhận</h3>
+      <button type="button" data-close class="flex h-12 w-12 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-100" aria-label="Đóng">✕</button>
+    </div>
+    <ul id="zalo-list" class="mt-4 space-y-3"></ul>
+  </div>
+</dialog>
+
+<!-- Number / text prompt -->
+<dialog id="prompt-dialog" class="w-[min(440px,calc(100vw-2rem))] rounded-2xl p-0 shadow-2xl">
+  <form method="dialog" class="p-6">
+    <h3 class="text-lg font-bold text-navy-darker" id="prompt-title">—</h3>
+    <input id="prompt-input" class="mt-4 h-14 w-full rounded-xl border border-slate-200 px-4 text-lg focus:border-navy-accent focus:outline-none focus:ring-2 focus:ring-navy-accent/30 select-text">
+    <div class="mt-5 grid grid-cols-2 gap-2">
+      <button value="cancel" class="h-12 rounded-xl border border-slate-200 font-semibold text-slate-600 hover:bg-slate-50">Hủy</button>
+      <button value="ok" class="h-12 rounded-xl bg-navy font-semibold text-white hover:bg-navy-accent">Lưu</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Toast -->
+<div id="toast" class="pointer-events-none fixed bottom-6 left-1/2 z-50 -translate-x-1/2"></div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ------------------------------------------------------------ static data */
+  var CATEGORIES = [
+    { id: 'all', name: 'Tất cả', emoji: '✨' },
+    { id: 'mix', name: 'Đồ uống pha chế', emoji: '🧋' },
+    { id: 'coffee', name: 'Cà phê máy', emoji: '☕' },
+    { id: 'smoothie', name: 'Sinh tố', emoji: '🥤' },
+    { id: 'cake', name: 'Bánh ngọt', emoji: '🍰' },
+  ];
+  var PRODUCTS = [
+    { id: 1, cat: 'mix', name: 'Cà phê sữa đá', price: 25000, emoji: '🧋', hot: true },
+    { id: 2, cat: 'mix', name: 'Bạc xỉu', price: 29000, emoji: '🥛' },
+    { id: 3, cat: 'mix', name: 'Trà đào cam sả', price: 35000, emoji: '🍑', hot: true },
+    { id: 4, cat: 'mix', name: 'Trà vải', price: 32000, emoji: '🍹' },
+    { id: 5, cat: 'mix', name: 'Matcha latte', price: 39000, emoji: '🍵' },
+    { id: 6, cat: 'mix', name: 'Cacao đá', price: 30000, emoji: '🍫' },
+    { id: 7, cat: 'coffee', name: 'Espresso', price: 30000, emoji: '☕' },
+    { id: 8, cat: 'coffee', name: 'Americano', price: 35000, emoji: '☕' },
+    { id: 9, cat: 'coffee', name: 'Cappuccino', price: 45000, emoji: '☕', hot: true },
+    { id: 10, cat: 'coffee', name: 'Latte', price: 45000, emoji: '🥛' },
+    { id: 11, cat: 'coffee', name: 'Caramel macchiato', price: 49000, emoji: '🍮' },
+    { id: 12, cat: 'smoothie', name: 'Sinh tố bơ', price: 40000, emoji: '🥑' },
+    { id: 13, cat: 'smoothie', name: 'Sinh tố xoài', price: 38000, emoji: '🥭' },
+    { id: 14, cat: 'smoothie', name: 'Sinh tố dâu', price: 40000, emoji: '🍓' },
+    { id: 15, cat: 'smoothie', name: 'Sinh tố chuối', price: 35000, emoji: '🍌' },
+    { id: 16, cat: 'cake', name: 'Tiramisu', price: 45000, emoji: '🍰', hot: true },
+    { id: 17, cat: 'cake', name: 'Croissant bơ', price: 30000, emoji: '🥐' },
+    { id: 18, cat: 'cake', name: 'Bánh su kem', price: 20000, emoji: '🧁' },
+    { id: 19, cat: 'cake', name: 'Cookie socola', price: 18000, emoji: '🍪' },
+    { id: 20, cat: 'cake', name: 'Bánh mì que', price: 15000, emoji: '🥖' },
+  ];
+  var TABLES = [
+    { id: 'takeaway', name: 'Mang đi', status: 'free' },
+    { id: 'B01', name: 'Bàn 01', status: 'free' },
+    { id: 'B02', name: 'Bàn 02', status: 'free' },
+    { id: 'B03', name: 'Bàn 03', status: 'busy' },
+    { id: 'B04', name: 'Bàn 04', status: 'free' },
+    { id: 'B05', name: 'Bàn 05', status: 'busy' },
+    { id: 'B06', name: 'Bàn 06', status: 'free' },
+  ];
+  var ZALO_DRAFTS = [
+    { code: 'ZL-1042', who: 'Nguyễn Minh Anh', ago: '3 phút trước', items: [{ id: 1, qty: 2 }, { id: 16, qty: 1 }] },
+    { code: 'ZL-1043', who: 'Trần Quốc Bảo', ago: 'vừa xong', items: [{ id: 3, qty: 1 }, { id: 9, qty: 1 }] },
+  ];
+  var TAX_RATE = 0.08;
+
+  /* ------------------------------------------------------------ state */
+  var state = { cat: 'all', q: '', cart: [], discount: 0, customer: '', note: '', method: 'cash', given: 0, seq: 128 };
+
+  /* ------------------------------------------------------------ helpers */
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var fmt = function (n) { return Math.round(n).toLocaleString('vi-VN') + 'đ'; };
+  var byId = function (id) { return PRODUCTS.filter(function (p) { return p.id === id; })[0]; };
+  var norm = function (s) { return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase(); };
+  var esc = function (s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+
+  function totals() {
+    var subtotal = state.cart.reduce(function (s, l) { return s + l.price * l.qty; }, 0);
+    var tax = subtotal * TAX_RATE;
+    var discount = Math.min(state.discount, subtotal + tax);
+    return { subtotal: subtotal, tax: tax, discount: discount, total: Math.max(0, subtotal + tax - discount), count: state.cart.reduce(function (s, l) { return s + l.qty; }, 0) };
+  }
+
+  var toastTimer;
+  function toast(msg, tone) {
+    var el = $('#toast');
+    el.innerHTML = '<div class="slidein rounded-xl px-5 py-3 text-sm font-semibold text-white shadow-xl ' + (tone === 'ok' ? 'bg-emerald-600' : 'bg-navy-darker') + '">' + esc(msg) + '</div>';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.innerHTML = ''; }, 1800);
+  }
+
+  /* ------------------------------------------------------------ render: left */
+  function renderCategories() {
+    $('#categories').innerHTML = CATEGORIES.map(function (c) {
+      var on = c.id === state.cat;
+      return '<button type="button" role="tab" aria-selected="' + on + '" data-cat="' + c.id + '" class="flex h-12 shrink-0 items-center gap-2 rounded-xl px-5 text-sm font-semibold transition active:scale-95 ' +
+        (on ? 'bg-navy text-white shadow-md' : 'bg-white text-slate-700 ring-1 ring-slate-200 hover:ring-navy-accent') + '">' +
+        '<span aria-hidden="true">' + c.emoji + '</span>' + esc(c.name) + '</button>';
+    }).join('');
+  }
+
+  function renderGrid() {
+    var q = norm(state.q.trim());
+    var list = PRODUCTS.filter(function (p) { return (state.cat === 'all' || p.cat === state.cat) && (!q || norm(p.name).indexOf(q) !== -1); });
+    var inCart = {};
+    state.cart.forEach(function (l) { inCart[l.id] = l.qty; });
+    $('#grid').innerHTML = list.map(function (p) {
+      var qty = inCart[p.id];
+      return '<button type="button" data-add="' + p.id + '" class="group relative flex min-h-[148px] flex-col items-start rounded-2xl bg-white p-4 text-left shadow-card ring-1 ring-slate-100 transition hover:-translate-y-0.5 hover:ring-navy-accent/40 active:scale-95 ' + (qty ? 'ring-2 ring-navy-accent' : '') + '">' +
+        (p.hot ? '<span class="absolute left-3 top-3 rounded-md bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-navy-darker">Bán chạy</span>' : '') +
+        (qty ? '<span class="absolute right-3 top-3 flex h-7 min-w-[28px] items-center justify-center rounded-full bg-navy-accent px-2 text-xs font-bold text-white tnum">' + qty + '</span>' : '') +
+        '<span class="mx-auto mt-2 text-5xl transition group-active:scale-110" aria-hidden="true">' + p.emoji + '</span>' +
+        '<span class="mt-auto w-full pt-3">' +
+          '<span class="block truncate text-[15px] font-bold text-dark">' + esc(p.name) + '</span>' +
+          '<span class="mt-0.5 block text-base font-extrabold text-navy tnum">' + fmt(p.price) + '</span>' +
+        '</span></button>';
+    }).join('');
+    $('#empty-grid').hidden = list.length > 0;
+  }
+
+  /* ------------------------------------------------------------ render: right */
+  function renderCart(bumpId) {
+    var ul = $('#cart');
+    ul.innerHTML = state.cart.map(function (l) {
+      return '<li class="rounded-xl border border-slate-100 bg-white p-3 ' + (l.id === bumpId ? 'pop' : '') + '">' +
+        '<div class="flex items-center gap-3">' +
+          '<span class="text-2xl" aria-hidden="true">' + l.emoji + '</span>' +
+          '<span class="min-w-0 flex-1">' +
+            '<span class="block truncate text-[15px] font-bold text-dark">' + esc(l.name) + '</span>' +
+            '<span class="block text-xs text-slate-500 tnum">' + fmt(l.price) + ' / món</span>' +
+          '</span>' +
+          '<button type="button" data-del="' + l.id + '" aria-label="Xóa ' + esc(l.name) + '" class="-mr-1 flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-slate-400 hover:bg-red-50 hover:text-red-600 active:scale-90">' +
+            '<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>' +
+          '</button>' +
+        '</div>' +
+        '<div class="mt-2 flex items-center justify-between">' +
+          '<span class="flex items-center rounded-xl bg-slate-100">' +
+            '<button type="button" data-dec="' + l.id + '" aria-label="Giảm ' + esc(l.name) + '" class="flex h-12 w-12 items-center justify-center rounded-xl text-2xl font-bold text-navy hover:bg-slate-200 active:scale-90">−</button>' +
+            '<span class="w-10 text-center text-lg font-extrabold tnum">' + l.qty + '</span>' +
+            '<button type="button" data-inc="' + l.id + '" aria-label="Tăng ' + esc(l.name) + '" class="flex h-12 w-12 items-center justify-center rounded-xl text-2xl font-bold text-navy hover:bg-slate-200 active:scale-90">+</button>' +
+          '</span>' +
+          '<span class="text-lg font-extrabold text-navy-darker tnum">' + fmt(l.price * l.qty) + '</span>' +
+        '</div></li>';
+    }).join('');
+    $('#cart-empty').classList.toggle('hidden', state.cart.length > 0);   // class, not [hidden]: .flex would win
+
+    var t = totals();
+    $('#subtotal').textContent = fmt(t.subtotal);
+    $('#tax').textContent = fmt(t.tax);
+    $('#discount').textContent = t.discount ? '−' + fmt(t.discount) : '0đ';
+    $('#total').textContent = fmt(t.total);
+    $('#btn-pay').disabled = t.count === 0;
+    $('#order-code').textContent = '#HD' + String(state.seq).padStart(5, '0') + (t.count ? ' · ' + t.count + ' món' : '');
+  }
+
+  function renderTables() {
+    $('#table').innerHTML = TABLES.map(function (t) {
+      return '<option value="' + t.id + '">' + (t.status === 'busy' ? '🔴 ' : '🟢 ') + t.name + (t.id === 'takeaway' ? '' : (t.status === 'busy' ? ' — Đang phục vụ' : ' — Trống')) + '</option>';
+    }).join('');
+    $('#table').value = 'B01';
+  }
+
+  /* ------------------------------------------------------------ cart actions */
+  function add(id, qty) {
+    var p = byId(id); if (!p) return;
+    var line = state.cart.filter(function (l) { return l.id === id; })[0];
+    if (line) line.qty += qty || 1;
+    else state.cart.push({ id: p.id, name: p.name, price: p.price, emoji: p.emoji, qty: qty || 1 });
+    renderCart(id); renderGrid();
+  }
+  function change(id, delta) {
+    state.cart = state.cart.map(function (l) { return l.id === id ? Object.assign({}, l, { qty: l.qty + delta }) : l; })
+                           .filter(function (l) { return l.qty > 0; });
+    renderCart(delta > 0 ? id : null); renderGrid();
+  }
+  function remove(id) { state.cart = state.cart.filter(function (l) { return l.id !== id; }); renderCart(); renderGrid(); }
+
+  /* ------------------------------------------------------------ prompt dialog */
+  function ask(title, value, type, cb) {
+    var d = $('#prompt-dialog'), input = $('#prompt-input');
+    $('#prompt-title').textContent = title;
+    input.type = type || 'text'; input.value = value || '';
+    if (type === 'number') { input.inputMode = 'numeric'; input.min = '0'; input.step = '1000'; } else { input.removeAttribute('inputmode'); }
+    d.onclose = function () { if (d.returnValue === 'ok') cb(input.value.trim()); };
+    d.returnValue = '';
+    d.showModal(); setTimeout(function () { input.focus(); input.select(); }, 30);
+  }
+
+  /* ------------------------------------------------------------ payment */
+  function openPay() {
+    var t = totals(); if (!t.count) return;
+    state.given = 0;
+    $('#pay-total').textContent = fmt(t.total);
+    $('#pay-sub').textContent = $('#table').selectedOptions[0].textContent.replace(/^\S+\s/, '') + ' · ' + t.count + ' món';
+    var suggestions = [t.total, Math.ceil(t.total / 50000) * 50000, Math.ceil(t.total / 100000) * 100000, Math.ceil(t.total / 100000) * 100000 + 100000, 500000]
+      .filter(function (v, i, a) { return v >= t.total && a.indexOf(v) === i; }).slice(0, 4);
+    $('#quick-cash').innerHTML = suggestions.map(function (v, i) {
+      return '<button type="button" data-given="' + v + '" class="h-12 rounded-xl border border-slate-200 text-sm font-bold tnum hover:border-navy-accent hover:text-navy-accent">' + (i === 0 ? 'Đủ tiền' : fmt(v)) + '</button>';
+    }).join('');
+    setMethod('cash');
+    $('#pay-dialog').showModal();
+  }
+  function setMethod(m) {
+    state.method = m;
+    document.querySelectorAll('.method').forEach(function (b) {
+      var on = b.getAttribute('data-method') === m;
+      b.setAttribute('aria-checked', on); b.setAttribute('role', 'radio');
+      b.className = 'method h-14 rounded-xl border-2 text-base font-bold transition ' + (on ? 'border-navy-accent bg-navy-50 text-navy' : 'border-slate-200 text-slate-600 hover:border-slate-300');
+    });
+    $('#cash-box').hidden = m !== 'cash';
+    updateChange();
+  }
+  function updateChange() {
+    var t = totals();
+    $('#change').textContent = state.given ? fmt(Math.max(0, state.given - t.total)) : '—';
+    document.querySelectorAll('[data-given]').forEach(function (b) {
+      var on = Number(b.getAttribute('data-given')) === state.given;
+      b.classList.toggle('border-navy-accent', on); b.classList.toggle('bg-navy-50', on);
+    });
+  }
+  function confirmPay() {
+    var t = totals();
+    $('#pay-dialog').close();
+    toast('Đã thanh toán ' + fmt(t.total) + ' · ' + { cash: 'Tiền mặt', transfer: 'Chuyển khoản', card: 'Thẻ' }[state.method], 'ok');
+    state.cart = []; state.discount = 0; state.customer = ''; state.note = ''; state.seq += 1;
+    $('#customer-label').textContent = 'Khách hàng'; $('#note-label').textContent = 'Ghi chú';
+    renderCart(); renderGrid();
+  }
+
+  /* ------------------------------------------------------------ zalo drafts */
+  function renderZalo() {
+    $('#zalo-count').textContent = ZALO_DRAFTS.length;
+    $('#zalo-banner').classList.toggle('hidden', ZALO_DRAFTS.length === 0);
+    $('#zalo-list').innerHTML = ZALO_DRAFTS.map(function (d, i) {
+      var sum = d.items.reduce(function (s, it) { return s + byId(it.id).price * it.qty; }, 0);
+      return '<li class="rounded-xl border border-slate-200 p-4">' +
+        '<div class="flex items-center justify-between"><p class="font-bold">' + esc(d.who) + '</p><span class="text-xs text-slate-500">' + esc(d.ago) + '</span></div>' +
+        '<p class="mt-1 text-sm text-slate-600">' + d.items.map(function (it) { return it.qty + '× ' + esc(byId(it.id).name); }).join(', ') + '</p>' +
+        '<div class="mt-3 flex items-center justify-between"><span class="font-mono text-xs text-slate-400">' + d.code + '</span>' +
+        '<span class="flex items-center gap-3"><span class="font-extrabold text-navy tnum">' + fmt(sum) + '</span>' +
+        '<button type="button" data-take="' + i + '" class="h-12 rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white hover:bg-emerald-700 active:scale-95">Nhận đơn</button></span></div></li>';
+    }).join('');
+  }
+
+  /* ------------------------------------------------------------ events */
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('button, [data-cat]'); if (!t) return;
+    if (t.hasAttribute('data-cat')) { state.cat = t.getAttribute('data-cat'); renderCategories(); renderGrid(); return; }
+    if (t.hasAttribute('data-add')) { add(Number(t.getAttribute('data-add'))); return; }
+    if (t.hasAttribute('data-inc')) { change(Number(t.getAttribute('data-inc')), 1); return; }
+    if (t.hasAttribute('data-dec')) { change(Number(t.getAttribute('data-dec')), -1); return; }
+    if (t.hasAttribute('data-del')) { remove(Number(t.getAttribute('data-del'))); return; }
+    if (t.hasAttribute('data-given')) { state.given = Number(t.getAttribute('data-given')); updateChange(); return; }
+    if (t.hasAttribute('data-method')) { setMethod(t.getAttribute('data-method')); return; }
+    if (t.hasAttribute('data-take')) {
+      var d = ZALO_DRAFTS.splice(Number(t.getAttribute('data-take')), 1)[0];
+      d.items.forEach(function (it) { add(it.id, it.qty); });
+      state.customer = d.who; $('#customer-label').textContent = d.who;
+      $('#table').value = 'takeaway';
+      renderZalo(); $('#zalo-dialog').close();
+      toast('Đã nhận đơn Zalo ' + d.code, 'ok');
+      return;
+    }
+    if (t.hasAttribute('data-close')) { t.closest('dialog').close(); return; }
+    switch (t.id) {
+      case 'btn-pay': openPay(); break;
+      case 'pay-confirm': confirmPay(); break;
+      case 'zalo-banner': $('#zalo-dialog').showModal(); break;
+      case 'btn-customer': ask('Tên / SĐT khách hàng', state.customer, 'text', function (v) { state.customer = v; $('#customer-label').textContent = v || 'Khách hàng'; }); break;
+      case 'btn-note': ask('Ghi chú cho đơn', state.note, 'text', function (v) { state.note = v; $('#note-label').textContent = v ? 'Có ghi chú' : 'Ghi chú'; }); break;
+      case 'btn-discount': ask('Giảm giá (đ)', state.discount || '', 'number', function (v) { state.discount = Math.max(0, Number(v) || 0); renderCart(); }); break;
+    }
+  });
+
+  $('#search').addEventListener('input', function (e) { state.q = e.target.value; renderGrid(); });
+
+  document.addEventListener('keydown', function (e) {
+    var typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+    var dialogOpen = document.querySelector('dialog[open]');
+    if (e.key === 'Enter' && !typing) {
+      e.preventDefault();
+      if ($('#pay-dialog').open) confirmPay();
+      else if (!dialogOpen) openPay();
+    } else if (e.key === '/' && !typing && !dialogOpen) {
+      e.preventDefault(); $('#search').focus();
+    } else if (e.key === 'Escape' && document.activeElement === $('#search')) {
+      $('#search').value = ''; state.q = ''; renderGrid(); $('#search').blur();
+    }
+  });
+
+  /* ------------------------------------------------------------ clock */
+  function tick() {
+    var now = new Date();
+    $('#clock').textContent = now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    $('#date').textContent = now.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit' });
+  }
+
+  /* ------------------------------------------------------------ boot */
+  renderCategories(); renderGrid(); renderTables(); renderCart(); renderZalo(); tick();
+  setInterval(tick, 15000);
+})();
+</script>
+</body>
+</html>
