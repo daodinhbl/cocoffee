@@ -174,7 +174,8 @@ async function start() {
   }
 
   const stop = () => { server.close(); mock.restoreAll(); };
-  return { base, calls, client, login, csrfOf, stop, ORDER, PASSWORD };
+  const resetPasswords = () => USERS.forEach((u) => hashes.set(u.id, u.password_hash));
+  return { base, calls, client, login, csrfOf, stop, resetPasswords, ORDER, PASSWORD };
 }
 
 module.exports = { start, PASSWORD };

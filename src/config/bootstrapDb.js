@@ -89,4 +89,26 @@ async function isUnfinishedBootstrap(conn, names) {
   return missingTables || env.db.seedDemo;                          // all tables there but the seed never ran
 }
 
-module.exports = { bootstrapIfEmpty };
+/**
+ * DEMO_MODE: make sure the demo account exists as an active admin with the published password. The hash is
+ * rewritten only when the password does not match, so restarts do not end everyone's demo session.
+ * @returns {Promise<'disabled'|'ok'|'reset'|'missing'|'failed'>}
+ */
+async function ensureDemoAccount() {
+  if (!env.demo.enabled) return 'disabled';
+  const userModel = require('../models/userModel');
+  try {
+    const user = await userModel.findByUsername(env.demo.username);
+    if (!user) { logger.warn(`DEMO_MODE: account "${env.demo.username}" does not exist`); return 'missing'; }
+    if (user.is_active && user.role === 'admin' && bcrypt.compareSync(env.demo.password, user.password_hash)) return 'ok';
+    await userModel.setPassword(user.id, bcrypt.hashSync(env.demo.password, 12));
+    await userModel.setActive(user.id, true);
+    logger.info(`DEMO_MODE: demo account "${env.demo.username}" reset`);
+    return 'reset';
+  } catch (err) {
+    logger.error('DEMO_MODE: could not prepare the demo account', err);
+    return 'failed';
+  }
+}
+
+module.exports = { bootstrapIfEmpty, ensureDemoAccount };

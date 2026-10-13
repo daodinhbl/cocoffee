@@ -4,7 +4,7 @@ const userModel = require('../../models/userModel');
 const { AppError } = require('../../utils/httpError');
 const v = require('../../utils/validate');
 const { render, formBool } = require('./common');
-const { checkNewPassword } = require('./authPages');
+const { checkNewPassword, isDemoAccount } = require('./authPages');
 
 async function page(req, res) {
   const forced = Boolean(req.session.mustChangePassword);
@@ -44,6 +44,7 @@ async function resetPassword(req) {
   const id = v.id(req.params.id);
   const target = await userModel.findById(id);
   if (!target) throw new AppError(404, 'NOT_FOUND', 'Không tìm thấy tài khoản.');
+  if (isDemoAccount(target)) throw new AppError(403, 'DEMO_ACCOUNT', 'Tài khoản demo không đổi được mật khẩu.');
   checkNewPassword(req.body.password);
   await userModel.setPassword(id, await bcrypt.hash(req.body.password, 12));
   return { message: `Đã đặt lại mật khẩu cho ${target.username}.` };
@@ -55,6 +56,7 @@ async function setActive(req) {
   const target = await userModel.findById(id);
   if (!target) throw new AppError(404, 'NOT_FOUND', 'Không tìm thấy tài khoản.');
   if (!active) {
+    if (isDemoAccount(target)) throw new AppError(403, 'DEMO_ACCOUNT', 'Không thể vô hiệu hóa tài khoản demo.');
     if (target.id === req.user.id) throw new AppError(409, 'CONFLICT', 'Không thể tự vô hiệu hóa tài khoản đang đăng nhập.');
     if (target.role === 'admin' && target.is_active && (await userModel.countActiveAdmins()) <= 1) {
       throw new AppError(409, 'CONFLICT', 'Phải còn ít nhất một quản trị viên hoạt động.');

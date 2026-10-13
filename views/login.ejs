@@ -5,53 +5,123 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light">
   <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#603813">
   <title>Đăng nhập · <%= shopName %> Admin</title>
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="/brand/favicon-32.png">
+  <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
   <script nonce="<%= nonce %>">
     tailwind.config = {
       theme: { extend: {
-        colors: { ink: { 950: '#16181A', 900: '#1B1D1F', 800: '#25282B', 700: '#2F3337', 600: '#3D4247', 500: '#6B737A', 400: '#8A9097', 300: '#B9BEC3' } },
+        colors: {
+          ink: { 950: '#16181A', 900: '#1B1D1F', 800: '#25282B', 700: '#2F3337', 600: '#3D4247', 500: '#6B737A', 400: '#8A9097', 300: '#B9BEC3' },
+          // Brand: "Cò Coffee" roast brown + cream (from the logo)
+          roast: { 50: '#FBF6EF', 100: '#F5EADB', 200: '#E9D3B6', 300: '#D2AE82', 600: '#7A4A1F', 700: '#603813', 800: '#4C2C0E', 900: '#341E09' },
+        },
         fontFamily: { sans: ['"Times New Roman"', 'Times', '"Liberation Serif"', 'Tinos', 'serif'] },
-        borderRadius: { DEFAULT: '4px', sm: '2px', md: '4px', lg: '4px' },
+        borderRadius: { DEFAULT: '4px', sm: '2px', md: '4px', lg: '6px', xl: '10px' },
       } },
     };
   </script>
   <style>
-    :focus-visible { outline: 2px solid #fbbf24; outline-offset: 2px; }
+    :focus-visible { outline: 2px solid #603813; outline-offset: 2px; }
     @media (max-width: 767px) { input { font-size: 16px !important; } }
+    .steam { background-image: radial-gradient(circle at 20% 15%, rgba(96,56,19,.08) 0, transparent 45%), radial-gradient(circle at 85% 80%, rgba(96,56,19,.10) 0, transparent 50%); }
   </style>
 </head>
-<body class="h-full bg-ink-900 font-sans text-gray-900 antialiased">
-  <main class="flex min-h-full items-center justify-center p-4">
-    <div class="w-full max-w-sm rounded border border-ink-700 bg-white p-6 sm:p-8">
-      <div class="flex items-center gap-3">
-        <span class="flex h-9 w-9 items-center justify-center rounded-sm bg-amber-400 text-base font-bold text-ink-900" aria-hidden="true">C</span>
-        <div class="leading-tight">
-          <h1 class="text-lg font-semibold"><%= shopName %></h1>
-          <p class="text-sm text-gray-500">Đăng nhập quản trị</p>
+<body class="min-h-full bg-roast-50 font-sans text-gray-900 antialiased">
+  <main class="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
+
+    <!-- Brand panel (laptop/desktop) -->
+    <section class="steam relative hidden flex-col items-center justify-center overflow-hidden bg-roast-100 px-12 lg:flex" aria-hidden="true">
+      <img src="/brand/logo.png" alt="" width="480" height="472" class="w-full max-w-md drop-shadow-sm">
+      <p class="mt-10 max-w-sm text-center text-lg italic text-roast-700">Quản lý quán — đơn hàng, thực đơn, kho và báo cáo — ở một nơi.</p>
+      <div class="absolute inset-x-0 bottom-0 h-1.5 bg-roast-700"></div>
+    </section>
+
+    <!-- Form -->
+    <section class="flex flex-col items-center justify-center px-4 py-10 sm:px-8">
+      <div class="w-full max-w-sm">
+        <div class="mb-8 flex flex-col items-center text-center lg:items-start lg:text-left">
+          <img src="/brand/mark.png" alt="<%= shopName %>" width="256" height="200" class="h-20 w-auto lg:hidden">
+          <h1 class="mt-4 text-3xl font-semibold text-roast-800 lg:mt-0"><%= shopName %></h1>
+          <p class="mt-1 text-sm text-gray-500">Đăng nhập trang quản trị</p>
         </div>
+
+        <div class="rounded-xl border border-roast-200 bg-white p-6 shadow-[0_10px_30px_-12px_rgba(96,56,19,.25)] sm:p-8">
+          <% if (error) { %>
+            <div role="alert" class="mb-5 flex gap-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+              <svg class="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
+              <span><%= error %></span>
+            </div>
+          <% } %>
+
+          <% if (locals.demo) { %>
+            <div class="mb-5 rounded border border-roast-200 bg-roast-50 px-3 py-3 text-sm text-roast-800">
+              <div class="flex items-center justify-between gap-3">
+                <p class="font-semibold">Tài khoản demo</p>
+                <button type="button" id="demo-fill" class="rounded border border-roast-300 bg-white px-2.5 py-1 text-xs font-semibold text-roast-700 hover:bg-roast-100">Dùng tài khoản này</button>
+              </div>
+              <p class="mt-1.5">Tên đăng nhập: <code class="font-mono font-semibold"><%= demo.username %></code> · Mật khẩu: <code class="font-mono font-semibold"><%= demo.password %></code></p>
+            </div>
+          <% } %>
+
+          <form method="post" action="/admin/login" class="space-y-4">
+            <input type="hidden" name="next" value="<%= next %>">
+            <div>
+              <label for="username" class="mb-1.5 block text-sm font-medium text-gray-700">Tên đăng nhập</label>
+              <div class="relative">
+                <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+                <input id="username" name="username" value="<%= username %>" required maxlength="50" autocomplete="username" autocapitalize="none" spellcheck="false" autofocus
+                  class="h-11 w-full rounded border border-gray-300 pl-9 pr-3 text-sm focus:border-roast-600 focus:outline-none focus:ring-1 focus:ring-roast-600">
+              </div>
+            </div>
+            <div>
+              <label for="password" class="mb-1.5 block text-sm font-medium text-gray-700">Mật khẩu</label>
+              <div class="relative">
+                <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+                <input id="password" name="password" type="password" required maxlength="200" autocomplete="current-password"
+                  class="h-11 w-full rounded border border-gray-300 pl-9 pr-11 text-sm focus:border-roast-600 focus:outline-none focus:ring-1 focus:ring-roast-600">
+                <button type="button" id="pw-toggle" aria-label="Hiện mật khẩu" aria-pressed="false"
+                  class="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded text-gray-400 hover:text-roast-700">
+                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </div>
+            <button type="submit" id="login-submit"
+              class="inline-flex h-11 w-full items-center justify-center gap-2 rounded bg-roast-700 text-sm font-semibold text-white hover:bg-roast-800 active:bg-roast-900 disabled:opacity-70">Đăng nhập</button>
+          </form>
+        </div>
+
+        <p class="mt-6 text-center text-xs text-gray-500 lg:text-left">Chỉ tài khoản quản trị mới vào được trang này. Thu ngân dùng ứng dụng POS.</p>
+        <p class="mt-1 text-center text-xs text-gray-400 lg:text-left">© <%= new Date().getFullYear() %> <%= shopName %></p>
       </div>
-
-      <% if (error) { %>
-        <div role="alert" class="mt-5 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"><%= error %></div>
-      <% } %>
-
-      <form method="post" action="/admin/login" class="mt-5 space-y-4">
-        <input type="hidden" name="next" value="<%= next %>">
-        <div>
-          <label for="username" class="mb-1 block text-sm font-medium">Tên đăng nhập</label>
-          <input id="username" name="username" value="<%= username %>" required maxlength="50" autocomplete="username" autocapitalize="none" spellcheck="false" autofocus
-            class="h-11 w-full rounded border border-gray-300 px-3 text-sm focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400">
-        </div>
-        <div>
-          <label for="password" class="mb-1 block text-sm font-medium">Mật khẩu</label>
-          <input id="password" name="password" type="password" required maxlength="200" autocomplete="current-password"
-            class="h-11 w-full rounded border border-gray-300 px-3 text-sm focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400">
-        </div>
-        <button type="submit" class="inline-flex h-11 w-full items-center justify-center rounded bg-amber-400 text-sm font-semibold text-ink-900 hover:bg-amber-500 active:bg-amber-600">Đăng nhập</button>
-      </form>
-      <p class="mt-5 text-xs text-gray-500">Chỉ tài khoản quản trị mới vào được trang này. Thu ngân dùng ứng dụng POS.</p>
-    </div>
+    </section>
   </main>
+
+  <script nonce="<%= nonce %>">
+    (function () {
+      var pw = document.getElementById('password');
+      var toggle = document.getElementById('pw-toggle');
+      toggle.addEventListener('click', function () {
+        var show = pw.type === 'password';
+        pw.type = show ? 'text' : 'password';
+        toggle.setAttribute('aria-pressed', String(show));
+        toggle.setAttribute('aria-label', show ? 'Ẩn mật khẩu' : 'Hiện mật khẩu');
+      });
+      var fill = document.getElementById('demo-fill');
+      if (fill) fill.addEventListener('click', function () {
+        document.getElementById('username').value = <%- safeJson(locals.demo ? demo.username : '') %>;
+        pw.value = <%- safeJson(locals.demo ? demo.password : '') %>;
+        document.getElementById('login-submit').focus();
+      });
+      document.querySelector('form').addEventListener('submit', function (e) {
+        var b = document.getElementById('login-submit');
+        if (b.disabled) { e.preventDefault(); return; }
+        setTimeout(function () { b.disabled = true; b.textContent = 'Đang đăng nhập…'; }, 0);
+      });
+    })();
+  </script>
 </body>
 </html>

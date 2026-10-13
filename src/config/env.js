@@ -53,6 +53,14 @@ module.exports = {
     bootstrapAdminPassword: optional('BOOTSTRAP_ADMIN_PASSWORD'),
   },
 
+  // Public demo: the login page shows these credentials, the account is (re)set to them at startup and
+  // cannot be locked, renamed away from its password or forced to change it. Anyone can sign in: demo data only.
+  demo: {
+    enabled: bool('DEMO_MODE', false),
+    username: optional('DEMO_USERNAME', 'admin'),
+    password: optional('DEMO_PASSWORD', 'admin'),
+  },
+
   jwt: {
     secret: jwtSecret(),
     expiresIn: optional('JWT_EXPIRES_IN', '12h'),

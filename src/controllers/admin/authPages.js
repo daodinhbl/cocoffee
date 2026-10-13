@@ -9,8 +9,12 @@ const { startSession, endSession, safeBack } = require('../../middlewares/adminA
 const DUMMY_HASH = bcrypt.hashSync('not-a-real-password', 12);
 const MIN_PASSWORD = 10;
 
+/** The public demo account (DEMO_MODE): shown on the login page, never forced/allowed to change. */
+const isDemoAccount = (user) => Boolean(env.demo.enabled && user && user.username === env.demo.username);
+const demoCredentials = () => (env.demo.enabled ? { username: env.demo.username, password: env.demo.password } : null);
+
 const renderLogin = (res, { status = 200, error = null, username = '', next = '' } = {}) =>
-  res.status(status).render('login', { shopName: env.business.shopName, error, username, next: safeBack(next, '') });
+  res.status(status).render('login', { shopName: env.business.shopName, error, username, next: safeBack(next, ''), demo: demoCredentials() });
 
 function loginForm(req, res) {
   if (req.user) return res.redirect(303, safeBack(req.query.next));
@@ -29,7 +33,7 @@ async function login(req, res) {
   if (user.role !== 'admin') {
     return renderLogin(res, { status: 403, error: 'Tài khoản này không có quyền quản trị. Thu ngân dùng ứng dụng POS.', username, next });
   }
-  const weak = password.length < MIN_PASSWORD;           // covers the factory admin/admin
+  const weak = password.length < MIN_PASSWORD && !isDemoAccount(user);   // covers the factory admin/admin
   startSession(res, user, { mustChangePassword: weak });
   if (weak) res.flash('info', 'Mật khẩu hiện tại quá yếu. Hãy đặt mật khẩu mới (tối thiểu 10 ký tự) để tiếp tục.');
   return res.redirect(303, weak ? '/admin/settings/password' : safeBack(next));
@@ -50,6 +54,7 @@ function checkNewPassword(password, confirm) {
 async function changeOwnPassword(req, res) {
   const { current_password: current, new_password: next, confirm_password: confirm } = req.body;
   const user = await userModel.findByUsername(req.user.username);
+  if (isDemoAccount(user)) throw new AppError(403, 'DEMO_ACCOUNT', 'Tài khoản demo không đổi được mật khẩu.');
   if (typeof current !== 'string' || !(await bcrypt.compare(current, user.password_hash))) throw new AppError(400, 'BAD_CREDENTIALS', 'Mật khẩu hiện tại không đúng.');
   checkNewPassword(next, confirm);
   if (next === current) throw new AppError(400, 'VALIDATION', 'Mật khẩu mới phải khác mật khẩu cũ.');
@@ -59,4 +64,4 @@ async function changeOwnPassword(req, res) {
   return { message: 'Đã đổi mật khẩu.', to: '/admin/settings' };
 }
 
-module.exports = { loginForm, login, logout, changeOwnPassword, checkNewPassword, MIN_PASSWORD };
+module.exports = { loginForm, login, logout, changeOwnPassword, checkNewPassword, isDemoAccount, MIN_PASSWORD };
