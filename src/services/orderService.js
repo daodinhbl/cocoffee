@@ -4,6 +4,7 @@ const orderModel = require('../models/orderModel');
 const tableModel = require('../models/tableModel');
 const productModel = require('../models/productModel');
 const inventoryService = require('./inventoryService');
+const customerModel = require('../models/customerModel');
 
 const MAX_QTY = 99;
 
@@ -98,6 +99,9 @@ async function payOrder(orderId, { method, tendered, reference, discount, userId
 
     await orderModel.insertPayment({ orderId, method, amount: total, reference, userId }, conn);
     await orderModel.markPaid(orderId, method, conn);
+    if (order.customer_id && order.status === 'completed') {          // was on the customer's debt: settle it
+      await customerModel.addEntry({ customerId: order.customer_id, orderId, type: 'payment', amount: -Number(total), method, note: `Thu nợ đơn ${order.order_code}`, userId }, conn);
+    }
     return { order: await getWithItems(orderId, conn), change: given - total };
   });
 }
@@ -160,6 +164,12 @@ async function confirmDraft(conn, orderId) {
     throw new AppError(409, 'ORDER_NOT_DRAFT', 'Order is not a pending Zalo draft');
   }
   await finalizeOrder(conn, order);
+  const customer = await customerModel.findByZaloUser(order.zalo_user_id, conn);
+  if (customer) {
+    const done = await orderModel.getById(orderId, conn);
+    await customerModel.linkOrder(orderId, customer.id, conn);
+    await customerModel.addEntry({ customerId: customer.id, orderId, type: 'debt', amount: Number(done.total), note: `Nợ đơn ${done.order_code}` }, conn);
+  }
   return order;
 }
 

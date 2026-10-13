@@ -138,10 +138,56 @@ const UPGRADES = [
    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ];
 
+UPGRADES.push(
+  `CREATE TABLE IF NOT EXISTS customer_ledger (
+     id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+     customer_id  INT UNSIGNED  NOT NULL,
+     order_id     INT UNSIGNED  NULL,
+     entry_type   ENUM('debt','payment','adjust') NOT NULL,
+     amount       DECIMAL(14,2) NOT NULL,
+     method       ENUM('cash','transfer','card','other') NULL,
+     note         VARCHAR(255)  NULL,
+     created_by   INT UNSIGNED  NULL,
+     created_at   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     PRIMARY KEY (id),
+     UNIQUE KEY uq_ledger_order (order_id, entry_type),
+     KEY idx_ledger_customer (customer_id, created_at),
+     CONSTRAINT fk_ledger_customer FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE CASCADE,
+     CONSTRAINT fk_ledger_order    FOREIGN KEY (order_id)    REFERENCES orders (id)    ON DELETE SET NULL
+   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+);
+
+/** Columns added to existing tables: [table, column, ALTER statement]. MySQL 8 has no ADD COLUMN IF NOT EXISTS. */
+const COLUMNS = [
+  ['orders', 'customer_id', 'ALTER TABLE orders ADD COLUMN customer_id INT UNSIGNED NULL AFTER note, ADD KEY idx_orders_customer (customer_id)'],
+];
+
+/**
+ * Backfill, idempotent: link Zalo orders to known customers, and open a debt row for every
+ * confirmed-but-unpaid order of a customer that has none yet (uq_ledger_order makes it a no-op afterwards).
+ */
+const BACKFILL = [
+  `UPDATE orders o JOIN customers c ON c.zalo_user_id = o.zalo_user_id
+      SET o.customer_id = c.id
+    WHERE o.customer_id IS NULL AND o.zalo_user_id IS NOT NULL`,
+  `INSERT IGNORE INTO customer_ledger (customer_id, order_id, entry_type, amount, note, created_at)
+   SELECT o.customer_id, o.id, 'debt', o.total, CONCAT('Nợ đơn ', o.order_code), COALESCE(o.completed_at, o.created_at)
+     FROM orders o
+    WHERE o.customer_id IS NOT NULL AND o.status = 'completed' AND o.payment_status = 'unpaid'`,
+];
+
 async function ensureSchemaUpgrades() {
   const { pool } = require('./db');
   try {
     for (const sql of UPGRADES) await pool.query(sql);
+    for (const [table, column, alter] of COLUMNS) {
+      const [[{ n }]] = await pool.query(
+        'SELECT COUNT(*) AS n FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?',
+        [table, column]
+      );
+      if (!Number(n)) { await pool.query(alter); logger.info(`Schema upgrade: added ${table}.${column}`); }
+    }
+    for (const sql of BACKFILL) await pool.query(sql);
     return 'ok';
   } catch (err) {
     logger.error('Schema upgrade failed', err);

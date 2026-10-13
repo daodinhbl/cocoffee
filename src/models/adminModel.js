@@ -137,20 +137,12 @@ async function zaloPendingDrafts(limit = 20, conn) {
 }
 
 /**
- * Customers owing money: Zalo orders that were confirmed (completed, stock deducted) but not paid, grouped
- * by the Zalo user who placed them, named from `customers` when that user is known.
+ * Customers owing money, from the debt ledger (customer_ledger). Zalo orders confirmed but not paid by a
+ * known customer open a debt row; payments close it.
  */
 async function topDebtors(limit = 6, conn) {
-  const [rows] = await db(conn).query(
-    `SELECT o.zalo_user_id, MAX(c.id) AS customer_id, MAX(c.name) AS customer_name, MAX(c.phone) AS customer_phone,
-            COUNT(*) AS orders, SUM(o.total) AS amount, MIN(o.completed_at) AS oldest
-       FROM orders o LEFT JOIN customers c ON c.zalo_user_id = o.zalo_user_id
-      WHERE o.status = 'completed' AND o.payment_status = 'unpaid' AND o.zalo_user_id IS NOT NULL
-      GROUP BY o.zalo_user_id
-      ORDER BY amount DESC LIMIT ?`,
-    [limit]
-  );
-  return rows;
+  const rows = await require('./customerModel').topBalances(limit, conn);
+  return rows.map((r) => ({ customer_id: r.id, customer_name: r.name, customer_phone: r.phone, zalo_user_id: r.zalo_user_id, orders: r.open_orders, amount: r.balance, oldest: r.oldest }));
 }
 
 module.exports = {

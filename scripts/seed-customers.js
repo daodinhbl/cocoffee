@@ -8,7 +8,7 @@
  *
  * What it writes (one transaction):
  *   - customers: Vietnamese names, unique phone, a synthetic zalo_user_id ("seed-..."), note "Khách mẫu (seed)";
- *   - per customer 1-4 orders: source zalo, status completed, payment unpaid, dated in the last 20 days,
+ *   - per customer 1-4 orders (linked by customer_id, each with a 'debt' row in customer_ledger): source zalo, status completed, payment unpaid, dated in the last 20 days,
  *     1-4 lines of real active products at their current price, COGS estimated from the BOM / stock cost.
  * Stock is NOT deducted (these are invoices for display/testing, not real sales) and every seeded row is
  * tagged in `note`, so --reset removes exactly what this script created. Refuses NODE_ENV=production
@@ -88,7 +88,7 @@ async function main() {
     let orderCount = 0;
     let debtTotal = 0;
     for (const c of customers) {
-      await conn.query('INSERT INTO customers (name, phone, zalo_user_id, note) VALUES (?, ?, ?, ?)', [c.name, c.phone, c.zalo, c.note]);
+      const [cust] = await conn.query('INSERT INTO customers (name, phone, zalo_user_id, note) VALUES (?, ?, ?, ?)', [c.name, c.phone, c.zalo, c.note]);
       const nOrders = between(1, 4);
       let owed = 0;
       for (let k = 0; k < nOrders; k++) {
@@ -99,14 +99,19 @@ async function main() {
         const cogs = lines.reduce((s, l) => s + Math.round(l.unitCogs * l.qty), 0);
         const at = new Date(Date.now() - between(1, 20 * 24 * 60) * 60 * 1000);   // last 20 days
         const [res] = await conn.query(
-          `INSERT INTO orders (source, zalo_user_id, zalo_chat_type, zalo_chat_id, status, payment_status, subtotal, discount, total, cogs_total, note, completed_at, created_at)
-           VALUES ('zalo', ?, 'user', ?, 'completed', 'unpaid', ?, 0, ?, ?, ?, ?, ?)`,
-          [c.zalo, c.zalo, subtotal, subtotal, cogs, ORDER_TAG, at, at]
+          `INSERT INTO orders (source, zalo_user_id, zalo_chat_type, zalo_chat_id, customer_id, status, payment_status, subtotal, discount, total, cogs_total, note, completed_at, created_at)
+           VALUES ('zalo', ?, 'user', ?, ?, 'completed', 'unpaid', ?, 0, ?, ?, ?, ?, ?)`,
+          [c.zalo, c.zalo, cust.insertId, subtotal, subtotal, cogs, ORDER_TAG, at, at]
         );
         await conn.query(`UPDATE orders SET order_code = CONCAT('CF', DATE_FORMAT(created_at, '%y%m%d'), '-', LPAD(id, 5, '0')) WHERE id = ?`, [res.insertId]);
         await conn.query(
           'INSERT INTO order_items (order_id, product_id, product_name, unit_price, quantity, line_total, unit_cogs, line_cogs) VALUES ?',
           [lines.map((l) => [res.insertId, l.id, l.name, l.price, l.qty, l.price * l.qty, l.unitCogs, Math.round(l.unitCogs * l.qty)])]
+        );
+        await conn.query(
+          `INSERT INTO customer_ledger (customer_id, order_id, entry_type, amount, note, created_at)
+           SELECT ?, id, 'debt', total, CONCAT('Nợ đơn ', order_code), completed_at FROM orders WHERE id = ?`,
+          [cust.insertId, res.insertId]
         );
         owed += subtotal; orderCount += 1;
       }

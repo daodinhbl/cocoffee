@@ -6,7 +6,7 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
-DROP TABLE IF EXISTS customers, app_settings, zalo_tokens, zalo_events, zalo_sessions, payments, inventory_movements,
+DROP TABLE IF EXISTS customer_ledger, customers, app_settings, zalo_tokens, zalo_events, zalo_sessions, payments, inventory_movements,
                      order_items, orders, dining_tables, recipes, product_aliases, products,
                      inventory_items, categories, users;
 
@@ -149,6 +149,7 @@ CREATE TABLE orders (
   total            DECIMAL(14,2) NOT NULL DEFAULT 0,
   cogs_total       DECIMAL(14,2) NOT NULL DEFAULT 0,
   note             VARCHAR(255)  NULL,
+  customer_id      INT UNSIGNED  NULL,              -- customers.id (debtor / regular); no FK: customers is created later
   created_by       INT UNSIGNED  NULL,
   paid_at          DATETIME      NULL,
   completed_at     DATETIME      NULL,
@@ -163,6 +164,7 @@ CREATE TABLE orders (
   KEY idx_orders_table (table_id),
   KEY idx_orders_zalo_user (source, zalo_user_id),
   KEY idx_orders_zalo_chat (zalo_chat_id),
+  KEY idx_orders_customer (customer_id),
   CONSTRAINT fk_orders_table FOREIGN KEY (table_id)   REFERENCES dining_tables (id) ON DELETE SET NULL,
   CONSTRAINT fk_orders_user  FOREIGN KEY (created_by) REFERENCES users (id)         ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -300,4 +302,24 @@ CREATE TABLE customers (
   PRIMARY KEY (id),
   UNIQUE KEY uq_customers_phone (phone),
   UNIQUE KEY uq_customers_zalo (zalo_user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Debt ledger (sổ công nợ). Balance of a customer = SUM(amount): a confirmed-but-unpaid order adds a
+-- 'debt' row (+total); collecting money adds a 'payment' row (-amount, may be partial); 'adjust' corrects.
+-- One debt row and one payment row per order at most (uq_ledger_order); free payments have order_id NULL.
+CREATE TABLE customer_ledger (
+  id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  customer_id  INT UNSIGNED  NOT NULL,
+  order_id     INT UNSIGNED  NULL,
+  entry_type   ENUM('debt','payment','adjust') NOT NULL,
+  amount       DECIMAL(14,2) NOT NULL,
+  method       ENUM('cash','transfer','card','other') NULL,
+  note         VARCHAR(255)  NULL,
+  created_by   INT UNSIGNED  NULL,
+  created_at   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_ledger_order (order_id, entry_type),
+  KEY idx_ledger_customer (customer_id, created_at),
+  CONSTRAINT fk_ledger_customer FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE CASCADE,
+  CONSTRAINT fk_ledger_order    FOREIGN KEY (order_id)    REFERENCES orders (id)    ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
