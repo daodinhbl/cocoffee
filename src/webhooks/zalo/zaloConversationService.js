@@ -6,18 +6,22 @@ const productModel = require('../../models/productModel');
 const orderModel = require('../../models/orderModel');
 const { sessionModel } = require('../../models/zaloModel');
 const orderService = require('../../services/orderService');
-const receiptService = require('../../services/receiptService');
-const zaloApi = require('../../services/zalo/zaloApiService');
 const parser = require('./zaloOrderParser');
 
 /**
- * Chat flow (per chat + sender, state in zalo_sessions):
- *   text with items  -> DRAFT order saved, summary sent, session = awaiting_confirm
+ * Chat flow (per chat + sender, state in zalo_sessions). Transport-agnostic: the caller passes
+ *   io.reply(text)            - how a message reaches the chat (bot HTTP response, or the OA API)
+ *   io.onConfirmed(orderId)   - what to do with the bill after COMMIT
+ *
+ *   text with items  -> DRAFT order saved, summary replied, session = awaiting_confirm
  *   "ok" / "oke"     -> ONE transaction: draft -> completed, stock deducted, COGS fixed, session cleared
- *                       -> after COMMIT the bill is sent through the Zalo API
+ *                       -> after COMMIT the bill goes out through io.onConfirmed
  *   "huy"            -> draft cancelled
  * In GROUP chats the bot stays silent unless the message is clearly meant for it
  * (order items, or a command while a draft exists), otherwise every "ok" in a group would trigger it.
+ * Drafts are per sender even inside a group, so one customer's "ok" never confirms another's order.
+ *
+ * Returns the action taken: 'draft' | 'confirmed' | 'cancelled' | 'expired' | 'menu' | 'help' | 'ignored' | 'error'.
  */
 
 const TXT = {
@@ -30,12 +34,14 @@ const TXT = {
   outOfStock: (names) => `Rất tiếc hiện đã hết hàng/nguyên liệu cho: ${names.join(', ')}. Bạn chọn món khác hoặc nhắn "huy" để hủy đơn nhé!`,
 };
 
-async function say(target, text) {
+/** Deliver a reply; a delivery failure is logged, never thrown (the order state is already saved). */
+async function say(ctx, text, action) {
   try {
-    await zaloApi.sendText(target, text);
+    await ctx.io.reply(text);
   } catch (err) {
-    logger.error(`Zalo reply failed (${target.chatType}:${target.chatId})`, err);
+    logger.error(`Zalo reply failed (${ctx.chatType}:${ctx.chatId})`, err);
   }
+  return action;
 }
 
 function draftSummary(order, unmatched) {
@@ -61,20 +67,19 @@ async function menuText() {
 }
 
 // --------------------------------------------------------------------------- entry point
-async function handleText({ chatType, chatId, userId, text, msgId }) {
-  const target = { chatType, chatId };
+async function handleText({ chatType, chatId, userId, text, msgId }, io) {
   const isGroup = chatType === 'group';
-  const ctx = { target, chatType, chatId, userId, msgId, isGroup };
+  const ctx = { io, chatType, chatId, userId, msgId, isGroup };
 
   const command = parser.detectCommand(text);
   if (command === 'confirm') return confirm(ctx);
   if (command === 'cancel') return cancel(ctx);
-  if (command === 'menu') return say(target, await menuText());
+  if (command === 'menu') return say(ctx, await menuText(), 'menu');
 
   const parsed = parser.parseOrder(text, await productModel.listForMatching());
   if (!parsed.items.length) {
-    if (isGroup) return undefined;                                   // ignore group chatter
-    return say(target, parsed.unmatched.length ? TXT.notFound(parsed.unmatched) : TXT.help);
+    if (isGroup) return 'ignored';                                   // ignore group chatter
+    return say(ctx, parsed.unmatched.length ? TXT.notFound(parsed.unmatched) : TXT.help, 'help');
   }
 
   try {
@@ -86,15 +91,16 @@ async function handleText({ chatType, chatId, userId, text, msgId }) {
       await sessionModel.setDraft(conn, session.id, orderId, msgId, env.zalo.draftTtlMinutes);
       return orderService.getWithItems(orderId, conn);
     });
-    return say(target, draftSummary(order, parsed.unmatched));
+    return say(ctx, draftSummary(order, parsed.unmatched), 'draft');
   } catch (err) {
     logger.error('Draft creation failed', err);
-    return say(target, TXT.busy);
+    return say(ctx, TXT.busy, 'error');
   }
 }
 
 // --------------------------------------------------------------------------- confirm
-async function confirm({ target, chatType, chatId, userId, isGroup }) {
+async function confirm(ctx) {
+  const { chatType, chatId, userId, isGroup } = ctx;
   let outcome;
   try {
     outcome = await withTransaction(async (conn) => {
@@ -109,31 +115,35 @@ async function confirm({ target, chatType, chatId, userId, isGroup }) {
 
       // Draft -> Completed + inventory deduction + COGS. Any throw below rolls back EVERYTHING
       // (order status, stock, ledger, session): the draft stays confirmable.
-      await orderService.confirmDraft(conn, session.draft_order_id);
+      const orderId = session.draft_order_id;                        // read before the session is cleared
+      await orderService.confirmDraft(conn, orderId);
       await sessionModel.clearDraft(conn, session.id);
-      return { status: 'ok', orderId: session.draft_order_id };
+      return { status: 'ok', orderId };
     });
   } catch (err) {
-    if (err.code === 'INSUFFICIENT_STOCK') return say(target, TXT.outOfStock(err.details?.products?.length ? err.details.products : [err.message]));
-    if (err.code === 'ORDER_NOT_DRAFT') return say(target, TXT.noDraft);
+    if (err.code === 'INSUFFICIENT_STOCK') return say(ctx, TXT.outOfStock(err.details?.products?.length ? err.details.products : [err.message]), 'error');
+    if (err.code === 'ORDER_NOT_DRAFT') return say(ctx, TXT.noDraft, 'ignored');
     logger.error('Order confirmation rolled back', err);
-    return say(target, TXT.busy);
+    return say(ctx, TXT.busy, 'error');
   }
 
   switch (outcome.status) {
-    case 'ok': {
-      // After COMMIT: a delivery problem must never undo the sale; it is stored on the order for retry.
-      const result = await receiptService.sendReceipt(outcome.orderId);
-      if (!result.sent) logger.warn(`Order ${outcome.orderId} completed but receipt not delivered: ${result.error}`);
-      return undefined;
-    }
-    case 'expired': return say(target, TXT.expired(env.zalo.draftTtlMinutes));
-    default: return isGroup ? undefined : say(target, TXT.noDraft);
+    case 'ok':
+      // After COMMIT: a delivery problem must never undo the sale (the transport records it on the order).
+      try {
+        await ctx.io.onConfirmed(outcome.orderId);
+      } catch (err) {
+        logger.warn(`Order ${outcome.orderId} completed but the bill was not delivered`, err);
+      }
+      return 'confirmed';
+    case 'expired': return say(ctx, TXT.expired(env.zalo.draftTtlMinutes), 'expired');
+    default: return isGroup ? 'ignored' : say(ctx, TXT.noDraft, 'ignored');
   }
 }
 
 // --------------------------------------------------------------------------- cancel
-async function cancel({ target, chatType, chatId, userId, isGroup }) {
+async function cancel(ctx) {
+  const { chatType, chatId, userId, isGroup } = ctx;
   const had = await withTransaction(async (conn) => {
     const session = await sessionModel.find(conn, { chatType, chatId, userId }, { forUpdate: true });
     if (!session || !session.draft_order_id) return false;
@@ -141,8 +151,8 @@ async function cancel({ target, chatType, chatId, userId, isGroup }) {
     await sessionModel.clearDraft(conn, session.id);
     return true;
   });
-  if (had) return say(target, TXT.cancelled);
-  return isGroup ? undefined : say(target, TXT.noDraft);
+  if (had) return say(ctx, TXT.cancelled, 'cancelled');
+  return isGroup ? 'ignored' : say(ctx, TXT.noDraft, 'ignored');
 }
 
 module.exports = { handleText, draftSummary };

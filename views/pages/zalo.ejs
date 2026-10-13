@@ -1,14 +1,20 @@
 <%
   const { btnSecondary } = ui;
   const EVENT = { received: ['Đang xử lý', 'info'], processed: ['Đã xử lý', 'good'], ignored: ['Bỏ qua', 'neutral'], failed: ['Lỗi', 'bad'] };
-  const tokenState = !conn.configured ? ['Chưa cấu hình', 'neutral', 'Thiếu ZALO_APP_ID / ZALO_OA_SECRET_KEY / ZALO_APP_SECRET_KEY trong biến môi trường.']
+  const isBot = conn.mode === 'bot';
+  const lastAgo = stats.lastEventAt ? Math.round((Date.now() - new Date(stats.lastEventAt).getTime()) / 60000) : null;
+  const botState = !conn.configured ? ['Chưa cấu hình', 'neutral', 'Đặt BOT_WEBHOOK_SECRET trong biến môi trường (hPanel) rồi cấu hình cùng giá trị đó ở Bot Client.']
+    : lastAgo === null ? ['Chưa nhận tin', 'warn', 'Bot Client chưa gửi tin nhắn nào tới webhook.']
+    : lastAgo > 60 * 24 ? ['Không hoạt động', 'warn', 'Hơn 24 giờ chưa nhận tin từ Bot Client: kiểm tra máy chạy bot.']
+    : ['Đang hoạt động', 'good', null];
+  const tokenState = isBot ? botState : !conn.configured ? ['Chưa cấu hình', 'neutral', 'Thiếu ZALO_APP_ID / ZALO_OA_SECRET_KEY / ZALO_APP_SECRET_KEY trong biến môi trường.']
     : conn.readError ? ['Không đọc được', 'warn', 'Không truy vấn được bảng token. Kiểm tra kết nối cơ sở dữ liệu.']
     : !conn.token ? ['Chưa cấp quyền', 'warn', conn.bootstrapPending ? 'Đã có ZALO_BOOTSTRAP_REFRESH_TOKEN, hệ thống sẽ đổi lấy token ở lần gửi tin đầu tiên.' : 'Cần đặt ZALO_BOOTSTRAP_REFRESH_TOKEN để cấp token lần đầu.']
     : ['Đã kết nối', 'good', null];
 %>
 <div class="flex flex-wrap items-start justify-between gap-4">
   <div>
-    <h1 class="text-xl font-semibold tracking-tight sm:text-2xl">Zalo OA</h1>
+    <h1 class="text-xl font-semibold tracking-tight sm:text-2xl"><%= isBot ? 'Zalo bot (tài khoản cá nhân)' : 'Zalo OA' %></h1>
     <p class="mt-1 max-w-2xl text-sm text-gray-500">Giám sát chatbot đặt món: kết nối, sự kiện webhook 24 giờ qua, đơn nháp đang chờ khách xác nhận và các bill gửi lỗi.</p>
   </div>
 </div>
@@ -22,7 +28,12 @@
     <% if (tokenState[2]) { %><p class="mt-2 text-sm text-gray-600"><%= tokenState[2] %></p><% } %>
     <dl class="mt-3 space-y-2 text-sm">
       <div class="flex justify-between gap-3"><dt class="text-gray-500">Webhook URL</dt><dd class="break-all text-right font-mono text-xs"><%= conn.webhookUrl %></dd></div>
+      <% if (isBot) { %>
+        <div class="flex justify-between gap-3"><dt class="text-gray-500">Xác thực</dt><dd class="text-right">Authorization: Bearer BOT_WEBHOOK_SECRET <%- conn.configured ? badge('Đã đặt', 'good') : badge('Chưa đặt', 'bad') %></dd></div>
+        <div class="flex justify-between gap-3"><dt class="text-gray-500">Tin nhắn gần nhất</dt><dd><%= stats.lastEventAt ? fmtTime(stats.lastEventAt) : '—' %></dd></div>
+      <% } else { %>
       <div class="flex justify-between gap-3"><dt class="text-gray-500">Xác thực chữ ký</dt><dd><%- conn.verifySignature ? badge('Bật', 'good') : badge('TẮT — chỉ dùng khi thử nghiệm', 'bad') %></dd></div>
+      <% } %>
       <% if (conn.token) { %>
         <div class="flex justify-between gap-3"><dt class="text-gray-500">Access token hết hạn</dt><dd class="tnum"><%= fmtTime(conn.token.accessExpiresAt) %><span class="block text-right text-xs text-gray-500">Tự gia hạn khi cần</span></dd></div>
       <% } %>

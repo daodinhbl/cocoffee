@@ -5,6 +5,8 @@ const keyedQueue = require('../../utils/keyedQueue');
 const { eventModel } = require('../../models/zaloModel');
 const { verifySignature } = require('../../services/zalo/zaloSignature');
 const conversation = require('./zaloConversationService');
+const zaloApi = require('../../services/zalo/zaloApiService');
+const receiptService = require('../../services/receiptService');
 
 // Text events we act on. Everything else (oa_send_*, follows, images, ...) is logged as 'ignored';
 // ignoring oa_send_group_text also prevents the bot from reacting to its own group messages.
@@ -18,6 +20,9 @@ const eventKey = (event, rawBody) => {
 };
 
 /**
+ * LEGACY transport (ZALO_MODE=oa): Zalo Official Account. The default is the personal-account bot,
+ * see botWebhookController.js.
+ *
  * POST /api/zalo/webhook
  * Zalo requires HTTP 200 within 2 seconds, so: verify -> record (idempotent) -> ACK -> process async.
  * Retries (+30s, 5m, 15m, 30m, 1h; header `num_retry`) carry the same msg_id and are dropped by the
@@ -67,6 +72,12 @@ async function handle(req, res) {
   return keyedQueue
     .run(`${chatType}:${chatId}:${senderId}`, () => conversation.handleText({
       chatType, chatId: String(chatId), userId: senderId, text: event.message.text, msgId: event.message.msg_id,
+    }, {
+      reply: (text) => zaloApi.sendText({ chatType, chatId: String(chatId) }, text),
+      onConfirmed: async (orderId) => {
+        const result = await receiptService.sendReceipt(orderId);
+        if (!result.sent) logger.warn(`Order ${orderId} completed but receipt not delivered: ${result.error}`);
+      },
     }))
     .then(() => eventModel.mark(key, 'processed'))
     .catch((err) => {

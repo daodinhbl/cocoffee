@@ -13,6 +13,17 @@ const logger = require('../../utils/logger');
  * @returns {Promise<{state:'ok'|'warn'|'off'|'unknown', label:string}>}
  */
 async function zaloStatus() {
+  if (env.zalo.mode !== 'oa') {
+    if (!env.zalo.botWebhookSecret) return { state: 'off', label: 'Zalo bot: chưa cấu hình' };
+    try {
+      const { lastEventAt } = await adminModel.zaloEventStats(24);
+      const fresh = lastEventAt && Date.now() - new Date(lastEventAt).getTime() < 24 * 3600 * 1000;
+      return fresh ? { state: 'ok', label: 'Zalo bot OK' } : { state: 'warn', label: 'Zalo bot: chưa nhận tin' };
+    } catch (err) {
+      logger.warn('Admin header: could not read Zalo bot state', err);
+      return { state: 'unknown', label: 'Zalo bot: không rõ' };
+    }
+  }
   if (!env.zalo.appId || !env.zalo.oaSecretKey) return { state: 'off', label: 'Zalo: chưa cấu hình' };
   try {
     const row = await tokenModel.get(null);

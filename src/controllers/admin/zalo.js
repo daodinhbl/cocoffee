@@ -5,8 +5,16 @@ const logger = require('../../utils/logger');
 const { render } = require('./common');
 const orders = require('./orders');
 
-/** Connection facts for the Zalo OA screen. Token VALUES are never read into the view model. */
+/** Connection facts for the Zalo screen. Secret / token VALUES are never read into the view model. */
 async function connection() {
+  if (env.zalo.mode !== 'oa') {
+    return {
+      mode: 'bot',
+      configured: Boolean(env.zalo.botWebhookSecret),
+      webhookUrl: `${env.publicBaseUrl || 'https://<tên-miền-của-bạn>'}/api/zalo/webhook`,
+      draftTtlMinutes: env.zalo.draftTtlMinutes,
+    };
+  }
   const configured = Boolean(env.zalo.appId && env.zalo.oaSecretKey && env.zalo.appSecretKey);
   let token = null;
   let readError = false;
@@ -18,7 +26,7 @@ async function connection() {
     logger.warn('Zalo screen: could not read token state', err);
   }
   return {
-    configured, token, readError,
+    mode: 'oa', configured, token, readError,
     bootstrapPending: configured && !token && Boolean(env.zalo.bootstrapRefreshToken),
     webhookUrl: `${env.publicBaseUrl || 'https://<tên-miền-của-bạn>'}/api/zalo/webhook`,
     verifySignature: env.zalo.verifySignature,
@@ -31,7 +39,7 @@ async function page(_req, res) {
     connection(), adminModel.zaloEventStats(24), adminModel.zaloRecentEvents(25), adminModel.zaloPendingDrafts(20), adminModel.receiptErrors(10),
   ]);
   await render(res, 'zalo', {
-    title: 'Zalo OA', activeMenu: 'zalo', breadcrumbs: [{ label: 'Phân tích', href: '#' }, { label: 'Zalo OA' }],
+    title: conn.mode === 'oa' ? 'Zalo OA' : 'Zalo bot', activeMenu: 'zalo', breadcrumbs: [{ label: 'Phân tích', href: '#' }, { label: conn.mode === 'oa' ? 'Zalo OA' : 'Zalo bot' }],
   }, { conn, stats, events, drafts, failed });
 }
 
