@@ -111,6 +111,19 @@ API: `GET /products`, `GET /products/:id` (kèm `recipe`), `PUT /products/:id` v
 
 ---
 
+### 2.4 Responsive và layout riêng cho điện thoại (đã triển khai trong `views/`)
+
+Thiết bị được nhận diện bằng media query (độ rộng + `pointer: coarse`) và thuộc tính `data-device` do JS đặt khi tải và khi xoay màn hình — không đọc user-agent.
+
+| Tier | Độ rộng | Điều hướng | Header | Bảng công thức | Hộp thoại |
+|---|---|---|---|---|---|
+| **Phone** | < 768 | **Thanh tab dưới 56px** (Tổng quan · Định mức · Menu) + drawer; vuốt trái để đóng; nền sau drawer `inert` | 56px: logo, tiêu đề trang, chấm Zalo, chuông | Mỗi dòng là một **thẻ**: tên + % lợi nhuận, chip nguyên liệu, giá vốn | giá bán, nút Sửa/Xóa cao 44px | **Bottom sheet**, nút Hủy/Lưu dính đáy |
+| **Tablet** | 768–1023 | Rail 72px (icon) | 64px | Lưới thẻ **2 cột** | Modal giữa màn hình |
+| **Laptop** | 1024–1279 | Rail mặc định, mở rộng được | 64px | Bảng đầy đủ | Modal |
+| **Desktop** | ≥ 1280 | Sidebar 240px, thu gọn được, **nhớ lựa chọn** (chỉ áp dụng từ 1024 trở lên) | 64px | Bảng đầy đủ, nội dung tối đa 1280px | Modal |
+
+Thao tác trên điện thoại: thanh tab phân đoạn và ô tìm kiếm **dính** dưới header; nút "+" và "Nhập Excel" nằm trong thanh công cụ dính (không dùng nút nổi vì nó che nút Xóa của thẻ); ô nhập ≥ 16px (iOS không tự phóng to); vùng chạm ≥ 44px khi `pointer: coarse`; tôn trọng safe-area (tai thỏ, thanh home); `touch-action: manipulation` bỏ trễ chạm đúp.
+
 ## Phần 3 — Layout Tablet POS (Thu ngân)
 
 ### 3.1 Nền tảng và lưới
@@ -291,26 +304,27 @@ Khách Zalo                 Máy chủ                                  Tablet P
 
 Quy tắc chung: màu nhấn chiếm ≤ 10 % diện tích; một màn chỉ có **một** nút amber đặc; trạng thái bàn = **màu + icon + chữ**.
 
-### 4.3 Typography (quán nhiều ánh sáng: ưu tiên cỡ lớn, nét đậm vừa, tương phản ≥ 7:1 cho chữ chính)
+### 4.3 Typography — Times New Roman (quyết định của chủ dự án)
 
-| Vai trò | Font | Cỡ / dòng | Weight |
+| Vai trò | Font |
+|---|---|
+| Toàn bộ UI: tiêu đề, nội dung, **số tiền, số lượng, đồng hồ, số bàn** | **Times New Roman** (dự phòng: Times, Liberation Serif, Tinos, serif). Font hệ thống: không phải tải, đủ dấu tiếng Việt; chữ số cố định bề rộng nên cột tiền vẫn thẳng hàng và tổng tiền đổi giá trị không làm layout nhảy |
+
+| Style | sp / dòng | Weight | Dùng cho |
 |---|---|---|---|
-| UI, nội dung | **Be Vietnam Pro** (OFL, thiết kế cho tiếng Việt — dấu thanh chồng không dính) | — | 400 / 500 / 600 / 700 |
-| **Số tiền, số lượng, đồng hồ, số bàn** | **IBM Plex Mono** (OFL) — chữ số cố định bề rộng nên cột tiền thẳng hàng, tổng tiền đổi giá trị không làm layout nhảy | — | 500 / 600 |
+| `display` | 32 / 40 | 700 | Tiêu đề lớn Admin |
+| `h1` | 24 / 32 | 600 | Tiêu đề trang, tiêu đề bảng |
+| `h2` | 20 / 28 | 600 | Nhóm, tên bàn |
+| `bodyL` | **18 / 26** | 400 | **Mặc định trên POS** (nhìn xa, tay bận) |
+| `body` | 16 / 24 | 400 | Admin, bảng |
+| `label` | 14 / 20 | 600 | Nút, chip, tiêu đề cột |
+| `caption` | 13 / 18 | 500 | Chữ phụ (sàn tối thiểu **13sp**) |
+| `numTotal` | 32 / 40 | 600 | Tổng cần thu, tiền thối |
+| `numL` / `num` / `timer` | 20 / 16 / 14 | 500 | Giá ô sản phẩm, dòng giỏ, đồng hồ |
 
-| Style | Font | sp / dòng | Weight | Dùng cho |
-|---|---|---|---|---|
-| `display` | Be Vietnam Pro | 32 / 40 | 700 | Tiêu đề lớn Admin |
-| `h1` | Be Vietnam Pro | 24 / 32 | 600 | Tiêu đề trang, tiêu đề bảng |
-| `h2` | Be Vietnam Pro | 20 / 28 | 600 | Nhóm, tên bàn |
-| `bodyL` | Be Vietnam Pro | **18 / 26** | 400 | **Mặc định trên POS** (nhìn xa, tay bận) |
-| `body` | Be Vietnam Pro | 16 / 24 | 400 | Admin, bảng |
-| `label` | Be Vietnam Pro | 14 / 20 | 600 | Nút, chip, tiêu đề cột |
-| `caption` | Be Vietnam Pro | 13 / 18 | 500 | Chữ phụ (sàn tối thiểu **13sp**) |
-| `numTotal` | IBM Plex Mono | 32 / 40 | 600 | Tổng cần thu, tiền thối |
-| `numL` / `num` / `timer` | IBM Plex Mono | 20 / 16 / 14 | 500 | Giá ô sản phẩm, dòng giỏ, đồng hồ |
+**Lưu ý đọc được:** Times New Roman có chiều cao chữ thường thấp hơn font không chân, nên cùng cỡ trông nhỏ hơn khoảng 10 %. Để bù: nội dung bảng dùng 14–16 px, nhãn 11–12 px chỉ cho chú thích phụ, độ đậm ≥ 500 cho nhãn, tương phản chữ chính giữ ≥ 7:1. Nếu thử trên máy POS thấy khó đọc dưới ánh sáng mạnh, tăng cỡ cơ sở thay vì đổi màu.
 
-Đóng gói font **trong app/asset** (không tải khi chạy: quán có thể mất mạng). Kiểm tra đủ glyph `đ Đ ư ơ ế ặ` trước khi phát hành.
+Font hệ thống nên không cần đóng gói; riêng app Flutter trên Android cần khai báo font dự phòng (Liberation Serif/Tinos) nếu máy không có Times New Roman. Kiểm tra đủ glyph `đ Đ ư ơ ế ặ` trên thiết bị thật trước khi phát hành.
 
 ### 4.4 Token khác
 

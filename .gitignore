@@ -6,3 +6,4 @@ public/receipts/*
 assets/fonts/*.ttf
 .idea/
 .vscode/
+.claude/

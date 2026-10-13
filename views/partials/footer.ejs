@@ -1,0 +1,13 @@
+<footer class="shrink-0 border-t border-gray-200 bg-white px-4 py-4 max-md:pb-[calc(5rem+env(safe-area-inset-bottom))] sm:px-6">
+  <div class="mx-auto flex w-full max-w-content flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
+    <p>© 2026 <%= shopName %> · Web Admin v1.0</p>
+    <% if (typeof isSample !== 'undefined' && isSample) { %>
+      <p><span class="rounded-sm border border-amber-200 bg-amber-50 px-1.5 py-0.5 font-medium text-amber-800">Dữ liệu mẫu</span> Giao diện demo, chưa kết nối CSDL.</p>
+    <% } %>
+  </div>
+</footer>
+
+<!-- Toasts (aria-live so screen readers announce them without stealing focus) -->
+<div id="toast-region" aria-live="polite" class="pointer-events-none fixed bottom-4 right-4 z-50 flex w-80 max-w-[calc(100vw-2rem)] flex-col gap-2"></div>
+
+<script src="/admin/admin.js?v=<%= assetV %>" defer></script>

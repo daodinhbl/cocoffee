@@ -1,0 +1,83 @@
+<%
+  // Navigation model. Items without `href` are planned modules and render as disabled (no dead links).
+  const nav = [
+    { heading: 'Vận hành', items: [
+      { key: 'dashboard', label: 'Tổng quan', icon: 'grid', href: '/admin/dashboard' },
+      { key: 'tables', label: 'Bàn', icon: 'table' },
+      { key: 'orders', label: 'Đơn hàng', icon: 'receipt' },
+      { key: 'menu', label: 'Thực đơn', icon: 'cup' },
+    ] },
+    { heading: 'Kho & Định mức', items: [
+      { key: 'inventory', label: 'Nguyên liệu', icon: 'box' },
+      { key: 'bom', label: 'Công thức (BOM)', icon: 'flask', href: '/admin/bom-recipes' },
+      { key: 'receiving', label: 'Nhập kho', icon: 'upload' },
+    ] },
+    { heading: 'Phân tích', items: [
+      { key: 'reports', label: 'Báo cáo', icon: 'chart' },
+      { key: 'zalo', label: 'Zalo OA', icon: 'chat' },
+    ] },
+    { heading: 'Hệ thống', items: [
+      { key: 'settings', label: 'Cài đặt', icon: 'sliders' },
+    ] },
+  ];
+  const itemBase = 'relative flex h-12 items-center gap-3 pl-[26px] pr-4 text-sm font-medium';
+%>
+<div id="sidebar-overlay" data-sidebar-overlay hidden class="fixed inset-0 z-30 bg-ink-950/60 md:hidden"></div>
+
+<aside id="sidebar" data-open="false" aria-label="Điều hướng chính"
+  class="z-40 flex w-sidebar shrink-0 flex-col bg-ink-900 text-ink-300 transition-[width,transform] duration-200
+         max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:-translate-x-full max-md:data-[open=true]:translate-x-0
+         md:sticky md:top-0 md:h-screen md:group-data-[sb=collapsed]/sb:w-sidebar-collapsed">
+
+  <!-- Brand -->
+  <div class="flex h-header shrink-0 items-center gap-3 border-b border-ink-700 pl-[22px] pr-3">
+    <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm bg-amber-400 text-sm font-bold text-ink-900" aria-hidden="true">C</span>
+    <span class="min-w-0 flex-1 leading-tight md:group-data-[sb=collapsed]/sb:hidden">
+      <span class="block truncate text-sm font-semibold text-white"><%= shopName %></span>
+      <span class="block text-xs text-ink-400">Admin</span>
+    </span>
+    <button type="button" data-sidebar-toggle aria-label="Đóng điều hướng"
+      class="icon-btn flex h-10 w-10 items-center justify-center rounded text-ink-300 hover:bg-ink-800 hover:text-white md:hidden">
+      <%- icon('x', 'h-5 w-5') %>
+    </button>
+  </div>
+
+  <!-- Menu -->
+  <nav class="flex-1 overflow-y-auto py-3">
+    <% nav.forEach((group, gi) => { %>
+      <div class="<%= gi > 0 ? 'mt-3' : '' %>">
+        <p class="px-6 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-ink-400 md:group-data-[sb=collapsed]/sb:hidden"><%= group.heading %></p>
+        <% if (gi > 0) { %><hr class="mx-4 hidden border-ink-700 md:group-data-[sb=collapsed]/sb:block"><% } %>
+        <ul>
+          <% group.items.forEach((item) => { const active = activeMenu === item.key; %>
+            <li>
+              <% if (item.href) { %>
+                <a href="<%= item.href %>" title="<%= item.label %>" <%- active ? 'aria-current="page"' : '' %>
+                  class="<%= itemBase %> <%= active
+                    ? 'bg-ink-800 text-white before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-amber-400'
+                    : 'hover:bg-ink-800 hover:text-white' %>">
+                  <span class="shrink-0 <%= active ? 'text-amber-400' : '' %>"><%- icon(item.icon, 'h-5 w-5') %></span>
+                  <span class="truncate md:group-data-[sb=collapsed]/sb:hidden"><%= item.label %></span>
+                </a>
+              <% } else { %>
+                <span aria-disabled="true" title="<%= item.label %> — sắp ra mắt" class="<%= itemBase %> cursor-not-allowed text-ink-500">
+                  <span class="shrink-0"><%- icon(item.icon, 'h-5 w-5') %></span>
+                  <span class="truncate md:group-data-[sb=collapsed]/sb:hidden"><%= item.label %></span>
+                </span>
+              <% } %>
+            </li>
+          <% }) %>
+        </ul>
+      </div>
+    <% }) %>
+  </nav>
+
+  <!-- Collapse (desktop only) -->
+  <div class="hidden shrink-0 border-t border-ink-700 lg:block">
+    <button type="button" data-sidebar-collapse aria-expanded="true" aria-label="Thu gọn thanh điều hướng" title="Thu gọn"
+      class="flex h-12 w-full items-center gap-3 pl-[26px] pr-4 text-sm font-medium text-ink-300 hover:bg-ink-800 hover:text-white">
+      <span class="shrink-0 transition-transform md:group-data-[sb=collapsed]/sb:rotate-180"><%- icon('chevrons', 'h-5 w-5') %></span>
+      <span data-collapse-label class="truncate md:group-data-[sb=collapsed]/sb:hidden">Thu gọn</span>
+    </button>
+  </div>
+</aside>

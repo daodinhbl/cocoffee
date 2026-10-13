@@ -5,12 +5,17 @@
  *   JWT_SECRET=.. ZALO_APP_ID=1111111111 ZALO_OA_SECRET_KEY=s ZALO_APP_SECRET_KEY=a \
  *   ZALO_BOOTSTRAP_REFRESH_TOKEN=boot npm test
  */
+// must be set before app.js / env.js are loaded: the test owns its own HTTP server, and the schema comes
+// from the production first-boot bootstrap (which is itself under test below)
+process.env.FNB_NO_LISTEN = '1';
+process.env.AUTO_BOOTSTRAP_DB = 'true';
+process.env.SEED_DEMO = 'true';
+
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
 const http = require('node:http');
 const axios = require('axios');
+const bcrypt = require('bcryptjs');
 const mysql = require('mysql2/promise');
 
 const enabled = process.env.RUN_INTEGRATION === '1' && /_test$/.test(process.env.DB_NAME || '');
@@ -37,12 +42,40 @@ suite('integration', async (t) => {
   const sends = () => zaloCalls.filter((c) => c.url.includes('openapi.zalo.me'));
   const lastText = () => sends().at(-1)?.body.message.text;
 
-  // ---- fresh schema + seed -------------------------------------------------------------------
+  // ---- start from a truly EMPTY database, then let the production bootstrap build it ----------
+  const { bootstrapIfEmpty } = require('../src/config/bootstrapDb');
   const admin = await mysql.createConnection({
     host: process.env.DB_HOST, port: Number(process.env.DB_PORT), user: process.env.DB_USER, password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME, multipleStatements: true, charset: 'utf8mb4',
   });
-  for (const f of ['schema.sql', 'seed.sql']) await admin.query(fs.readFileSync(path.join(__dirname, '..', 'database', f), 'utf8'));
+  const tableCount = async () => (await admin.query('SELECT COUNT(*) c FROM information_schema.tables WHERE table_schema = DATABASE()'))[0][0].c;
+  await admin.query('SET FOREIGN_KEY_CHECKS = 0');
+  const [existing] = await admin.query('SELECT table_name AS n FROM information_schema.tables WHERE table_schema = DATABASE()');
+  for (const { n } of existing) await admin.query(`DROP TABLE IF EXISTS \`${n}\``);
+  await admin.query('SET FOREIGN_KEY_CHECKS = 1');
+  assert.equal(await tableCount(), 0, 'test database starts empty');
+
+  await t.test('first-boot bootstrap: builds schema + seed on an empty DB, and NEVER touches a non-empty one', async () => {
+    assert.equal(await bootstrapIfEmpty(), 'applied');
+    assert.equal(await tableCount(), 14);
+    const [[admin1]] = await admin.query("SELECT username, role, password_hash FROM users WHERE username = 'admin'");
+    assert.equal(admin1.role, 'admin');
+    assert.ok(await bcrypt.compare('admin', admin1.password_hash), 'seeded admin/admin account works');
+    assert.equal((await admin.query('SELECT COUNT(*) c FROM products'))[0][0].c, 10);
+    assert.equal((await admin.query('SELECT COUNT(*) c FROM dining_tables'))[0][0].c, 10);
+
+    // real data now exists; a second boot (redeploy / restart) must leave everything alone, DROP TABLEs included
+    await admin.query("INSERT INTO categories (code, name) VALUES ('marker', 'must survive a redeploy')");
+    await admin.query("UPDATE inventory_items SET quantity_on_hand = 1234 WHERE sku = 'RM-COFFEE'");
+    assert.equal(await bootstrapIfEmpty(), 'skipped-not-empty');
+    assert.equal((await admin.query("SELECT COUNT(*) c FROM categories WHERE code = 'marker'"))[0][0].c, 1);
+    assert.equal(Number((await admin.query("SELECT quantity_on_hand q FROM inventory_items WHERE sku = 'RM-COFFEE'"))[0][0].q), 1234, 'data written after the first boot is untouched');
+    assert.equal(await tableCount(), 14);
+
+    // restore the seeded values so the rest of the suite starts from the documented baseline
+    await admin.query("DELETE FROM categories WHERE code = 'marker'");
+    await admin.query("UPDATE inventory_items SET quantity_on_hand = 5000 WHERE sku = 'RM-COFFEE'");
+  });
   await admin.end();
 
   const server = http.createServer(app).listen(0);

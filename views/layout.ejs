@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full group/sb" data-sb="expanded">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <meta name="robots" content="noindex, nofollow">
+  <title><%= title %> · <%= shopName %> Admin</title>
+
+  <!-- Tailwind Play CDN (pinned). Theme is configured inline below, as per the "no build step" brief. -->
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script nonce="<%= nonce %>">
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            // Concrete / steel greys (docs/design-tokens.json). Amber = Tailwind amber-400 (#fbbf24) for CTAs.
+            ink: { 950: '#16181A', 900: '#1B1D1F', 800: '#25282B', 700: '#2F3337', 600: '#3D4247', 500: '#6B737A', 400: '#8A9097', 300: '#B9BEC3' },
+          },
+          // Times New Roman everywhere (system font, no download). Its digits are fixed-width, so the
+          // numeric `font-mono` utility used for prices/quantities maps to the same family. Fallbacks are the
+          // metric-compatible Liberation Serif / Tinos for Linux and Android.
+          fontFamily: {
+            sans: ['"Times New Roman"', 'Times', '"Liberation Serif"', 'Tinos', 'serif'],
+            mono: ['"Times New Roman"', 'Times', '"Liberation Serif"', 'Tinos', 'serif'],
+            serif: ['"Times New Roman"', 'Times', '"Liberation Serif"', 'Tinos', 'serif'],
+          },
+          width: { sidebar: '240px', 'sidebar-collapsed': '72px' },
+          height: { header: '64px' },
+          maxWidth: { content: '1280px' },
+          // flat industrial look: nothing rounder than 4px
+          borderRadius: { DEFAULT: '4px', sm: '2px', md: '4px', lg: '4px' },
+        },
+      },
+    };
+  </script>
+  <script nonce="<%= nonce %>">
+    // Device/layout detection before first paint (no flash). Mirrors applyResponsive() in /admin/admin.js:
+    //   phone <768 drawer | tablet 768-1023 icon rail | laptop 1024-1279 rail by default | desktop >=1280 expanded.
+    // A saved preference only applies on desktop-class widths (>=1024).
+    (function () {
+      var h = document.documentElement, w = window.innerWidth, pref = null;
+      try { pref = localStorage.getItem('cocoffee.sidebar'); } catch (e) { /* storage blocked */ }
+      h.setAttribute('data-sb', (w < 1024 || (pref ? pref === 'collapsed' : w < 1280)) ? 'collapsed' : 'expanded');
+      h.setAttribute('data-device', w < 768 ? 'phone' : (w < 1024 ? 'tablet' : 'desktop'));
+      if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) h.setAttribute('data-pointer', 'coarse');
+    })();
+  </script>
+  <style>
+    :focus-visible { outline: 2px solid #fbbf24; outline-offset: 2px; }
+    html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; touch-action: manipulation; }
+    .tnum { font-variant-numeric: tabular-nums; }
+    dialog::backdrop { background: rgba(22, 24, 26, 0.55); }
+    dialog { padding: 0; }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+    /* Touch devices (detected via the pointer media feature, not the user agent): >= 44px tap targets */
+    @media (pointer: coarse) {
+      button, [role="tab"], select, input:not([type="file"]):not([type="checkbox"]):not([type="radio"]), summary { min-height: 44px; }
+      .icon-btn { min-width: 44px; }
+      #sidebar nav a, #sidebar nav span[aria-disabled] { min-height: 48px; }
+    }
+    /* Notched phones / landscape safe areas */
+    #toast-region { right: max(1rem, env(safe-area-inset-right)); bottom: max(1rem, env(safe-area-inset-bottom)); }
+    header { padding-top: env(safe-area-inset-top); }
+
+    /* Responsive table: below 1024px every row becomes a card (2 columns on tablets, 1 on phones).
+       Cells carry data-label="..." which is printed as the field name. Real <table> markup is kept for >= 1024px. */
+    @media (max-width: 1023px) {
+      .rtable, .rtable tbody { display: block; min-width: 0 !important; }
+      .rtable thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+      .rtable tbody { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 12px; padding: 12px; }
+      .rtable tbody tr:not([hidden]) { display: block; border: 1px solid #e5e7eb; border-radius: 4px; padding: 2px 14px; background: #fff; }
+      .rtable tbody tr[data-empty]:not([hidden]) { grid-column: 1 / -1; border-style: dashed; }
+      .rtable td { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+                   padding: 9px 0 !important; text-align: right !important; border-top: 1px dashed #e5e7eb; }
+      .rtable td:first-child { border-top: 0; }
+      .rtable td::before { content: attr(data-label); flex-shrink: 0; font-size: 12px; font-weight: 600; letter-spacing: .04em;
+                           text-transform: uppercase; color: #6b7280; text-align: left; }
+      .rtable td[data-label=""]::before { display: none; }
+      .rtable td.rt-title { justify-content: flex-start; text-align: left !important; }
+      .rtable td.rt-actions { justify-content: flex-end; }
+
+      /* Dedicated recipe card (BOM rows). Same <tr>, re-laid out with grid areas:
+           [ title          margin ]
+           [ ingredient chips      ]
+           [ Giá vốn   |   Giá bán ]
+           [  Sửa  |  Xóa          ]                                                                  */
+      .rtable-bom tbody tr:not([hidden]):not([data-empty]) {
+        display: grid; grid-template-columns: 1fr 1fr; column-gap: 12px; padding: 14px;
+        grid-template-areas: "title margin" "ing ing" "cogs price" "act act";
+      }
+      .rtable-bom td { display: block; border: 0 !important; padding: 0 !important; text-align: left !important; }
+      .rtable-bom td::before { display: none; }
+      .rtable-bom .rt-title { grid-area: title; }
+      .rtable-bom .rt-margin { grid-area: margin; justify-self: end; text-align: right !important; }
+      .rtable-bom .rt-ingredients { grid-area: ing; margin-top: 10px; }
+      .rtable-bom .rt-cogs, .rtable-bom .rt-price { margin-top: 12px; padding-top: 10px !important; border-top: 1px dashed #e5e7eb !important; }
+      .rtable-bom .rt-cogs { grid-area: cogs; }
+      .rtable-bom .rt-price { grid-area: price; text-align: right !important; }
+      .rtable-bom .rt-cogs::before, .rtable-bom .rt-price::before { display: block; margin-bottom: 2px; }
+      .rtable-bom .rt-actions { grid-area: act; margin-top: 12px; }
+      .rtable-bom .rt-actions > div { display: flex; width: 100%; gap: 8px; }
+      .rtable-bom .rt-actions button { flex: 1; width: auto; height: 44px; gap: 8px; border: 1px solid #d1d5db; color: #1f2937; }
+      .rtable-bom .rt-actions .btn-label { display: inline; font-size: 14px; font-weight: 500; }
+    }
+    .btn-label { display: none; }
+
+    /* Phones: >=16px form text (iOS Safari zooms smaller inputs), toasts clear the bottom nav, momentum scroll contained */
+    @media (max-width: 767px) {
+      input, select, textarea { font-size: 16px !important; }
+      #toast-region { left: 1rem; right: 1rem; width: auto; max-width: none; bottom: calc(4.5rem + env(safe-area-inset-bottom)); }
+      #sidebar, dialog { overscroll-behavior: contain; }
+    }
+  </style>
+</head>
+<body class="h-full bg-white font-sans text-gray-900 antialiased">
+  <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded focus:bg-amber-400 focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-ink-900">Bỏ qua điều hướng</a>
+
+  <div class="flex min-h-full">
+    <%- include('partials/sidebar') %>
+
+    <div class="flex min-w-0 flex-1 flex-col">
+      <%- include('partials/header') %>
+
+      <main id="main" tabindex="-1" class="flex-1 bg-white p-4 sm:p-6">
+        <div class="mx-auto w-full max-w-content">
+          <%- body %>
+        </div>
+      </main>
+
+      <%- include('partials/footer') %>
+    </div>
+  </div>
+
+  <%- include('partials/mobile_nav') %>
+</body>
+</html>

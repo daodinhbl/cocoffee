@@ -57,8 +57,9 @@
     }
   },
   "typography": {
-    "family.ui": "Be Vietnam Pro",
-    "family.numeric": "IBM Plex Mono",
+    "family.ui": "Times New Roman, Times, Liberation Serif, Tinos, serif",
+    "family.numeric": "Times New Roman, Times, Liberation Serif, Tinos, serif",
+    "$note": "Times New Roman everywhere (system font, nothing to download). Its digits are fixed-width, so prices and quantities stay column-aligned without a separate monospace face.",
     "scale": {
       "display": { "family": "ui", "size": 32, "line": 40, "weight": 700 },
       "h1": { "family": "ui", "size": 24, "line": 32, "weight": 600 },
@@ -80,6 +81,10 @@
   "motion": { "fast": 120, "base": 200, "slow": 300, "easing": "cubic-bezier(0.2, 0, 0, 1)", "reducedMotion": "disable pulses and slides, keep 120ms fades" },
   "layout": {
     "pos": { "referenceDp": [1280, 800], "minDp": [960, 600], "rail": 72, "categories": 136, "cart": 380, "topBar": 56, "tile": 122, "tableCard": [148, 112] },
-    "admin": { "referencePx": [1440, 900], "minPx": 1024, "sidebar": 240, "sidebarCollapsed": 72, "header": 64, "contentMax": 1280, "gutter": 24, "columns": 12 }
+    "admin": {
+      "referencePx": [1440, 900], "minPx": 1024, "sidebar": 240, "sidebarCollapsed": 72, "header": 64, "headerPhone": 56,
+      "contentMax": 1280, "gutter": 24, "gutterPhone": 12, "columns": 12, "padding": 24, "paddingPhone": 16, "bottomNavPhone": 56,
+      "breakpoints": { "phone": "<768", "tablet": "768-1023", "laptop": "1024-1279", "desktop": ">=1280" }
+    }
   }
 }

@@ -1,6 +1,7 @@
 const path = require('path');
+const crypto = require('crypto');
 
-// Local dev reads .env; on cPanel the same keys come from "Setup Node.js App" environment variables.
+// Local dev reads .env; on Hostinger the same keys come from the app's environment variables.
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env'), quiet: true });
 
 const required = (key) => {
@@ -18,6 +19,18 @@ const int = (key, fallback) => {
   return Number.isFinite(n) ? n : fallback;
 };
 
+/**
+ * JWT signing key. An explicit JWT_SECRET always wins. When it is not set (e.g. Hostinger's
+ * "Setup website database" injects a platform-generated DB_PASSWORD that nobody ever sees) the key is
+ * derived from DB_PASSWORD with HMAC-SHA256 under a fixed context label, so no human-chosen or
+ * pasted secret is needed. Rotating the DB password therefore also invalidates issued tokens.
+ */
+const jwtSecret = () => {
+  const explicit = optional('JWT_SECRET');
+  if (explicit) return explicit;
+  return crypto.createHmac('sha256', required('DB_PASSWORD')).update('cocoffee-fnb:jwt:v1').digest('hex');
+};
+
 module.exports = {
   nodeEnv: optional('NODE_ENV', 'development'),
   rootDir: path.resolve(__dirname, '../..'),
@@ -31,10 +44,13 @@ module.exports = {
     password: required('DB_PASSWORD'),
     poolLimit: int('DB_POOL_LIMIT', 5),
     timezone: optional('DB_TIMEZONE', '+07:00'),
+    // First-boot setup for hosts without SQL import (see src/config/bootstrapDb.js). Both default off.
+    autoBootstrap: bool('AUTO_BOOTSTRAP_DB', false),
+    seedDemo: bool('SEED_DEMO', false),
   },
 
   jwt: {
-    secret: required('JWT_SECRET'),
+    secret: jwtSecret(),
     expiresIn: optional('JWT_EXPIRES_IN', '12h'),
   },
 

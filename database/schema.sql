@@ -1,6 +1,6 @@
 -- =============================================================================
 --  CoCoffee F&B  -  MySQL 8.x / MariaDB 10.4+  -  schema
---  Import into database `cocoffee_fnb` (select it first in phpMyAdmin; shared
+--  Import into database `cocoffee` (select it first in phpMyAdmin; shared
 --  hosting users cannot CREATE DATABASE). Safe to re-run: drops & recreates.
 -- =============================================================================
 SET NAMES utf8mb4;
