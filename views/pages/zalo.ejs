@@ -28,6 +28,15 @@
     <% if (tokenState[2]) { %><p class="mt-2 text-sm text-gray-600"><%= tokenState[2] %></p><% } %>
     <dl class="mt-3 space-y-2 text-sm">
       <div class="flex justify-between gap-3"><dt class="text-gray-500">Webhook URL</dt><dd class="break-all text-right font-mono text-xs"><%= conn.webhookUrl %></dd></div>
+      <% if (conn.platform && conn.configured) { %>
+      <div class="pt-1">
+        <form method="post" action="/admin/zalo/register-webhook" data-confirm="Đăng ký webhook này với Zalo Bot Platform? Zalo sẽ gửi tin nhắn của bot về địa chỉ trên.">
+          <%- include('../partials/csrf') %>
+          <input type="hidden" name="_back" value="/admin/zalo">
+          <button type="submit" class="<%= btnSecondary %> w-full sm:w-auto">Đăng ký webhook với Zalo</button>
+        </form>
+      </div>
+      <% } %>
       <% if (isBot) { %>
         <% if (conn.platform) { %>
         <div class="flex justify-between gap-3"><dt class="text-gray-500">Bot token (ZALO_BOT_TOKEN)</dt><dd><%- conn.tokenSet ? badge('Đã đặt', 'good') : badge('Chưa đặt', 'bad') %></dd></div>

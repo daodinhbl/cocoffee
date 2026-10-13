@@ -4,6 +4,8 @@ const adminModel = require('../../models/adminModel');
 const logger = require('../../utils/logger');
 const { render } = require('./common');
 const orders = require('./orders');
+const { AppError } = require('../../utils/httpError');
+const zaloBot = require('../../services/zalo/zaloBotPlatform');
 
 /** Connection facts for the Zalo screen. Secret / token VALUES are never read into the view model. */
 async function connection() {
@@ -45,4 +47,32 @@ async function page(_req, res) {
   }, { conn, stats, events, drafts, failed });
 }
 
-module.exports = { page, connection, resendReceipt: orders.resendReceipt };
+/**
+ * Zalo Bot Platform: getMe + setWebhook from the server itself, with the token from the environment, so the
+ * owner never has to copy the token anywhere else. Zalo test-calls the webhook right away and reports back.
+ */
+async function registerWebhook() {
+  if (env.zalo.mode !== 'platform') throw new AppError(409, 'NOT_PLATFORM', 'Chưa có ZALO_BOT_TOKEN: đặt biến này trong hPanel trước.');
+  const secret = env.zalo.botWebhookSecret;
+  if (!secret || secret.length < 8 || secret.length > 256) throw new AppError(400, 'VALIDATION', 'BOT_WEBHOOK_SECRET phải dài 8–256 ký tự (đặt trong hPanel).');
+  if (!/^https:\/\//.test(env.publicBaseUrl || '')) throw new AppError(400, 'VALIDATION', 'PUBLIC_BASE_URL phải là địa chỉ https công khai của app.');
+  const url = `${env.publicBaseUrl.replace(/\/+$/, '')}/api/zalo/webhook`;
+  let me;
+  let result;
+  try {
+    me = await zaloBot.getMe();
+    result = await zaloBot.setWebhook(url, secret);
+  } catch (err) {
+    throw new AppError(502, 'ZALO_BOT_API', `Zalo từ chối: ${err.message.replace(/^Zalo Bot \w+ failed: /, '')}`);
+  }
+  const v = result.verification || {};
+  const name = me.account_name || me.display_name || me.name || 'bot';
+  return {
+    message: v.ok === false
+      ? `Đã lưu webhook cho ${name}, nhưng Zalo gọi thử chưa thành công (${v.outcome || 'không rõ'}). ${v.hint || ''}`.trim()
+      : `Đã đăng ký webhook cho ${name}: Zalo gọi thử thành công.`,
+    to: '/admin/zalo',
+  };
+}
+
+module.exports = { page, connection, registerWebhook, resendReceipt: orders.resendReceipt };
