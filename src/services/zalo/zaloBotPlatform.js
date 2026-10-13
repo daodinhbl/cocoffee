@@ -6,7 +6,8 @@ const env = require('../../config/env');
  *   https://bot-api.zaloplatforms.com/bot<BOT_TOKEN>/<method>   - JSON in, { ok, result | description, error_code } out
  * The token is part of the URL, so it must never reach a log: errors are rethrown with the method name only.
  */
-const API = 'https://bot-api.zaloplatforms.com';
+// ZALO_BOT_API_BASE only for local end-to-end tests against a stub; production always talks to Zalo.
+const API = process.env.ZALO_BOT_API_BASE || 'https://bot-api.zaloplatforms.com';
 const MAX_TEXT = 2000;
 
 class ZaloBotError extends Error {
