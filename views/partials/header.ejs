@@ -33,7 +33,7 @@
     <label for="quick-search" class="sr-only">Tìm nhanh</label>
     <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><%- icon('search', 'h-4 w-4') %></span>
     <input id="quick-search" type="search" autocomplete="off" placeholder="Tìm nhanh…"
-      class="h-10 w-full rounded border border-gray-200 bg-gray-50 pl-9 pr-14 text-sm placeholder:text-gray-400 focus:border-amber-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-amber-400">
+      class="h-10 w-full rounded border border-gray-200 bg-gray-50 pl-9 pr-14 text-sm placeholder:text-gray-400 focus:border-navy-accent focus:bg-white focus:outline-none focus:ring-1 focus:ring-navy-accent">
     <kbd class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded-sm border border-gray-200 bg-white px-1.5 py-0.5 font-mono text-[11px] text-gray-500">Ctrl K</kbd>
   </form>
 
@@ -82,7 +82,7 @@
   <div class="hidden items-center gap-2 border-l border-gray-200 pl-3 xl:flex">
     <% const who = (typeof currentUser !== 'undefined' && currentUser) || { username: '', full_name: '' };
          const initials = (who.full_name || who.username || '?').trim().split(/\s+/).slice(-2).map((w) => w[0]).join('').toUpperCase(); %>
-    <span class="flex h-8 w-8 items-center justify-center rounded-sm bg-ink-800 text-xs font-semibold text-white" aria-hidden="true"><%= initials %></span>
+    <span class="flex h-8 w-8 items-center justify-center rounded-sm bg-navy text-xs font-semibold text-white" aria-hidden="true"><%= initials %></span>
     <span class="hidden leading-tight xl:block">
       <span class="block text-sm font-medium"><%= who.full_name || who.username %></span>
       <span class="block text-xs text-gray-500">Quản trị viên</span>

@@ -56,7 +56,7 @@
           <tr class="border-b border-gray-200 last:border-b-0 hover:bg-gray-50">
             <td data-label="" class="rt-title px-4 py-3 tnum"><%= fmtTime(m.created_at) %></td>
             <td data-label="Nguyên liệu" class="px-4 py-3">
-              <a href="/admin/inventory/<%= m.inventory_item_id %>" class="hover:underline"><%= m.item_name %></a>
+              <a href="/admin/inventory/<%= m.inventory_item_id %>" class="text-blue-700 hover:text-navy hover:underline"><%= m.item_name %></a>
               <% if (m.note) { %><span class="block text-xs text-gray-500"><%= m.note %></span><% } %>
             </td>
             <td data-label="Số lượng" class="px-4 py-3 text-right font-mono tnum">+<%= num(m.quantity_change) %> <span class="text-gray-500"><%= m.unit %></span></td>

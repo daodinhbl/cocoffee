@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="light">
   <meta name="robots" content="noindex, nofollow">
   <title><%= title %> · <%= shopName %> Admin</title>
-  <meta name="theme-color" content="#1B1D1F">
+  <meta name="theme-color" content="#0f172a">
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="icon" type="image/png" href="/brand/favicon-32.png">
   <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
@@ -20,6 +20,17 @@
           colors: {
             // Concrete / steel greys (docs/design-tokens.json). Amber = Tailwind amber-400 (#fbbf24) for CTAs.
             ink: { 950: '#16181A', 900: '#1B1D1F', 800: '#25282B', 700: '#2F3337', 600: '#3D4247', 500: '#6B737A', 400: '#8A9097', 300: '#B9BEC3' },
+            // Navy = primary (sidebar, dark surfaces, active/hover); amber stays the CTA accent.
+            navy: {
+              darker: '#0f172a',   // sidebar background (slate-900)
+              dark: '#172554',     // hover (blue-950)
+              DEFAULT: '#1e3a8a',  // blue-900
+              lighter: '#1e3a8a',  // active item
+              accent: '#1d4ed8',   // blue-700: active marks, outlines, links
+              line: '#1e293b',     // dividers on navy
+              muted: '#94a3b8',    // secondary text on navy
+              soft: '#cbd5e1',     // primary text on navy
+            },
           },
           // Times New Roman everywhere (system font, no download). Its digits are fixed-width, so the
           // numeric `font-mono` utility used for prices/quantities maps to the same family. Fallbacks are the
@@ -51,10 +62,10 @@
     })();
   </script>
   <style>
-    :focus-visible { outline: 2px solid #fbbf24; outline-offset: 2px; }
+    :focus-visible { outline: 2px solid #1d4ed8; outline-offset: 2px; }
     html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; touch-action: manipulation; }
     .tnum { font-variant-numeric: tabular-nums; }
-    dialog::backdrop { background: rgba(22, 24, 26, 0.55); }
+    dialog::backdrop { background: rgba(15, 23, 42, 0.55); }
     dialog { padding: 0; }
     @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 
@@ -118,7 +129,7 @@
     }
   </style>
 </head>
-<body class="h-full bg-white font-sans text-gray-900 antialiased">
+<body class="h-full bg-gray-50 font-sans text-gray-900 antialiased">
   <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-50 focus:rounded focus:bg-amber-400 focus:px-3 focus:py-2 focus:text-sm focus:font-semibold focus:text-ink-900">Bỏ qua điều hướng</a>
 
   <div class="flex min-h-full">
@@ -127,7 +138,7 @@
     <div class="flex min-w-0 flex-1 flex-col">
       <%- include('partials/header') %>
 
-      <main id="main" tabindex="-1" class="flex-1 bg-white p-4 sm:p-6">
+      <main id="main" tabindex="-1" class="flex-1 bg-gray-50 p-4 sm:p-6">
         <div class="mx-auto w-full max-w-content">
           <% if (typeof flash !== 'undefined' && flash) {
                const tone = { success: 'border-green-200 bg-green-50 text-green-800', error: 'border-red-200 bg-red-50 text-red-800', info: 'border-sky-200 bg-sky-50 text-sky-800' }[flash.type] || 'border-gray-200 bg-gray-50 text-gray-800'; %>

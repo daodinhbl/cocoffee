@@ -28,8 +28,8 @@
 
 <div class="mt-6 flex flex-wrap items-center justify-between gap-3">
   <div class="flex gap-2" role="group" aria-label="Lọc theo tồn kho">
-    <a href="/admin/inventory" <%- !onlyLow ? 'aria-current="true"' : '' %> class="inline-flex h-9 items-center rounded border px-3 text-sm <%= !onlyLow ? 'border-amber-400 bg-amber-50 font-medium' : 'border-gray-300 hover:bg-gray-50' %>">Tất cả</a>
-    <a href="/admin/inventory?low=1" <%- onlyLow ? 'aria-current="true"' : '' %> class="inline-flex h-9 items-center rounded border px-3 text-sm <%= onlyLow ? 'border-amber-400 bg-amber-50 font-medium' : 'border-gray-300 hover:bg-gray-50' %>">Sắp hết (<%= lowCount %>)</a>
+    <a href="/admin/inventory" <%- !onlyLow ? 'aria-current="true"' : '' %> class="inline-flex h-9 items-center rounded border px-3 text-sm <%= !onlyLow ? 'border-navy-accent bg-blue-50 font-medium' : 'border-gray-300 hover:bg-gray-50' %>">Tất cả</a>
+    <a href="/admin/inventory?low=1" <%- onlyLow ? 'aria-current="true"' : '' %> class="inline-flex h-9 items-center rounded border px-3 text-sm <%= onlyLow ? 'border-navy-accent bg-blue-50 font-medium' : 'border-gray-300 hover:bg-gray-50' %>">Sắp hết (<%= lowCount %>)</a>
   </div>
   <div class="relative w-full sm:w-80">
     <label for="inv-filter" class="sr-only">Tìm nguyên liệu</label>
@@ -58,7 +58,7 @@
            const fillAdj = { new_quantity: i.quantity_on_hand }; %>
         <tr data-row class="border-b border-gray-200 last:border-b-0 hover:bg-gray-50 <%= i.is_active ? '' : 'text-gray-400' %>">
           <td data-label="" class="rt-title px-4 py-3">
-            <a href="/admin/inventory/<%= i.id %>" class="font-medium hover:underline"><%= i.name %></a>
+            <a href="/admin/inventory/<%= i.id %>" class="font-medium text-blue-700 hover:text-navy hover:underline"><%= i.name %></a>
             <p class="mt-0.5 font-mono text-xs text-gray-500"><%= i.sku %></p>
           </td>
           <td data-label="Tồn kho" class="px-4 py-3 text-right font-mono tnum"><%= num(i.quantity_on_hand) %> <span class="text-gray-500"><%= i.unit %></span></td>
@@ -132,7 +132,7 @@
       </div>
       <label class="flex items-center gap-2 text-sm">
         <input type="hidden" name="is_active" value="0">
-        <input type="checkbox" name="is_active" value="1" checked class="h-4 w-4 rounded border-gray-300 accent-amber-400">
+        <input type="checkbox" name="is_active" value="1" checked class="h-4 w-4 rounded border-gray-300 accent-blue-700">
         Đang sử dụng
       </label>
     </div>

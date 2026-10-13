@@ -89,13 +89,13 @@ const METHOD_LABEL = { cash: 'Tiền mặt', transfer: 'Chuyển khoản', card:
 
 /** Shared Tailwind class strings so every admin form/table looks the same. */
 const ui = {
-  input: 'h-10 w-full rounded border border-gray-300 bg-white px-3 text-sm placeholder:text-gray-400 focus:border-amber-400 focus:outline-none focus:ring-1 focus:ring-amber-400',
+  input: 'h-10 w-full rounded border border-gray-300 bg-white px-3 text-sm placeholder:text-gray-400 focus:border-navy-accent focus:outline-none focus:ring-1 focus:ring-navy-accent',
   label: 'mb-1 block text-sm font-medium',
   btnPrimary: 'inline-flex h-10 items-center justify-center gap-2 rounded bg-amber-400 px-4 text-sm font-semibold text-ink-900 hover:bg-amber-500 active:bg-amber-600',
   btnSecondary: 'inline-flex h-10 items-center justify-center gap-2 rounded border border-gray-300 bg-white px-4 text-sm font-medium text-gray-800 hover:bg-gray-50',
   btnDanger: 'inline-flex h-10 items-center justify-center gap-2 rounded bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700',
-  btnGhost: 'icon-btn inline-flex h-9 w-9 items-center justify-center rounded text-gray-500 hover:bg-gray-100 hover:text-gray-900',
-  card: 'rounded border border-gray-200',
+  btnGhost: 'icon-btn inline-flex h-9 w-9 items-center justify-center rounded text-gray-500 hover:bg-blue-50 hover:text-navy-accent',
+  card: 'rounded border border-gray-200 bg-white',
   th: 'px-4 py-3',
   thead: 'border-b border-gray-200 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500',
   // <dialog> is a bottom sheet on phones, a centred modal from sm up

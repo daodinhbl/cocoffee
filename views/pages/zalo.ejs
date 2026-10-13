@@ -53,7 +53,7 @@
     <tbody>
       <% drafts.forEach((d) => { %>
         <tr class="border-b border-gray-200 last:border-b-0">
-          <td data-label="" class="rt-title px-4 py-3"><% if (d.order_id) { %><a href="/admin/orders/<%= d.order_id %>" class="font-mono text-[13px] font-medium hover:underline"><%= d.order_code %></a><% } else { %>—<% } %></td>
+          <td data-label="" class="rt-title px-4 py-3"><% if (d.order_id) { %><a href="/admin/orders/<%= d.order_id %>" class="font-mono text-[13px] font-medium text-blue-700 hover:text-navy hover:underline"><%= d.order_code %></a><% } else { %>—<% } %></td>
           <td data-label="Chat" class="px-4 py-3"><%= d.chat_type === 'group' ? 'Nhóm' : '1:1' %></td>
           <td data-label="Tổng" class="px-4 py-3 text-right font-mono tnum"><%= d.total == null ? '—' : money(d.total) %></td>
           <td data-label="Hoạt động cuối" class="px-4 py-3 tnum"><%= ago(d.last_activity_at) %></td>
@@ -74,7 +74,7 @@
     <% failed.forEach((f) => { %>
       <li class="flex flex-wrap items-center justify-between gap-3 px-5 py-3 max-lg:px-0">
         <span class="min-w-0">
-          <a href="/admin/orders/<%= f.id %>" class="font-mono text-[13px] font-medium hover:underline"><%= f.order_code %></a>
+          <a href="/admin/orders/<%= f.id %>" class="font-mono text-[13px] font-medium text-blue-700 hover:text-navy hover:underline"><%= f.order_code %></a>
           <span class="block break-words text-xs text-red-700"><%= f.receipt_error %></span>
         </span>
         <form method="post" action="/admin/zalo/orders/<%= f.id %>/resend-receipt">

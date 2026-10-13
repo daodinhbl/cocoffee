@@ -39,7 +39,7 @@
           </td>
           <td data-label="Đơn hiện tại" class="px-4 py-3">
             <% if (t.current_order_id) { %>
-              <a href="/admin/orders/<%= t.current_order_id %>" class="font-mono text-[13px] hover:underline"><%= t.current_order_code %></a>
+              <a href="/admin/orders/<%= t.current_order_id %>" class="font-mono text-[13px] text-blue-700 hover:text-navy hover:underline"><%= t.current_order_code %></a>
               <span class="ml-1 font-mono text-xs text-gray-500 tnum"><%= money(t.current_order_total) %></span>
             <% } else { %>—<% } %>
           </td>

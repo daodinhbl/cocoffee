@@ -55,7 +55,7 @@
           <td data-label="Tồn sau" class="px-4 py-3 text-right font-mono tnum"><%= num(m.balance_after) %></td>
           <td data-label="Đơn giá" class="px-4 py-3 text-right font-mono tnum"><%= money(m.unit_cost) %></td>
           <td data-label="Ghi chú" class="px-4 py-3 text-gray-600">
-            <% if (m.order_id) { %><a href="/admin/orders/<%= m.order_id %>" class="font-mono text-[13px] hover:underline"><%= m.note || ('#' + m.order_id) %></a><% } else { %><%= m.note || '—' %><% } %>
+            <% if (m.order_id) { %><a href="/admin/orders/<%= m.order_id %>" class="font-mono text-[13px] text-blue-700 hover:text-navy hover:underline"><%= m.note || ('#' + m.order_id) %></a><% } else { %><%= m.note || '—' %><% } %>
           </td>
         </tr>
       <% }) %>

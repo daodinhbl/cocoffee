@@ -78,7 +78,7 @@
     <tbody>
       <% orders.forEach((o) => { %>
         <tr class="border-b border-gray-200 last:border-b-0 hover:bg-gray-50">
-          <td data-label="" class="rt-title px-4 py-3"><a href="/admin/orders/<%= o.id %>" class="font-mono text-[13px] font-medium hover:underline"><%= o.order_code %></a></td>
+          <td data-label="" class="rt-title px-4 py-3"><a href="/admin/orders/<%= o.id %>" class="font-mono text-[13px] font-medium text-blue-700 hover:text-navy hover:underline"><%= o.order_code %></a></td>
           <td data-label="Kênh" class="px-4 py-3"><%- sourceBadge(o.source) %></td>
           <td data-label="Bàn" class="px-4 py-3 font-mono text-[13px]"><%= o.table_code || '—' %></td>
           <td data-label="Tổng tiền" class="px-4 py-3 text-right font-mono tnum"><%= money(o.total) %></td>

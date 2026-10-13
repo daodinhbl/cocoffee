@@ -5,6 +5,7 @@
  */
 process.env.FNB_NO_LISTEN = '1';
 process.env.DB_NAME ||= 'x'; process.env.DB_USER ||= 'x'; process.env.DB_PASSWORD ||= 'x';
+process.env.DEMO_MODE = 'false';   // a developer .env may enable it; tests opt in explicitly
 process.env.ZALO_APP_ID = ''; process.env.ZALO_OA_SECRET_KEY = '';
 
 const http = require('node:http');

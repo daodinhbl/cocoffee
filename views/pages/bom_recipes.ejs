@@ -45,7 +45,7 @@
     <% tabs.forEach((tab, i) => { %>
       <button type="button" role="tab" id="tab-<%= tab.id %>" aria-controls="panel-<%= tab.id %>"
         aria-selected="<%= i === 0 ? 'true' : 'false' %>" tabindex="<%= i === 0 ? '0' : '-1' %>"
-        class="inline-flex h-12 shrink-0 items-center gap-2 border-b-2 border-transparent px-1 text-sm font-medium text-gray-500 hover:text-gray-900 aria-selected:border-amber-400 aria-selected:text-gray-900
+        class="inline-flex h-12 shrink-0 items-center gap-2 border-b-2 border-transparent px-1 text-sm font-medium text-gray-500 hover:text-gray-900 aria-selected:border-navy-accent aria-selected:text-gray-900
                max-md:h-10 max-md:flex-1 max-md:justify-center max-md:rounded-sm max-md:border-b-0 aria-selected:max-md:bg-white aria-selected:max-md:shadow-sm">
         <%= tab.label %>
         <span data-tab-count class="rounded-sm bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-600 max-md:bg-gray-200"><%= tab.rows.length %></span>
