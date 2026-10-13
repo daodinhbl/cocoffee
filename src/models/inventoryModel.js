@@ -17,7 +17,7 @@ async function list({ lowStockOnly = false } = {}, conn) {
 async function listAll(conn) {
   const [rows] = await db(conn).query(
     `SELECT id, sku, name, unit, quantity_on_hand, avg_cost, min_stock, is_active,
-            (quantity_on_hand <= min_stock) AS is_low, ROUND(quantity_on_hand * avg_cost, 2) AS stock_value
+            (quantity_on_hand <= min_stock) AS is_low, ROUND(quantity_on_hand * avg_cost, 2) AS stock_value, image_url
        FROM inventory_items ORDER BY is_active DESC, name`
   );
   return rows;
