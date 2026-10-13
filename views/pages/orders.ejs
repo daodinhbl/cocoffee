@@ -3,100 +3,167 @@
   const sel = (a, b) => (a === b ? 'selected' : '');
   const from = (page - 1) * pageSize + 1;
   const to = Math.min(total, page * pageSize);
+  const card = 'rounded-xl border border-milk-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,.04)]';
+  const tabs = [
+    { label: 'Tất cả', n: counts.all, href: tabUrl(), on: !filters.status && !filters.payment },
+    { label: 'Chờ xác nhận', n: counts.draft, href: tabUrl('draft'), on: filters.status === 'draft' && !filters.payment },
+    { label: 'Đang phục vụ', n: counts.open, href: tabUrl('open'), on: filters.status === 'open' && !filters.payment },
+    { label: 'Chưa thu', n: counts.unpaid, href: tabUrl('completed', 'unpaid'), on: filters.status === 'completed' && filters.payment === 'unpaid', tone: 'amber' },
+    { label: 'Hoàn tất', n: counts.completed, href: tabUrl('completed'), on: filters.status === 'completed' && !filters.payment },
+    { label: 'Đã hủy', n: counts.cancelled, href: tabUrl('cancelled'), on: filters.status === 'cancelled' && !filters.payment },
+  ];
+  const quick = (f, t) => { const p = new URLSearchParams(); for (const k of ['status', 'source', 'payment', 'q']) if (filters[k]) p.set(k, filters[k]); p.set('from', f); p.set('to', t); return `/admin/orders?${p}`; };
+  const isRange = (f, t) => filters.from === f && filters.to === t;
+  // page numbers: first, last, current ± 1, with gaps
+  const nums = [...new Set([1, page - 1, page, page + 1, pages])].filter((n) => n >= 1 && n <= pages).sort((a, b) => a - b);
 %>
-<div class="flex flex-wrap items-start justify-between gap-4">
+
+<div class="flex flex-wrap items-end justify-between gap-4">
   <div>
-    <h1 class="text-xl font-semibold tracking-tight sm:text-2xl">Đơn hàng</h1>
-    <p class="mt-1 text-sm text-gray-500">Đơn từ máy POS và chatbot Zalo. Bấm vào mã đơn để xem món, thu tiền hoặc hủy.</p>
+    <h1 class="text-2xl font-semibold tracking-tight text-navy-darker">Đơn hàng</h1>
+    <p class="mt-1 text-sm text-milk-500">Đơn từ máy POS và chatbot Zalo. Bấm vào mã đơn để xem món, thu tiền, in hóa đơn hoặc hủy.</p>
   </div>
+  <a href="/admin/pos" class="inline-flex h-11 items-center gap-2 rounded-xl bg-amber-400 px-4 text-sm font-bold text-navy-darker shadow hover:bg-amber-500"><%- icon('cart', 'h-5 w-5') %> Bán hàng (POS)</a>
 </div>
 
+<!-- Summary for the current filters (dates, channel, search) -->
+<section aria-label="Tổng hợp" class="no-scrollbar -mx-4 mt-5 flex snap-x gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-5 sm:overflow-visible sm:px-0">
+  <div class="<%= card %> min-w-[72%] shrink-0 snap-start p-4 sm:min-w-0">
+    <p class="text-xs font-semibold uppercase tracking-wide text-milk-500">Doanh thu đơn hoàn tất</p>
+    <p class="mt-1 font-mono text-2xl font-bold text-navy-darker tnum"><%= money(counts.revenue) %></p>
+    <p class="mt-1 text-xs text-milk-500"><%= counts.completed %> đơn hoàn tất</p>
+  </div>
+  <a href="<%= tabUrl('completed', 'unpaid') %>" class="<%= card %> block min-w-[72%] shrink-0 snap-start p-4 sm:min-w-0 transition hover:border-amber-300">
+    <p class="text-xs font-semibold uppercase tracking-wide text-milk-500">Chưa thu tiền</p>
+    <p class="mt-1 font-mono text-2xl font-bold tnum <%= counts.unpaidAmount ? 'text-amber-700' : 'text-navy-darker' %>"><%= money(counts.unpaidAmount) %></p>
+    <p class="mt-1 text-xs text-milk-500"><%= counts.unpaid %> đơn đã giao, chờ thu</p>
+  </a>
+  <a href="<%= tabUrl('open') %>" class="<%= card %> block min-w-[72%] shrink-0 snap-start p-4 sm:min-w-0 transition hover:border-blue-300">
+    <p class="text-xs font-semibold uppercase tracking-wide text-milk-500">Đang phục vụ</p>
+    <p class="mt-1 font-mono text-2xl font-bold text-navy-darker tnum"><%= money(counts.openAmount) %></p>
+    <p class="mt-1 text-xs text-milk-500"><%= counts.open %> đơn trên bàn · <%= counts.draft %> đơn Zalo chờ xác nhận</p>
+  </a>
+</section>
+
+<!-- Status tabs (keep the other filters) -->
+<nav aria-label="Trạng thái đơn" class="no-scrollbar -mx-4 mt-5 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+  <ul class="flex w-max gap-2">
+    <% tabs.forEach((t) => { %>
+      <li>
+        <a href="<%= t.href %>" <%- t.on ? 'aria-current="page"' : '' %>
+           class="inline-flex h-10 items-center gap-2 rounded-full border px-4 text-sm font-medium transition <%= t.on ? 'border-navy bg-navy text-white shadow-sm' : 'border-milk-200 bg-white text-dark hover:border-navy-accent' %>">
+          <%= t.label %>
+          <span class="rounded-full px-2 py-0.5 font-mono text-xs tnum <%= t.on ? 'bg-white/15 text-white' : t.tone === 'amber' && t.n ? 'bg-amber-100 text-amber-800' : 'bg-milk-100 text-milk-500' %>"><%= t.n %></span>
+        </a>
+      </li>
+    <% }) %>
+  </ul>
+</nav>
+
 <!-- Filters are plain GET parameters, so every view is linkable and survives a refresh -->
-<form method="get" action="/admin/orders" class="mt-5 grid grid-cols-2 gap-3 rounded border border-gray-200 p-3 sm:p-4 md:grid-cols-6">
-  <div class="col-span-2 md:col-span-2">
-    <label for="o-q" class="sr-only">Mã đơn</label>
-    <input id="o-q" name="q" type="search" value="<%= filters.q %>" placeholder="Tìm mã đơn (VD: CF261013)" maxlength="30" class="<%= input %>" autocomplete="off">
+<form method="get" action="/admin/orders" class="<%= card %> mt-4 p-3 sm:p-4">
+  <% if (filters.status) { %><input type="hidden" name="status" value="<%= filters.status %>"><% } %>
+  <% if (filters.payment) { %><input type="hidden" name="payment" value="<%= filters.payment %>"><% } %>
+  <div class="grid grid-cols-2 gap-3 md:grid-cols-12">
+    <div class="relative col-span-2 md:col-span-4">
+      <label for="o-q" class="sr-only">Mã đơn</label>
+      <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-milk-500"><%- icon('search', 'h-4 w-4') %></span>
+      <input id="o-q" name="q" type="search" value="<%= filters.q %>" placeholder="Tìm mã đơn (VD: CF261013)" maxlength="30" class="<%= input %> pl-9" autocomplete="off">
+    </div>
+    <div class="col-span-2 md:col-span-2">
+      <label for="o-source" class="sr-only">Kênh</label>
+      <select id="o-source" name="source" class="<%= input %>">
+        <option value="">Mọi kênh</option>
+        <option value="pos" <%= sel(filters.source, 'pos') %>>POS</option>
+        <option value="zalo" <%= sel(filters.source, 'zalo') %>>Zalo</option>
+      </select>
+    </div>
+    <div class="md:col-span-2">
+      <label for="o-from" class="sr-only">Từ ngày</label>
+      <input id="o-from" name="from" type="date" value="<%= filters.from %>" class="<%= input %>" title="Từ ngày">
+    </div>
+    <div class="md:col-span-2">
+      <label for="o-to" class="sr-only">Đến ngày</label>
+      <input id="o-to" name="to" type="date" value="<%= filters.to %>" class="<%= input %>" title="Đến ngày">
+    </div>
+    <div class="col-span-2 flex gap-2 md:col-span-2">
+      <button type="submit" class="<%= btnPrimary %> flex-1">Lọc</button>
+      <% if (hasFilter) { %><a href="/admin/orders" class="<%= btnSecondary %>" title="Xóa toàn bộ bộ lọc">Xóa</a><% } %>
+    </div>
   </div>
-  <div>
-    <label for="o-status" class="sr-only">Trạng thái</label>
-    <select id="o-status" name="status" class="<%= input %>">
-      <option value="">Mọi trạng thái</option>
-      <option value="draft" <%= sel(filters.status, 'draft') %>>Chờ khách xác nhận</option>
-      <option value="open" <%= sel(filters.status, 'open') %>>Đang phục vụ</option>
-      <option value="completed" <%= sel(filters.status, 'completed') %>>Hoàn tất</option>
-      <option value="cancelled" <%= sel(filters.status, 'cancelled') %>>Đã hủy</option>
-    </select>
-  </div>
-  <div>
-    <label for="o-source" class="sr-only">Kênh</label>
-    <select id="o-source" name="source" class="<%= input %>">
-      <option value="">Mọi kênh</option>
-      <option value="pos" <%= sel(filters.source, 'pos') %>>POS</option>
-      <option value="zalo" <%= sel(filters.source, 'zalo') %>>Zalo</option>
-    </select>
-  </div>
-  <div>
-    <label for="o-payment" class="sr-only">Thanh toán</label>
-    <select id="o-payment" name="payment" class="<%= input %>">
-      <option value="">Mọi thanh toán</option>
-      <option value="unpaid" <%= sel(filters.payment, 'unpaid') %>>Chưa thu</option>
-      <option value="paid" <%= sel(filters.payment, 'paid') %>>Đã thu</option>
-    </select>
-  </div>
-  <div class="md:col-span-1"></div>
-  <div>
-    <label for="o-from" class="mb-1 block text-xs text-gray-500">Từ ngày</label>
-    <input id="o-from" name="from" type="date" value="<%= filters.from %>" class="<%= input %>">
-  </div>
-  <div>
-    <label for="o-to" class="mb-1 block text-xs text-gray-500">Đến ngày</label>
-    <input id="o-to" name="to" type="date" value="<%= filters.to %>" class="<%= input %>">
-  </div>
-  <div class="col-span-2 flex items-end gap-2 md:col-span-4 md:justify-end">
-    <% if (hasFilter) { %><a href="/admin/orders" class="<%= btnSecondary %>">Xóa lọc</a><% } %>
-    <button type="submit" class="<%= btnPrimary %>">Lọc</button>
+  <div class="mt-3 flex flex-wrap items-center gap-2 text-xs">
+    <span class="text-milk-500">Nhanh:</span>
+    <a href="<%= quick(today, today) %>" class="rounded-full border px-3 py-1 font-medium <%= isRange(today, today) ? 'border-navy-accent bg-blue-50 text-navy' : 'border-milk-200 text-dark hover:border-navy-accent' %>">Hôm nay</a>
+    <a href="<%= quick(weekAgo, today) %>" class="rounded-full border px-3 py-1 font-medium <%= isRange(weekAgo, today) ? 'border-navy-accent bg-blue-50 text-navy' : 'border-milk-200 text-dark hover:border-navy-accent' %>">7 ngày</a>
   </div>
 </form>
 
-<p class="mt-4 text-sm text-gray-500" aria-live="polite">
-  <% if (total) { %>Hiển thị <span class="font-mono font-medium text-gray-900 tnum"><%= from %>–<%= to %></span> / <span class="font-mono tnum"><%= total %></span> đơn<% } else { %>Không có đơn phù hợp.<% } %>
+<p class="mt-4 text-sm text-milk-500" aria-live="polite">
+  <% if (total) { %>Hiển thị <span class="font-mono font-medium text-dark tnum"><%= from %>–<%= to %></span> / <span class="font-mono tnum"><%= total %></span> đơn<% } else { %>Không có đơn phù hợp.<% } %>
 </p>
 
-<div class="mt-3 rounded border border-gray-200 max-lg:border-0">
-  <table class="rtable w-full border-collapse text-left text-sm lg:min-w-[760px]">
+<div class="<%= card %> mt-3 overflow-hidden max-lg:border-0 max-lg:bg-transparent max-lg:shadow-none">
+  <% if (!orders.length) { %>
+    <div class="flex flex-col items-center px-5 py-14 text-center">
+      <span class="flex h-14 w-14 items-center justify-center rounded-full bg-milk-100 text-milk-500" aria-hidden="true"><%- icon('receipt', 'h-7 w-7') %></span>
+      <p class="mt-3 font-medium text-dark">Không có đơn nào</p>
+      <p class="mt-1 text-sm text-milk-500"><%= hasFilter ? 'Thử bỏ bớt bộ lọc.' : 'Đơn từ POS và Zalo sẽ hiện ở đây.' %></p>
+    </div>
+  <% } else { %>
+  <table class="rtable w-full border-collapse text-left text-sm lg:min-w-[860px]">
     <caption class="sr-only">Danh sách đơn hàng</caption>
     <thead class="<%= ui.thead %>">
       <tr>
         <th scope="col" class="px-4 py-3">Mã đơn</th>
         <th scope="col" class="px-4 py-3">Kênh</th>
-        <th scope="col" class="px-4 py-3">Bàn</th>
+        <th scope="col" class="px-4 py-3">Bàn / Khách</th>
+        <th scope="col" class="px-4 py-3 text-right">Món</th>
         <th scope="col" class="px-4 py-3 text-right">Tổng tiền</th>
         <th scope="col" class="px-4 py-3">Trạng thái</th>
-        <th scope="col" class="px-4 py-3">Thời gian</th>
+        <th scope="col" class="px-4 py-3 text-right"><span class="sr-only">Thao tác</span></th>
       </tr>
     </thead>
     <tbody>
-      <% orders.forEach((o) => { %>
-        <tr class="border-b border-gray-200 last:border-b-0 hover:bg-gray-50">
-          <td data-label="" class="rt-title px-4 py-3"><a href="/admin/orders/<%= o.id %>" class="font-mono text-[13px] font-medium text-blue-700 hover:text-navy hover:underline"><%= o.order_code %></a></td>
+      <% orders.forEach((o) => { const who = o.customer_name || (o.table_code ? `Bàn ${o.table_code}` : (o.source === 'zalo' ? 'Khách Zalo' : 'Mang đi')); %>
+        <tr class="border-b border-milk-200 last:border-b-0 hover:bg-milk-50">
+          <td data-label="" class="rt-title px-4 py-3">
+            <a href="/admin/orders/<%= o.id %>" class="font-mono text-[13px] font-semibold text-blue-700 hover:text-navy hover:underline"><%= o.order_code %></a>
+            <span class="block text-xs text-milk-500 tnum"><%= fmtTime(o.created_at) %></span>
+          </td>
           <td data-label="Kênh" class="px-4 py-3"><%- sourceBadge(o.source) %></td>
-          <td data-label="Bàn" class="px-4 py-3 font-mono text-[13px]"><%= o.table_code || '—' %></td>
-          <td data-label="Tổng tiền" class="px-4 py-3 text-right font-mono tnum"><%= money(o.total) %></td>
+          <td data-label="Bàn / Khách" class="px-4 py-3">
+            <span class="<%= o.customer_name ? 'font-medium text-dark' : 'text-milk-500' %>"><%= who %></span>
+            <% if (o.customer_name && o.table_code) { %><span class="block text-xs text-milk-500">Bàn <%= o.table_code %></span><% } %>
+          </td>
+          <td data-label="Món" class="px-4 py-3 text-right font-mono text-milk-500 tnum"><%= o.item_count %></td>
+          <td data-label="Tổng tiền" class="px-4 py-3 text-right font-mono font-bold text-navy-darker tnum"><%= money(o.total) %></td>
           <td data-label="Trạng thái" class="px-4 py-3">
             <%- orderStatusBadge(o) %>
             <% if (o.receipt_error) { %><span class="ml-1"><%- badge('Bill lỗi', 'bad') %></span><% } %>
           </td>
-          <td data-label="Thời gian" class="px-4 py-3 text-gray-600 tnum"><%= fmtTime(o.created_at) %></td>
+          <td data-label="" class="rt-actions px-4 py-3 text-right">
+            <div class="inline-flex items-center gap-1">
+              <% if (['open', 'completed'].includes(o.status)) { %>
+              <a href="/admin/pos/receipt/<%= o.id %>" target="_blank" rel="noopener" class="<%= ui.btnGhost %>" title="In hóa đơn" aria-label="In hóa đơn <%= o.order_code %>"><%- icon('receipt', 'h-4 w-4') %></a>
+              <% } %>
+              <a href="/admin/orders/<%= o.id %>" class="inline-flex h-9 items-center rounded-lg border border-milk-200 px-3 text-xs font-semibold text-navy hover:border-navy-accent hover:bg-blue-50">Xem</a>
+            </div>
+          </td>
         </tr>
       <% }) %>
     </tbody>
   </table>
+  <% } %>
 </div>
 
 <% if (pages > 1) { %>
-  <nav aria-label="Phân trang" class="mt-4 flex items-center justify-between gap-3">
-    <% if (page > 1) { %><a href="<%= pageUrl(page - 1) %>" rel="prev" class="<%= btnSecondary %>">← Trước</a><% } else { %><span></span><% } %>
-    <span class="text-sm text-gray-500">Trang <span class="font-mono tnum"><%= page %></span> / <span class="font-mono tnum"><%= pages %></span></span>
-    <% if (page < pages) { %><a href="<%= pageUrl(page + 1) %>" rel="next" class="<%= btnSecondary %>">Sau →</a><% } else { %><span></span><% } %>
+  <nav aria-label="Phân trang" class="mt-4 flex flex-wrap items-center justify-center gap-1.5">
+    <% if (page > 1) { %><a href="<%= pageUrl(page - 1) %>" rel="prev" class="inline-flex h-10 items-center rounded-lg border border-milk-200 bg-white px-3 text-sm hover:border-navy-accent">← Trước</a><% } %>
+    <% nums.forEach((n, i) => { %>
+      <% if (i > 0 && n - nums[i - 1] > 1) { %><span class="px-1 text-milk-500">…</span><% } %>
+      <a href="<%= pageUrl(n) %>" <%- n === page ? 'aria-current="page"' : '' %>
+         class="inline-flex h-10 min-w-10 items-center justify-center rounded-lg border px-3 font-mono text-sm tnum <%= n === page ? 'border-navy bg-navy text-white' : 'border-milk-200 bg-white hover:border-navy-accent' %>"><%= n %></a>
+    <% }) %>
+    <% if (page < pages) { %><a href="<%= pageUrl(page + 1) %>" rel="next" class="inline-flex h-10 items-center rounded-lg border border-milk-200 bg-white px-3 text-sm hover:border-navy-accent">Sau →</a><% } %>
   </nav>
 <% } %>

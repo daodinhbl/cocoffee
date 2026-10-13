@@ -144,13 +144,40 @@ async function list({ limit = 50, offset = 0, ...filter } = {}, conn) {
   const [rows] = await db(conn).query(
     `SELECT o.id, o.order_code, o.source, o.status, o.payment_status, o.payment_method, o.total,
             o.cogs_total, o.table_id, t.code AS table_code, o.zalo_user_id, o.zalo_chat_type, o.note,
-            o.receipt_sent_at, o.receipt_error, o.created_at, o.completed_at
+            o.receipt_sent_at, o.receipt_error, o.created_at, o.completed_at, o.customer_id, c.name AS customer_name,
+            (SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi WHERE oi.order_id = o.id) AS item_count
        FROM orders o LEFT JOIN dining_tables t ON t.id = o.table_id
+                     LEFT JOIN customers c ON c.id = o.customer_id
       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
       ORDER BY o.id DESC LIMIT ? OFFSET ?`,
     [...params, Math.min(Number(limit) || 50, 200), Number(offset) || 0]
   );
   return rows;
+}
+
+/**
+ * Counts and amounts per status for the list's tabs and summary cards. Uses every filter EXCEPT the
+ * status/payment ones, so each tab shows what clicking it would give.
+ */
+async function breakdown({ source, tableId, from, to, q } = {}, conn) {
+  const { where, params } = buildFilter({ source, tableId, from, to, q });
+  const [rows] = await db(conn).query(
+    `SELECT o.status, o.payment_status, COUNT(*) AS n, COALESCE(SUM(o.total), 0) AS amount
+       FROM orders o ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+      GROUP BY o.status, o.payment_status`,
+    params
+  );
+  const out = { all: 0, draft: 0, open: 0, completed: 0, cancelled: 0, unpaid: 0, revenue: 0, unpaidAmount: 0, openAmount: 0 };
+  for (const r of rows) {
+    const n = Number(r.n);
+    const amount = Number(r.amount);
+    out.all += n;
+    out[r.status] += n;
+    if (r.status === 'completed') out.revenue += amount;
+    if (r.status === 'completed' && r.payment_status === 'unpaid') { out.unpaid += n; out.unpaidAmount += amount; }
+    if (r.status === 'open') out.openAmount += amount;
+  }
+  return out;
 }
 
 /** Revenue / COGS / gross profit over completed orders in [from, to). */
@@ -167,5 +194,5 @@ async function summary(from, to, conn) {
 
 module.exports = {
   insert, getById, getItems, replaceItems, recalcTotals, setDiscount, setItemCogs, markCompleted, markPaid,
-  markCancelled, insertPayment, markReceipt, list, count, getPayments, summary,
+  markCancelled, insertPayment, markReceipt, list, count, getPayments, summary, breakdown,
 };

@@ -3,7 +3,7 @@ const orderService = require('../../services/orderService');
 const receiptService = require('../../services/receiptService');
 const { AppError } = require('../../utils/httpError');
 const v = require('../../utils/validate');
-const { parseDay, dayBounds } = require('../../utils/shopTime');
+const { parseDay, dayBounds, shopDay } = require('../../utils/shopTime');
 const { render, optional } = require('./common');
 
 const PAGE_SIZE = 25;
@@ -34,7 +34,7 @@ async function list(req, res) {
     excludeStatuses: f.payment === 'unpaid' && !f.status ? ['cancelled', 'draft'] : undefined,
     from: bounds.from, to: bounds.to,
   };
-  const total = await orderModel.count(where);
+  const [total, counts] = await Promise.all([orderModel.count(where), orderModel.breakdown(where)]);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const page = Math.min(f.page, pages);
   const orders = await orderModel.list({ ...where, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE });
@@ -50,7 +50,20 @@ async function list(req, res) {
 
   await render(res, 'orders', {
     title: 'Đơn hàng', activeMenu: 'orders', breadcrumbs: [{ label: 'Vận hành', href: '#' }, { label: 'Đơn hàng' }],
-  }, { orders, filters: f, total, page, pages, pageSize: PAGE_SIZE, pageUrl, hasFilter: [...params.keys()].length > 0 });
+  }, {
+    orders, filters: f, total, page, pages, pageSize: PAGE_SIZE, pageUrl, hasFilter: [...params.keys()].length > 0, counts,
+    // a URL with the current filters but another status/payment tab
+    tabUrl: (status, payment) => {
+      const p = new URLSearchParams(params);
+      p.delete('status'); p.delete('payment');
+      if (status) p.set('status', status);
+      if (payment) p.set('payment', payment);
+      const s = p.toString();
+      return `/admin/orders${s ? `?${s}` : ''}`;
+    },
+    today: shopDay(),
+    weekAgo: shopDay(new Date(), -6),
+  });
 }
 
 async function detail(req, res) {

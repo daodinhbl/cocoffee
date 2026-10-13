@@ -102,7 +102,7 @@ test('admin pages', async (t) => {
     const checks = {
       '/admin/dashboard': [/Tổng quan/],
       '/admin/tables': [/Bàn 1/, /Có khách/, /Trống/],
-      '/admin/orders': [/CF261013-00042/, /Chờ thu tiền/, /Trang <span[^>]*>1<\/span> \/ <span[^>]*>3<\/span>/],
+      '/admin/orders': [/CF261013-00042/, /Chờ thu tiền/, /aria-current="page"[^>]*>1<\/a>/, /href="\/admin\/orders\?page=3"/, /237\.000đ/, /In hóa đơn CF261013-00042/],
       '/admin/orders/42': [/Cà phê sữa đá/, /ít đá/, /Gửi lại bill qua Zalo/, /Thu 79\.000đ/, /Zalo 500/],
       '/admin/menu': [/cf sữa/, /Thuốc lá 555/, /Ngừng bán/],
       '/admin/inventory': [/Sữa tươi/, /Sắp hết/, /Giá trị tồn kho/],
