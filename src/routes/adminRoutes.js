@@ -18,6 +18,7 @@ const reports = require('../controllers/admin/reports');
 const zalo = require('../controllers/admin/zalo');
 const settings = require('../controllers/admin/settings');
 const pos = require('../controllers/admin/pos');
+const customers = require('../controllers/admin/customers');
 
 const router = express.Router();
 
@@ -51,6 +52,18 @@ router.get('/orders/:id', orders.detail);
 router.post('/orders/:id/cancel', act(orders.cancel));
 router.post('/orders/:id/pay', act(orders.pay));
 router.post('/orders/:id/resend-receipt', act(orders.resendReceipt));
+
+router.get('/customers', customers.list);
+router.get('/customers/new', customers.newForm);
+router.get('/customers/reconciliation', customers.reconciliation);
+router.get('/customers/:id/statement', customers.statementPage);
+router.post('/customers', act(customers.create));
+router.get('/customers/:id', customers.detail);
+router.get('/customers/:id/edit', customers.editForm);
+router.post('/customers/:id', act(customers.update));
+router.post('/customers/:id/collect', act(customers.collect));
+router.post('/customers/:id/adjust', act(customers.adjust));
+
 
 router.get('/menu', menu.page);
 router.post('/menu/categories', act(menu.createCategory));

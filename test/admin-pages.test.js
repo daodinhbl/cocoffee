@@ -467,6 +467,41 @@ test('admin pages', async (t) => {
     }
   });
 
+  await t.test('customers & debt: list, detail, collect (partial), adjust, reconciliation, printable statement', async () => {
+    for (const [p, re] of [
+      ['/admin/customers', /Chị Lan[\s\S]*120\.000đ/],
+      ['/admin/customers/5', /Số dư công nợ[\s\S]*120\.000đ[\s\S]*Thu nợ/],
+      ['/admin/customers/new', /Thêm khách hàng/],
+      ['/admin/customers/5/edit', /value="0909000111"/],
+      ['/admin/customers/reconciliation?from=2026-10-01&to=2026-10-13', /Nợ cuối kỳ[\s\S]*120\.000đ[\s\S]*Biên bản/],
+    ]) {
+      const r = await admin.get(p);
+      assert.equal(r.status, 200, p);
+      assert.match(await r.text(), re, p);
+    }
+    const st = await (await admin.get('/admin/customers/5/statement?from=2026-10-01&to=2026-10-13')).text();
+    assert.match(st, /BIÊN BẢN ĐỐI CHIẾU CÔNG NỢ/);
+    assert.match(st, /Từ ngày 01\/10\/2026 đến ngày 13\/10\/2026/);
+    assert.match(st, /Bên B còn nợ Bên A số tiền: <b>120\.000đ/);
+    assert.equal((await admin.get('/admin/customers/999')).status, 404);
+
+    reset();
+    let r = await admin.post('/admin/customers/5/collect', { _csrf: token, _back: '/admin/customers/5', amount: '50000', method: 'transfer', note: 'CK' });
+    assert.equal(r.headers.get('location'), '/admin/customers/5');
+    assert.deepEqual(called('customer.collect')[0].args, [5, { amount: 50000, method: 'transfer', note: 'CK', userId: 1 }]);
+    await admin.post('/admin/customers/5/collect', { _csrf: token, _back: '/admin/customers/5', amount: '50000', method: 'bitcoin' });
+    assert.equal(called('customer.collect').length, 1, 'unknown method refused before the service');
+
+    reset();
+    await admin.post('/admin/customers/5/adjust', { _csrf: token, _back: '/admin/customers/5', direction: 'decrease', amount: '20000', note: 'xóa nợ lẻ' });
+    assert.equal(called('customer.adjust')[0].args[1].amount, -20000);
+    await admin.post('/admin/customers/5/adjust', { _csrf: token, _back: '/admin/customers/5', direction: 'increase', amount: '20000', note: '' });
+    assert.equal(called('customer.adjust').length, 1, 'a reason is required');
+
+    const { c } = await fx.login('thungan', PASSWORD);
+    assert.equal((await c.get('/admin/customers')).headers.get('location'), '/admin/pos', 'cashiers cannot open customer debts');
+  });
+
   await t.test('dashboard charts: best sellers, low stock, overstock, debtors named from customers', async () => {
     const html = await (await admin.get('/admin/dashboard')).text();
     for (const title of ['Món bán chạy', 'Hàng sắp hết', 'Nguyên liệu tồn kho nhiều', 'Khách hàng công nợ nhiều nhất']) assert.match(html, new RegExp(title));

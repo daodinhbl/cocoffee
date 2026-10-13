@@ -1,0 +1,38 @@
+<%
+  const { input, label, btnPrimary, btnSecondary } = ui;
+  const c = customer || {};
+  const isNew = !customer;
+  const card = 'rounded-xl border border-milk-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,.04)]';
+%>
+<div class="mx-auto max-w-2xl">
+  <h1 class="text-2xl font-semibold tracking-tight text-navy-darker"><%= isNew ? 'Thêm khách hàng' : `Sửa: ${c.name}` %></h1>
+  <p class="mt-1 text-sm text-milk-500">Gắn <b>Zalo ID</b> để đơn Zalo của khách tự vào sổ công nợ khi khách chốt đơn mà chưa trả tiền.</p>
+
+  <form method="post" action="<%= isNew ? '/admin/customers' : `/admin/customers/${c.id}` %>" class="<%= card %> mt-5 space-y-4 p-5 sm:p-6">
+    <%- include('../partials/csrf') %>
+    <input type="hidden" name="_back" value="<%= isNew ? '/admin/customers/new' : `/admin/customers/${c.id}/edit` %>">
+    <div>
+      <label for="c-name" class="<%= label %>">Tên khách hàng</label>
+      <input id="c-name" name="name" required maxlength="120" value="<%= c.name || '' %>" class="<%= input %>" autocomplete="off" autofocus>
+    </div>
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div>
+        <label for="c-phone" class="<%= label %>">Số điện thoại</label>
+        <input id="c-phone" name="phone" maxlength="20" inputmode="tel" value="<%= c.phone || '' %>" class="<%= input %> font-mono" autocomplete="off" placeholder="09xx xxx xxx">
+      </div>
+      <div>
+        <label for="c-zalo" class="<%= label %>">Zalo ID</label>
+        <input id="c-zalo" name="zalo_user_id" maxlength="64" value="<%= c.zalo_user_id || '' %>" class="<%= input %> font-mono" autocomplete="off" placeholder="ID người dùng Zalo">
+        <p class="mt-1 text-xs text-milk-500">Xem ở trang Zalo bot › sự kiện gần đây, hoặc trong đơn Zalo của khách.</p>
+      </div>
+    </div>
+    <div>
+      <label for="c-note" class="<%= label %>">Ghi chú</label>
+      <input id="c-note" name="note" maxlength="255" value="<%= c.note || '' %>" class="<%= input %>" autocomplete="off" placeholder="VD: văn phòng tầng 3, ghi sổ cuối tuần">
+    </div>
+    <div class="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-end">
+      <a href="<%= isNew ? '/admin/customers' : `/admin/customers/${c.id}` %>" class="<%= btnSecondary %>">Hủy</a>
+      <button type="submit" class="<%= btnPrimary %>"><%= isNew ? 'Thêm khách hàng' : 'Lưu thay đổi' %></button>
+    </div>
+  </form>
+</div>

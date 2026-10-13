@@ -57,6 +57,8 @@ async function start() {
   const adminModel = require('../../src/models/adminModel');
   const { tokenModel } = require('../../src/models/zaloModel');
   const settingsModel = require('../../src/models/settingsModel');
+  const customerModel = require('../../src/models/customerModel');
+  const customerService = require('../../src/services/customerService');
   const { pool } = require('../../src/config/db');
 
   // Password changes are kept per app instance, so a changed password really invalidates older sessions.
@@ -146,6 +148,23 @@ async function start() {
   mock.method(adminModel, 'zaloRecentEvents', async () => [{ id: 1, event_name: 'user_send_text', status: 'failed', error: 'boom <script>', num_retry: 1, received_at: NOW }]);
   mock.method(adminModel, 'topDebtors', async () => [{ zalo_user_id: 'z-1234', customer_name: 'Chị Lan', orders: 2, amount: 120000, oldest: NOW }]);
   mock.method(adminModel, 'zaloPendingDrafts', async () => [{ id: 1, chat_type: 'user', last_activity_at: NOW, expires_at: NOW, order_id: 50, order_code: 'CF-D', total: 35000 }]);
+  const CUSTOMER = { id: 5, name: 'Chị Lan', phone: '0909000111', zalo_user_id: 'z-1234', note: 'văn phòng', balance: 120000, order_count: 2, created_at: NOW, updated_at: NOW };
+  mock.method(customerModel, 'list', async () => [CUSTOMER]);
+  mock.method(customerModel, 'count', async () => 1);
+  mock.method(customerModel, 'summary', async () => ({ total_customers: 1, debt_customers: 1, total_debt: 120000 }));
+  mock.method(customerModel, 'getById', async (id) => (Number(id) === 5 ? CUSTOMER : null));
+  mock.method(customerModel, 'ledgerHistory', async () => [
+    { id: 2, entry_type: 'payment', amount: -30000, method: 'cash', note: 'Thu nợ', created_at: NOW, order_id: null, order_code: null, created_by_name: 'boss' },
+    { id: 1, entry_type: 'debt', amount: 150000, method: null, note: 'Nợ đơn CF-1', created_at: NOW, order_id: 42, order_code: ORDER.order_code, created_by_name: null },
+  ]);
+  mock.method(customerModel, 'orderHistory', async () => [{ ...ORDER, payment_status: 'unpaid', status: 'completed', total: 150000 }]);
+  mock.method(customerModel, 'reconciliation', async () => [{ id: 5, name: 'Chị Lan', phone: '0909000111', opening: 50000, increase: 100000, decrease: 30000, closing: 120000 }]);
+  mock.method(customerModel, 'statement', async () => ({ opening: 50000, increase: 100000, decrease: 30000, closing: 120000,
+    entries: [{ id: 1, entry_type: 'debt', amount: 100000, created_at: NOW, order_code: ORDER.order_code, balance: 150000 }, { id: 2, entry_type: 'payment', amount: -30000, method: 'transfer', created_at: NOW, balance: 120000 }] }));
+  mock.method(customerModel, 'create', rec('customer.create', 9));
+  mock.method(customerModel, 'update', rec('customer.update'));
+  mock.method(customerService, 'collect', rec('customer.collect', { amount: 50000, balance: 70000, settled: [ORDER.order_code] }));
+  mock.method(customerService, 'adjust', rec('customer.adjust', { balance: 100000 }));
   const SETTINGS = new Map();   // app_settings, in memory
   mock.method(settingsModel, 'getByPrefix', async (prefix) => Object.fromEntries([...SETTINGS].filter(([k]) => k.startsWith(prefix))));
   mock.method(settingsModel, 'setMany', rec('settings.setMany', (values) => { for (const [k, v] of Object.entries(values)) SETTINGS.set(k, String(v)); }));

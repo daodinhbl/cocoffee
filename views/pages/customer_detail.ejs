@@ -1,0 +1,166 @@
+<%
+  const { input, label, btnPrimary, btnSecondary, sheet, grabber } = ui;
+  const card = 'rounded-xl border border-milk-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,.04)]';
+  const balance = Number(customer.balance);
+  const owes = balance > 0;
+  const unpaid = orders.filter((o) => o.status === 'completed' && o.payment_status === 'unpaid');
+  const unpaidTotal = unpaid.reduce((s, o) => s + Number(o.total), 0);
+  const paidTotal = ledger.filter((l) => l.entry_type === 'payment').reduce((s, l) => s - Number(l.amount), 0);
+  const debtTotal = ledger.filter((l) => l.entry_type === 'debt').reduce((s, l) => s + Number(l.amount), 0);
+  const ENTRY = { debt: ['Phát sinh nợ', 'warn'], payment: ['Thu nợ', 'good'], adjust: ['Điều chỉnh', 'info'] };
+  const METHOD = { cash: 'Tiền mặt', transfer: 'Chuyển khoản', card: 'Thẻ', other: 'Khác' };
+  const initials = String(customer.name).trim().split(/\s+/).slice(-2).map((w) => w[0]).join('').toUpperCase();
+  // running balance, oldest -> newest, shown next to each ledger row (ledger arrives newest first)
+  let run = balance;
+  const rows = ledger.map((l) => { const after = run; run -= Number(l.amount); return { ...l, after }; });
+%>
+
+<!-- Header -->
+<div class="flex flex-wrap items-start justify-between gap-4">
+  <div class="flex min-w-0 items-center gap-4">
+    <span class="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-navy text-lg font-bold text-white" aria-hidden="true"><%= initials %></span>
+    <div class="min-w-0">
+      <h1 class="truncate text-2xl font-semibold tracking-tight text-navy-darker"><%= customer.name %></h1>
+      <p class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-milk-500">
+        <% if (customer.phone) { %><a href="tel:<%= customer.phone %>" class="font-mono text-dark hover:text-navy-accent"><%= customer.phone %></a><% } %>
+        <% if (customer.zalo_user_id) { %><%- badge('Zalo', 'info') %><% } %>
+        <span>Khách từ <%= fmtTime(customer.created_at) %></span>
+      </p>
+      <% if (customer.note) { %><p class="mt-1 text-sm italic text-milk-500"><%= customer.note %></p><% } %>
+    </div>
+  </div>
+  <div class="flex gap-2">
+    <a href="/admin/customers" class="<%= btnSecondary %>">← Danh sách</a>
+    <a href="/admin/customers/<%= customer.id %>/statement" target="_blank" rel="noopener" class="<%= btnSecondary %>"><%- icon('receipt', 'h-4 w-4') %> Biên bản đối chiếu</a>
+    <a href="/admin/customers/<%= customer.id %>/edit" class="<%= btnSecondary %>"><%- icon('pencil', 'h-4 w-4') %> Sửa</a>
+  </div>
+</div>
+
+<div class="mt-5 grid grid-cols-12 gap-4 sm:gap-6">
+  <!-- Balance + collect -->
+  <section aria-labelledby="bal-title" class="col-span-12 lg:col-span-5">
+    <div class="relative overflow-hidden rounded-2xl <%= owes ? 'bg-navy-darker text-white' : 'bg-white border border-milk-200' %> p-5 shadow-[0_12px_32px_-16px_rgba(15,23,42,.45)]">
+      <% if (owes) { %><div class="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full bg-amber-400/15 blur-2xl" aria-hidden="true"></div><% } %>
+      <h2 id="bal-title" class="text-xs font-semibold uppercase tracking-wider <%= owes ? 'text-navy-muted' : 'text-milk-500' %>">Số dư công nợ</h2>
+      <p class="relative mt-1 font-mono text-4xl font-bold tnum <%= owes ? 'text-amber-300' : balance < 0 ? 'text-emerald-700' : 'text-navy-darker' %>"><%= money(balance) %></p>
+      <p class="relative mt-1 text-sm <%= owes ? 'text-navy-soft' : 'text-milk-500' %>">
+        <%= owes ? `${unpaid.length} đơn chưa thu · ${money(unpaidTotal)}` : balance < 0 ? 'Khách đang có tiền trả trước' : 'Không còn nợ' %>
+      </p>
+      <dl class="relative mt-4 grid grid-cols-2 gap-3 text-sm">
+        <div><dt class="<%= owes ? 'text-navy-muted' : 'text-milk-500' %>">Tổng phát sinh</dt><dd class="font-mono font-semibold tnum"><%= money(debtTotal) %></dd></div>
+        <div><dt class="<%= owes ? 'text-navy-muted' : 'text-milk-500' %>">Đã thu</dt><dd class="font-mono font-semibold tnum"><%= money(paidTotal) %></dd></div>
+      </dl>
+    </div>
+
+    <% if (owes) { %>
+    <form method="post" action="/admin/customers/<%= customer.id %>/collect" class="<%= card %> mt-4 space-y-3 p-5"
+          data-confirm="Ghi nhận thu nợ của <%= customer.name %>?">
+      <%- include('../partials/csrf') %>
+      <input type="hidden" name="_back" value="/admin/customers/<%= customer.id %>">
+      <h3 class="text-base font-semibold text-navy-darker">Thu nợ</h3>
+      <div>
+        <label for="col-amount" class="<%= label %>">Số tiền thu (đ)</label>
+        <input id="col-amount" name="amount" type="number" min="1" max="<%= balance %>" step="1000" required inputmode="numeric" value="<%= balance %>" class="<%= input %> text-right font-mono text-lg">
+        <p class="mt-1 text-xs text-milk-500">Có thể thu một phần. Tiền thu được trừ vào các đơn nợ cũ nhất trước; đơn nào được trả đủ sẽ chuyển "Đã thu".</p>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label for="col-method" class="<%= label %>">Hình thức</label>
+          <select id="col-method" name="method" class="<%= input %>">
+            <option value="cash">Tiền mặt</option><option value="transfer">Chuyển khoản</option><option value="card">Thẻ</option><option value="other">Khác</option>
+          </select>
+        </div>
+        <div>
+          <label for="col-note" class="<%= label %>">Ghi chú</label>
+          <input id="col-note" name="note" maxlength="255" class="<%= input %>" placeholder="VD: CK Vietcombank" autocomplete="off">
+        </div>
+      </div>
+      <button type="submit" class="<%= btnPrimary %> w-full">Ghi nhận thu nợ</button>
+    </form>
+    <% } %>
+
+    <details class="<%= card %> mt-4 p-5">
+      <summary class="cursor-pointer text-sm font-semibold text-navy-darker">Điều chỉnh công nợ thủ công</summary>
+      <form method="post" action="/admin/customers/<%= customer.id %>/adjust" class="mt-3 space-y-3" data-confirm="Điều chỉnh công nợ của <%= customer.name %>?">
+        <%- include('../partials/csrf') %>
+        <input type="hidden" name="_back" value="/admin/customers/<%= customer.id %>">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label for="adj-dir" class="<%= label %>">Loại</label>
+            <select id="adj-dir" name="direction" class="<%= input %>">
+              <option value="increase">Tăng nợ (+)</option>
+              <option value="decrease">Giảm nợ (−)</option>
+            </select>
+          </div>
+          <div>
+            <label for="adj-amount" class="<%= label %>">Số tiền (đ)</label>
+            <input id="adj-amount" name="amount" type="number" min="1" step="1000" required inputmode="numeric" class="<%= input %> text-right font-mono">
+          </div>
+        </div>
+        <div>
+          <label for="adj-note" class="<%= label %>">Lý do (bắt buộc)</label>
+          <input id="adj-note" name="note" maxlength="255" required class="<%= input %>" placeholder="VD: nợ cũ ghi sổ tay, xóa nợ lẻ" autocomplete="off">
+        </div>
+        <button type="submit" class="<%= btnSecondary %> w-full">Lưu điều chỉnh</button>
+      </form>
+    </details>
+  </section>
+
+  <!-- Ledger + orders -->
+  <div class="col-span-12 space-y-4 sm:space-y-6 lg:col-span-7">
+    <section aria-labelledby="led-title" class="<%= card %> overflow-hidden">
+      <div class="flex items-center justify-between border-b border-milk-200 px-5 py-4">
+        <h2 id="led-title" class="text-base font-semibold text-navy-darker">Sổ công nợ</h2>
+        <span class="text-xs text-milk-500"><%= ledger.length %> dòng</span>
+      </div>
+      <% if (!rows.length) { %>
+        <p class="px-5 py-10 text-center text-sm text-milk-500">Chưa có phát sinh công nợ.</p>
+      <% } else { %>
+      <ol class="divide-y divide-milk-200">
+        <% rows.forEach((l) => { const [txt, tone] = ENTRY[l.entry_type] || [l.entry_type, 'neutral']; const plus = Number(l.amount) > 0; %>
+          <li class="flex items-start justify-between gap-3 px-5 py-3">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <%- badge(txt, tone) %>
+                <% if (l.order_code) { %><a href="/admin/orders/<%= l.order_id %>" class="font-mono text-[13px] text-blue-700 hover:text-navy hover:underline"><%= l.order_code %></a><% } %>
+                <% if (l.method) { %><span class="text-xs text-milk-500"><%= METHOD[l.method] || l.method %></span><% } %>
+              </div>
+              <p class="mt-1 truncate text-xs text-milk-500"><%= fmtTime(l.created_at) %><%= l.created_by_name ? ` · ${l.created_by_name}` : '' %><%= l.note && !/^Nợ đơn /.test(l.note) ? ` · ${l.note}` : '' %></p>
+            </div>
+            <div class="shrink-0 text-right">
+              <p class="font-mono font-semibold tnum <%= plus ? 'text-red-700' : 'text-emerald-700' %>"><%= plus ? '+' : '−' %><%= money(Math.abs(Number(l.amount))) %></p>
+              <p class="font-mono text-xs text-milk-500 tnum">Dư <%= money(l.after) %></p>
+            </div>
+          </li>
+        <% }) %>
+      </ol>
+      <% } %>
+    </section>
+
+    <section aria-labelledby="ord-title" class="<%= card %> overflow-hidden">
+      <div class="flex items-center justify-between border-b border-milk-200 px-5 py-4">
+        <h2 id="ord-title" class="text-base font-semibold text-navy-darker">Đơn hàng của khách</h2>
+        <span class="text-xs text-milk-500"><%= orders.length %> đơn</span>
+      </div>
+      <% if (!orders.length) { %>
+        <p class="px-5 py-10 text-center text-sm text-milk-500">Chưa có đơn nào liên kết với khách này.</p>
+      <% } else { %>
+      <ul class="divide-y divide-milk-200">
+        <% orders.forEach((o) => { %>
+          <li class="flex items-center justify-between gap-3 px-5 py-3">
+            <div class="min-w-0">
+              <a href="/admin/orders/<%= o.id %>" class="font-mono text-[13px] font-semibold text-blue-700 hover:text-navy hover:underline"><%= o.order_code %></a>
+              <span class="ml-2"><%- sourceBadge(o.source) %></span>
+              <p class="mt-0.5 text-xs text-milk-500"><%= fmtTime(o.created_at) %></p>
+            </div>
+            <div class="flex shrink-0 items-center gap-3">
+              <%- orderStatusBadge(o) %>
+              <span class="w-24 text-right font-mono font-semibold text-navy-darker tnum"><%= money(o.total) %></span>
+            </div>
+          </li>
+        <% }) %>
+      </ul>
+      <% } %>
+    </section>
+  </div>
+</div>

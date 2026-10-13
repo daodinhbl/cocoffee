@@ -1,0 +1,91 @@
+<%
+  const { input, btnPrimary, btnSecondary } = ui;
+  const card = 'rounded-xl border border-milk-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,.04)]';
+  const qs = (extra = {}) => { const p = new URLSearchParams({ from: period.from, to: period.to, ...(q ? { q } : {}), ...extra }); return p.toString(); };
+  const fmtDay = (d) => d.split('-').reverse().join('/');
+  const swipe = 'min-w-[60%] shrink-0 snap-start sm:min-w-0';
+%>
+<div class="flex flex-wrap items-end justify-between gap-4">
+  <div>
+    <h1 class="text-2xl font-semibold tracking-tight text-navy-darker">Đối chiếu công nợ</h1>
+    <p class="mt-1 text-sm text-milk-500">Kỳ <b class="text-dark"><%= fmtDay(period.from) %> – <%= fmtDay(period.to) %></b>: nợ đầu kỳ, phát sinh tăng, đã thu / giảm và nợ cuối kỳ của từng khách. Bấm "Biên bản" để in gửi khách ký xác nhận.</p>
+  </div>
+  <a href="/admin/customers" class="<%= btnSecondary %>">← Khách hàng</a>
+</div>
+
+<!-- Period -->
+<form method="get" action="/admin/customers/reconciliation" class="<%= card %> mt-5 p-3 sm:p-4">
+  <div class="grid grid-cols-2 gap-3 md:grid-cols-12">
+    <div class="relative col-span-2 md:col-span-4">
+      <label for="r-q" class="sr-only">Tìm khách</label>
+      <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-milk-500"><%- icon('search', 'h-4 w-4') %></span>
+      <input id="r-q" name="q" type="search" value="<%= q %>" placeholder="Tên hoặc số điện thoại" maxlength="60" class="<%= input %> pl-9" autocomplete="off">
+    </div>
+    <div class="md:col-span-3"><label for="r-from" class="sr-only">Từ ngày</label><input id="r-from" name="from" type="date" value="<%= period.from %>" class="<%= input %>" title="Từ ngày"></div>
+    <div class="md:col-span-3"><label for="r-to" class="sr-only">Đến ngày</label><input id="r-to" name="to" type="date" value="<%= period.to %>" class="<%= input %>" title="Đến ngày"></div>
+    <div class="col-span-2 md:col-span-2"><button type="submit" class="<%= btnPrimary %> w-full">Xem</button></div>
+  </div>
+  <div class="mt-3 flex flex-wrap items-center gap-2 text-xs">
+    <span class="text-milk-500">Kỳ nhanh:</span>
+    <% presets.forEach((p) => { const on = p.from === period.from && p.to === period.to; %>
+      <a href="/admin/customers/reconciliation?<%= new URLSearchParams({ from: p.from, to: p.to, ...(q ? { q } : {}) }) %>" class="rounded-full border px-3 py-1 font-medium <%= on ? 'border-navy-accent bg-blue-50 text-navy' : 'border-milk-200 text-dark hover:border-navy-accent' %>"><%= p.label %></a>
+    <% }) %>
+  </div>
+</form>
+
+<!-- Totals -->
+<section aria-label="Tổng kỳ" class="no-scrollbar -mx-4 mt-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-4 sm:gap-5 sm:overflow-visible sm:px-0">
+  <div class="<%= card %> <%= swipe %> p-4"><p class="text-xs font-semibold uppercase tracking-wide text-milk-500">Nợ đầu kỳ</p><p class="mt-1 font-mono text-2xl font-bold text-navy-darker tnum"><%= money(totals.opening) %></p></div>
+  <div class="<%= card %> <%= swipe %> p-4"><p class="text-xs font-semibold uppercase tracking-wide text-milk-500">Phát sinh tăng</p><p class="mt-1 font-mono text-2xl font-bold text-red-700 tnum">+<%= money(totals.increase) %></p></div>
+  <div class="<%= card %> <%= swipe %> p-4"><p class="text-xs font-semibold uppercase tracking-wide text-milk-500">Đã thu / giảm</p><p class="mt-1 font-mono text-2xl font-bold text-emerald-700 tnum">−<%= money(totals.decrease) %></p></div>
+  <div class="<%= swipe %> rounded-xl bg-navy-darker p-4 text-white shadow"><p class="text-xs font-semibold uppercase tracking-wide text-navy-muted">Nợ cuối kỳ</p><p class="mt-1 font-mono text-2xl font-bold text-amber-300 tnum"><%= money(totals.closing) %></p></div>
+</section>
+
+<div class="<%= card %> mt-4 overflow-hidden max-lg:border-0 max-lg:bg-transparent max-lg:shadow-none">
+  <% if (!rows.length) { %>
+    <p class="px-5 py-14 text-center text-sm text-milk-500">Không có khách nào phát sinh công nợ trong kỳ này.</p>
+  <% } else { %>
+  <table class="rtable w-full border-collapse text-left text-sm lg:min-w-[860px]">
+    <caption class="sr-only">Bảng đối chiếu công nợ theo khách hàng</caption>
+    <thead class="<%= ui.thead %>">
+      <tr>
+        <th scope="col" class="px-4 py-3">Khách hàng</th>
+        <th scope="col" class="px-4 py-3 text-right">Nợ đầu kỳ</th>
+        <th scope="col" class="px-4 py-3 text-right">Phát sinh tăng</th>
+        <th scope="col" class="px-4 py-3 text-right">Đã thu / giảm</th>
+        <th scope="col" class="px-4 py-3 text-right">Nợ cuối kỳ</th>
+        <th scope="col" class="px-4 py-3 text-right"><span class="sr-only">Thao tác</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% rows.forEach((r) => { %>
+        <tr class="border-b border-milk-200 last:border-b-0 hover:bg-milk-50">
+          <td data-label="" class="rt-title px-4 py-3">
+            <a href="/admin/customers/<%= r.id %>" class="font-semibold text-blue-700 hover:text-navy hover:underline"><%= r.name %></a>
+            <% if (r.phone) { %><span class="block font-mono text-xs text-milk-500"><%= r.phone %></span><% } %>
+          </td>
+          <td data-label="Nợ đầu kỳ" class="px-4 py-3 text-right font-mono tnum"><%= money(r.opening) %></td>
+          <td data-label="Phát sinh tăng" class="px-4 py-3 text-right font-mono text-red-700 tnum"><%= r.increase ? '+' + money(r.increase) : '—' %></td>
+          <td data-label="Đã thu / giảm" class="px-4 py-3 text-right font-mono text-emerald-700 tnum"><%= r.decrease ? '−' + money(r.decrease) : '—' %></td>
+          <td data-label="Nợ cuối kỳ" class="px-4 py-3 text-right font-mono font-bold tnum <%= r.closing > 0 ? 'text-navy-darker' : 'text-milk-500' %>"><%= money(r.closing) %></td>
+          <td data-label="" class="rt-actions px-4 py-3 text-right">
+            <a href="/admin/customers/<%= r.id %>/statement?<%= new URLSearchParams({ from: period.from, to: period.to }) %>" target="_blank" rel="noopener"
+               class="inline-flex h-9 items-center gap-1.5 rounded-lg border border-milk-200 px-3 text-xs font-semibold text-navy hover:border-navy-accent hover:bg-blue-50"><%- icon('receipt', 'h-3.5 w-3.5') %> Biên bản</a>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+    <tfoot class="max-lg:hidden">
+      <tr class="border-t-2 border-navy bg-milk-50 font-semibold">
+        <td class="px-4 py-3">Tổng cộng (<%= rows.length %> khách)</td>
+        <td class="px-4 py-3 text-right font-mono tnum"><%= money(totals.opening) %></td>
+        <td class="px-4 py-3 text-right font-mono text-red-700 tnum">+<%= money(totals.increase) %></td>
+        <td class="px-4 py-3 text-right font-mono text-emerald-700 tnum">−<%= money(totals.decrease) %></td>
+        <td class="px-4 py-3 text-right font-mono font-bold text-navy-darker tnum"><%= money(totals.closing) %></td>
+        <td></td>
+      </tr>
+    </tfoot>
+  </table>
+  <% } %>
+</div>
+<p class="mt-3 text-xs text-milk-500">Nợ cuối kỳ = Nợ đầu kỳ + Phát sinh tăng − Đã thu / giảm. Số liệu lấy từ sổ công nợ (đơn Zalo chưa thu, các lần thu nợ và điều chỉnh).</p>
