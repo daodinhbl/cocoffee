@@ -32,6 +32,8 @@ router.post('/login', rateLimit({ windowMs: 15 * 60 * 1000, max: 20 }), auth.log
 router.post('/logout', requireStaff, requireCsrf, auth.logout);
 router.get('/pos', requireStaff, pos.page);
 router.get('/pos/orders/:id', requireStaff, pos.openOrder);
+router.get('/pos/receipt/sample', requireStaff, pos.sampleReceipt);
+router.get('/pos/receipt/:id', requireStaff, pos.receipt);
 router.post('/pos/checkout', requireStaff, requireCsrf, pos.json(pos.checkout));
 router.post('/pos/hold', requireStaff, requireCsrf, pos.json(pos.hold));
 
@@ -78,6 +80,7 @@ router.post('/zalo/orders/:id/resend-receipt', act(zalo.resendReceipt));
 router.get('/settings', settings.page);
 router.get('/settings/password', settings.page);
 router.post('/settings/password', act(auth.changeOwnPassword));
+router.post('/settings/printer', act(settings.savePrinter));
 router.post('/settings/users', act(settings.createUser));
 router.post('/settings/users/:id/password', act(settings.resetPassword));
 router.post('/settings/users/:id/active', act(settings.setActive));

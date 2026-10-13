@@ -6,7 +6,7 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
-DROP TABLE IF EXISTS zalo_tokens, zalo_events, zalo_sessions, payments, inventory_movements,
+DROP TABLE IF EXISTS app_settings, zalo_tokens, zalo_events, zalo_sessions, payments, inventory_movements,
                      order_items, orders, dining_tables, recipes, product_aliases, products,
                      inventory_items, categories, users;
 
@@ -275,4 +275,14 @@ CREATE TABLE zalo_tokens (
   access_expires_at DATETIME     NOT NULL,
   updated_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Key/value settings edited from the Web Admin (receipt printer, ...). Also created at startup on older
+-- databases (src/config/bootstrapDb.js ensureSchemaUpgrades), so it must stay CREATE-IF-NOT-EXISTS-safe.
+CREATE TABLE app_settings (
+  setting_key   VARCHAR(64)  NOT NULL,
+  setting_value TEXT         NULL,
+  updated_by    INT UNSIGNED NULL,
+  updated_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (setting_key)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

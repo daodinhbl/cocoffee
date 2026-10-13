@@ -5,6 +5,7 @@ const { AppError } = require('../../utils/httpError');
 const v = require('../../utils/validate');
 const { render, formBool } = require('./common');
 const { checkNewPassword, isDemoAccount } = require('./authPages');
+const printerSettings = require('../../services/printerSettings');
 
 async function page(req, res) {
   const forced = Boolean(req.session.mustChangePassword);
@@ -14,6 +15,7 @@ async function page(req, res) {
   }, {
     forced,
     users: forced ? [] : await userModel.list(),
+    printer: forced ? null : await printerSettings.get(),
     config: {
       publicBaseUrl: env.publicBaseUrl || '(chưa đặt)',
       allowNegativeStock: env.business.allowNegativeStock,
@@ -66,4 +68,10 @@ async function setActive(req) {
   return { message: active ? `Đã kích hoạt ${target.username}.` : `Đã vô hiệu hóa ${target.username}.` };
 }
 
-module.exports = { page, createUser, resetPassword, setActive };
+/** Receipt printer: paper, auto print, copies, header/footer lines, VAT line. */
+async function savePrinter(req) {
+  await printerSettings.save(req.body, req.user.id);
+  return { message: 'Đã lưu cấu hình máy in.', to: '/admin/settings' };
+}
+
+module.exports = { page, createUser, resetPassword, setActive, savePrinter };

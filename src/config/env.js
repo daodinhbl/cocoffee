@@ -81,6 +81,13 @@ module.exports = {
     allowNegativeStock: bool('ALLOW_NEGATIVE_STOCK', false),
     shopName: optional('SHOP_NAME', 'CoCoffee'),
     paymentNote: optional('SHOP_PAYMENT_NOTE'),
+    address: optional('SHOP_ADDRESS'),
+    phone: optional('SHOP_PHONE'),
+  },
+
+  // Printed receipt (thermal printer). 80mm paper prints ~72mm wide; 58mm prints ~48mm.
+  receiptPaper: {
+    widthMm: [58, 80].includes(int('RECEIPT_PAPER_MM', 80)) ? int('RECEIPT_PAPER_MM', 80) : 80,
   },
 
   receiptImage: {

@@ -54,6 +54,7 @@ async function start() {
   const categoryModel = require('../../src/models/categoryModel');
   const adminModel = require('../../src/models/adminModel');
   const { tokenModel } = require('../../src/models/zaloModel');
+  const settingsModel = require('../../src/models/settingsModel');
   const { pool } = require('../../src/config/db');
 
   // Password changes are kept per app instance, so a changed password really invalidates older sessions.
@@ -141,6 +142,9 @@ async function start() {
   mock.method(adminModel, 'zaloEventStats', async () => ({ received: 0, processed: 10, ignored: 2, failed: 1, lastEventAt: NOW }));
   mock.method(adminModel, 'zaloRecentEvents', async () => [{ id: 1, event_name: 'user_send_text', status: 'failed', error: 'boom <script>', num_retry: 1, received_at: NOW }]);
   mock.method(adminModel, 'zaloPendingDrafts', async () => [{ id: 1, chat_type: 'user', last_activity_at: NOW, expires_at: NOW, order_id: 50, order_code: 'CF-D', total: 35000 }]);
+  const SETTINGS = new Map();   // app_settings, in memory
+  mock.method(settingsModel, 'getByPrefix', async (prefix) => Object.fromEntries([...SETTINGS].filter(([k]) => k.startsWith(prefix))));
+  mock.method(settingsModel, 'setMany', rec('settings.setMany', (values) => { for (const [k, v] of Object.entries(values)) SETTINGS.set(k, String(v)); }));
   mock.method(tokenModel, 'get', async () => ({ access_token: 'SECRET-ACCESS', refresh_token: 'SECRET-REFRESH', access_expires_at: NOW, needs_refresh: 0 }));
 
   // withTransaction() -> a connection that does nothing; the models above ignore it

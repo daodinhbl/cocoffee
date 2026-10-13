@@ -48,6 +48,71 @@
     </dl>
   </section>
 
+  <section class="col-span-12 rounded border border-gray-200 bg-white p-5" aria-labelledby="printer-title">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h2 id="printer-title" class="text-base font-semibold">Máy in hóa đơn</h2>
+        <p class="mt-1 text-xs text-gray-500">Áp dụng cho hóa đơn in từ màn hình bán hàng (POS) và trang chi tiết đơn. Trình duyệt in ra <b>máy in mặc định</b> của thiết bị: hãy đặt máy in nhiệt làm mặc định và chọn khổ giấy tương ứng trong hộp thoại in lần đầu.</p>
+      </div>
+      <a href="/admin/pos/receipt/sample" target="_blank" rel="noopener" class="<%= btnSecondary %>"><%- icon('receipt', 'h-4 w-4') %> In thử</a>
+    </div>
+    <form method="post" action="/admin/settings/printer" class="mt-4 grid grid-cols-12 gap-4">
+      <%- include('../partials/csrf') %>
+      <input type="hidden" name="_back" value="/admin/settings">
+      <fieldset class="col-span-12 sm:col-span-6 lg:col-span-4">
+        <legend class="<%= label %>">Khổ giấy</legend>
+        <div class="flex gap-2">
+          <% [80, 58].forEach((mm) => { %>
+          <label class="flex h-10 flex-1 cursor-pointer items-center justify-center gap-2 rounded border border-gray-300 bg-white text-sm font-medium has-[:checked]:border-navy-accent has-[:checked]:bg-blue-50 has-[:checked]:text-navy">
+            <input type="radio" name="paperMm" value="<%= mm %>" <%= printer.paperMm === mm ? 'checked' : '' %> class="accent-blue-700"> <%= mm %>mm
+          </label>
+          <% }) %>
+        </div>
+      </fieldset>
+      <div class="col-span-6 sm:col-span-3 lg:col-span-2">
+        <label for="p-copies" class="<%= label %>">Số liên</label>
+        <select id="p-copies" name="copies" class="<%= input %>">
+          <% [1, 2, 3].forEach((n) => { %><option value="<%= n %>" <%= printer.copies === n ? 'selected' : '' %>><%= n %> liên</option><% }) %>
+        </select>
+      </div>
+      <div class="col-span-6 sm:col-span-3 lg:col-span-2">
+        <label for="p-vat" class="<%= label %>">Thuế VAT (%)</label>
+        <input id="p-vat" name="vatRate" type="number" min="0" max="20" step="1" inputmode="numeric" value="<%= printer.vatRate %>" class="<%= input %> text-right font-mono">
+      </div>
+      <div class="col-span-12 lg:col-span-4">
+        <label for="p-name" class="<%= label %>">Tên máy in (ghi chú)</label>
+        <input id="p-name" name="printerName" maxlength="100" value="<%= printer.printerName %>" placeholder="VD: Xprinter XP-80C quầy 1" class="<%= input %>">
+      </div>
+      <div class="col-span-12 sm:col-span-8">
+        <label for="p-addr" class="<%= label %>">Địa chỉ in trên hóa đơn</label>
+        <input id="p-addr" name="shopAddress" maxlength="200" value="<%= printer.shopAddress %>" placeholder="Số nhà, đường, phường, thành phố" class="<%= input %>">
+      </div>
+      <div class="col-span-12 sm:col-span-4">
+        <label for="p-phone" class="<%= label %>">Điện thoại</label>
+        <input id="p-phone" name="shopPhone" maxlength="30" value="<%= printer.shopPhone %>" inputmode="tel" class="<%= input %>">
+      </div>
+      <div class="col-span-12">
+        <label for="p-footer" class="<%= label %>">Lời chào cuối hóa đơn</label>
+        <input id="p-footer" name="footer" maxlength="255" value="<%= printer.footer %>" class="<%= input %>">
+      </div>
+      <div class="col-span-12 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+        <label class="flex min-h-10 items-center gap-2">
+          <input type="hidden" name="autoPrint" value="0">
+          <input type="checkbox" name="autoPrint" value="1" <%= printer.autoPrint ? 'checked' : '' %> class="h-4 w-4 rounded border-gray-300 accent-blue-700">
+          Tự động in sau khi thanh toán ở POS
+        </label>
+        <label class="flex min-h-10 items-center gap-2">
+          <input type="hidden" name="showVat" value="0">
+          <input type="checkbox" name="showVat" value="1" <%= printer.showVat ? 'checked' : '' %> class="h-4 w-4 rounded border-gray-300 accent-blue-700">
+          Hiện dòng "Đã gồm VAT" trên hóa đơn
+        </label>
+      </div>
+      <div class="col-span-12">
+        <button type="submit" class="<%= btnPrimary %> w-full sm:w-auto">Lưu cấu hình máy in</button>
+      </div>
+    </form>
+  </section>
+
   <section class="col-span-12 rounded border border-gray-200 max-lg:border-0" aria-labelledby="users-title">
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-5 py-4 max-lg:border-b-0 max-lg:px-0">
       <h2 id="users-title" class="text-base font-semibold">Tài khoản nhân viên (<%= users.length %>)</h2>

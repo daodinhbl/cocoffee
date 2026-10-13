@@ -8,10 +8,12 @@
   'use strict';
 
   var DATA = JSON.parse(document.getElementById('pos-data').textContent);
-  var VAT_RATE = 0.08;                      // prices include VAT; shown as "of which VAT"
-  var TAKEAWAY = '';                        // <select> value for "no table"
+  var PRINTER = DATA.printer || { autoPrint: true, vatRate: 8 };
+  var VAT_RATE = (PRINTER.vatRate || 0) / 100;   // prices include VAT; shown as "of which VAT" (0 = hidden)
+  var ICON_TABLE = '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><rect x="10" y="17" width="28" height="14" rx="3"/><path d="M15 31v8M33 31v8"/><rect x="4" y="21" width="5" height="9" rx="2"/><rect x="39" y="21" width="5" height="9" rx="2"/><path d="M17 12h14"/></svg>';
+  var ICON_TAKEAWAY = '<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" aria-hidden="true"><path d="M10 16h28l-2.5 26h-23L10 16z"/><path d="M18 16v-3a6 6 0 0 1 12 0v3"/><path d="M17 26c2 3 5 4.5 7 4.5s5-1.5 7-4.5"/></svg>';
 
-  var state = { cat: 'all', q: '', cart: [], discount: 0, note: '', method: 'cash', given: 0, orderId: null, orderCode: null, busy: false };
+  var state = { tableId: null, lastPaid: null, cat: 'all', q: '', cart: [], discount: 0, note: '', method: 'cash', given: 0, orderId: null, orderCode: null, busy: false };
 
   /* ------------------------------------------------------------------ helpers */
   var $ = function (s, r) { return (r || document).querySelector(s); };
@@ -96,10 +98,34 @@
   }
 
   /* ------------------------------------------------------------------ right side */
+  function currentTable() {
+    return DATA.tables.filter(function (t) { return String(t.id) === String(state.tableId); })[0] || null;
+  }
+
+  /** The picker button in the order header + the floor grid in the dialog. */
   function renderTables() {
-    $('#table').innerHTML = '<option value="' + TAKEAWAY + '">🥡 Mang đi</option>' + DATA.tables.map(function (t) {
-      return '<option value="' + t.id + '">' + (t.busy ? '🔴 ' : '🟢 ') + esc(t.name || t.code) + (t.busy ? ' — Đang phục vụ' : ' — Trống') + '</option>';
-    }).join('');
+    var cur = currentTable();
+    $('#table-icon').innerHTML = '<span class="block h-8 w-8">' + (cur ? ICON_TABLE : ICON_TAKEAWAY) + '</span>';
+    $('#table-icon').className = 'flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ' + (cur ? (cur.busy ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600') : 'bg-amber-50 text-amber-600');
+    $('#table-name').textContent = cur ? (cur.name || cur.code) : 'Mang đi';
+    $('#table-sub').textContent = cur ? (cur.busy ? 'Đang phục vụ' + (state.orderCode ? ' · ' + state.orderCode : '') : 'Bàn trống') : 'Khách mang đi · chạm để chọn bàn';
+
+    var tile = function (o) {
+      return '<button type="button" data-table="' + o.value + '" aria-pressed="' + o.on + '" class="relative flex aspect-square flex-col items-center justify-center gap-1 rounded-2xl border-2 p-3 text-center transition active:scale-95 ' + o.cls + (o.on ? ' border-navy-accent ring-4 ring-navy-accent/30' : '') + '">' +
+        '<span class="block h-14 w-14">' + o.icon + '</span>' +
+        '<span class="block text-lg font-bold leading-tight">' + esc(o.name) + '</span>' +
+        '<span class="block text-sm">' + o.sub + '</span>' +
+        (o.on ? '<span class="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-navy-accent text-sm font-bold text-white">✓</span>' : '') + '</button>';
+    };
+    $('#table-grid').innerHTML =
+      tile({ value: '', on: !cur, icon: ICON_TAKEAWAY, name: 'Mang đi', sub: 'Không dùng bàn', cls: 'border-amber-300 bg-amber-50 text-amber-700 hover:border-amber-400' }) +
+      DATA.tables.map(function (t) {
+        return tile({
+          value: t.id, on: !!cur && cur.id === t.id, icon: ICON_TABLE, name: t.name || t.code,
+          sub: t.busy ? 'Đang phục vụ' : 'Trống',
+          cls: t.busy ? 'border-red-200 bg-red-50 text-red-700 hover:border-red-400' : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-400',
+        });
+      }).join('');
   }
 
   function renderCart(bumpId) {
@@ -123,9 +149,11 @@
     $('#subtotal').textContent = fmt(t.subtotal);
     $('#discount').textContent = t.discount ? '−' + fmt(t.discount) : '0đ';
     $('#tax').textContent = fmt(t.vat);
+    show($('#tax-row'), VAT_RATE > 0);
     $('#total').textContent = fmt(t.total);
     $('#btn-pay').disabled = t.count === 0 || state.busy;
-    $('#btn-hold').disabled = t.count === 0 || state.busy || $('#table').value === TAKEAWAY;
+    $('#btn-hold').disabled = t.count === 0 || state.busy || !state.tableId;
+    $('#btn-reprint').disabled = !state.lastPaid;
     $('#order-code').textContent = (state.orderCode || 'Đơn mới') + (t.count ? ' · ' + t.count + ' món' : '');
   }
 
@@ -163,10 +191,13 @@
   }
 
   /** Picking a busy table loads its open order, so items are added to it and paid together. */
-  function onTableChange() {
-    var t = DATA.tables.filter(function (x) { return String(x.id) === $('#table').value; })[0];
+  function selectTable(value) {
+    state.tableId = value ? Number(value) : null;
+    $('#table-dialog').close();
+    var t = currentTable();
     if (!t || !t.busy || !t.orderId) {
       if (state.orderId) resetOrder(); else renderCart();
+      renderTables();
       return;
     }
     state.busy = true; renderCart();
@@ -180,13 +211,12 @@
         toast('Đã mở đơn ' + j.order.code + ' của ' + (t.name || t.code));
       })
       .catch(function (e) { toast(e.message || 'Không mở được đơn của bàn.', 'bad'); })
-      .then(function () { state.busy = false; renderCart(); renderGrid(); });
+      .then(function () { state.busy = false; renderCart(); renderGrid(); renderTables(); });
   }
 
   function payload(extra) {
-    var tableId = $('#table').value;
     var body = {
-      table_id: state.orderId ? null : (tableId || null),
+      table_id: state.orderId ? null : state.tableId,
       order_id: state.orderId,
       items: state.cart.map(function (l) { return { product_id: l.id, quantity: l.qty }; }),
       note: state.note,
@@ -197,18 +227,18 @@
 
   function markTable(id, busy, orderId) {
     DATA.tables.forEach(function (t) { if (String(t.id) === String(id)) { t.busy = busy; t.orderId = orderId || null; } });
-    var keep = $('#table').value; renderTables(); $('#table').value = keep;
+    renderTables();
   }
 
   function hold() {
     if (state.busy || !state.cart.length) return;
-    var tableId = $('#table').value;
+    var tableId = state.tableId;
     state.busy = true; renderCart();
     post('/admin/pos/hold', payload({}))
       .then(function (j) {
         markTable(tableId, true, j.order.id);
         toast(j.message, 'ok');
-        $('#table').value = TAKEAWAY; resetOrder();
+        state.tableId = null; resetOrder(); renderTables();
       })
       .catch(function (e) { toast(e.message, 'bad'); })
       .then(function () { state.busy = false; renderCart(); });
@@ -232,7 +262,8 @@
     if (!t.count || state.busy) return;
     state.given = 0;
     $('#pay-total').textContent = fmt(t.total);
-    $('#pay-sub').textContent = $('#table').selectedOptions[0].textContent.replace(/^\S+\s/, '') + ' · ' + t.count + ' món';
+    var cur = currentTable();
+    $('#pay-sub').textContent = (cur ? (cur.name || cur.code) : 'Mang đi') + ' · ' + t.count + ' món';
     var opts = [t.total, Math.ceil(t.total / 50000) * 50000, Math.ceil(t.total / 100000) * 100000, Math.ceil(t.total / 100000) * 100000 + 100000, 500000]
       .filter(function (v, i, a) { return v >= t.total && a.indexOf(v) === i; }).slice(0, 4);
     $('#quick-cash').innerHTML = opts.map(function (v, i) {
@@ -263,7 +294,7 @@
   function confirmPay() {
     if (state.busy) return;
     var t = totals();
-    var tableId = $('#table').value;
+    var tableId = state.tableId;
     state.busy = true;
     $('#pay-confirm').disabled = true; $('#pay-confirm').textContent = 'Đang xử lý…';
     post('/admin/pos/checkout', payload({ method: state.method, discount: t.discount || undefined, tendered: state.method === 'cash' && state.given ? state.given : undefined }))
@@ -271,8 +302,10 @@
         $('#pay-dialog').close();
         toast(j.message + (j.change ? ' Thối ' + fmt(j.change) + '.' : ''), 'ok');
         if (tableId) markTable(tableId, false, null);
-        $('#table').value = TAKEAWAY;
-        resetOrder();
+        state.lastPaid = { id: j.order.id, given: state.method === 'cash' && state.given ? state.given : 0 };
+        if (PRINTER.autoPrint) printReceipt(state.lastPaid);
+        state.tableId = null;
+        resetOrder(); renderTables();
       })
       .catch(function (e) { $('#pay-error').textContent = e.message; show($('#pay-error'), true); })
       .then(function () {
@@ -280,6 +313,12 @@
         $('#pay-confirm').disabled = false; $('#pay-confirm').textContent = 'XÁC NHẬN THANH TOÁN';
         renderCart();
       });
+  }
+
+  /** Print the receipt (80mm by default) through a hidden same-origin iframe: no pop-up to block. */
+  function printReceipt(p) {
+    if (!p) return;
+    $('#print-frame').src = '/admin/pos/receipt/' + p.id + '?print=1' + (p.given ? '&given=' + p.given : '') + '&t=' + Date.now();
   }
 
   /* ------------------------------------------------------------------ events */
@@ -293,16 +332,18 @@
     if (t.hasAttribute('data-given')) { state.given = Number(t.getAttribute('data-given')); updateChange(); return; }
     if (t.hasAttribute('data-method')) { setMethod(t.getAttribute('data-method')); return; }
     if (t.hasAttribute('data-close')) { t.closest('dialog').close(); return; }
+    if (t.hasAttribute('data-table')) { selectTable(t.getAttribute('data-table')); return; }
     switch (t.id) {
       case 'btn-pay': openPay(); break;
       case 'btn-hold': hold(); break;
+      case 'btn-reprint': printReceipt(state.lastPaid); break;
+      case 'table-btn': renderTables(); $('#table-dialog').showModal(); break;
       case 'pay-confirm': confirmPay(); break;
       case 'zalo-banner': $('#zalo-dialog').showModal(); break;
       case 'btn-note': ask('Ghi chú cho đơn', state.note, 'text', function (v) { state.note = v.slice(0, 255); $('#note-label').textContent = v ? 'Có ghi chú' : 'Ghi chú'; }); break;
       case 'btn-discount': ask('Giảm giá (đ)', state.discount || '', 'number', function (v) { state.discount = Math.max(0, Math.round(Number(v) || 0)); renderCart(); }); break;
     }
   });
-  $('#table').addEventListener('change', onTableChange);
   $('#search').addEventListener('input', function (e) { state.q = e.target.value; renderGrid(); });
 
   document.addEventListener('keydown', function (e) {

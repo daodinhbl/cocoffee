@@ -411,6 +411,61 @@ test('admin pages', async (t) => {
     assert.equal(called('order.createPos').length, 0);
   });
 
+  await t.test('POS: 80mm receipt page (print CSS, cash change, frameable by itself only)', async () => {
+    const { c } = await fx.login('thungan', PASSWORD);
+    const res = await c.get('/admin/pos/receipt/42?print=1&given=100000');
+    assert.equal(res.status, 200);
+    const html = await res.text();
+    assert.match(html, /@page \{ size: 80mm auto; margin: 0; \}/);
+    assert.match(html, /CF261013-00042/);
+    assert.match(html, /Cà phê sữa đá/);
+    assert.match(html, /Tiền thối/);
+    assert.match(html, /21\.000đ/, 'change = 100.000 - 79.000');
+    assert.match(html, /window\.print\(\)/);
+    assert.match(res.headers.get('content-security-policy'), /frame-ancestors 'self'/);
+    assert.ok(!/\son[a-z]+\s*=/i.test(html));
+    const plain = await (await c.get('/admin/pos/receipt/42')).text();
+    assert.doesNotMatch(plain, /Tiền thối/, 'no cash block without ?given=');
+  });
+
+  await t.test('printer settings: saved from the settings page and applied to the receipt', async () => {
+    const page = await (await admin.get('/admin/settings')).text();
+    assert.match(page, /Máy in hóa đơn/);
+    assert.match(page, /name="paperMm" value="80" checked/);
+
+    reset();
+    await admin.post('/admin/settings/printer', { _csrf: token, _back: '/admin/settings', paperMm: '57', copies: '1', vatRate: '8' });
+    assert.equal(called('settings.setMany').length, 0, 'unknown paper size refused');
+    await admin.post('/admin/settings/printer', { _csrf: token, _back: '/admin/settings', paperMm: '80', copies: '9', vatRate: '8' });
+    assert.equal(called('settings.setMany').length, 0, 'copies 1..3');
+
+    const save = await admin.post('/admin/settings/printer', {
+      _csrf: token, _back: '/admin/settings', paperMm: '58', copies: '2', vatRate: '10', printerName: 'XP-58 quầy', shopAddress: '12 Lê Lợi, Đà Lạt',
+      shopPhone: '0909 000 111', footer: 'Hẹn gặp lại <3', autoPrint: '0', showVat: ['0', '1'],
+    });
+    assert.equal(save.headers.get('location'), '/admin/settings');
+    const saved = called('settings.setMany')[0].args[0];
+    assert.equal(saved['printer.paperMm'], 58);
+    assert.equal(saved['printer.autoPrint'], '0');
+    assert.equal(saved['printer.showVat'], '1');
+    assert.equal(called('settings.setMany')[0].args[1], 1, 'who changed it');
+
+    const html = await (await admin.get('/admin/pos/receipt/42')).text();
+    assert.match(html, /@page \{ size: 58mm auto; margin: 0; \}/);
+    assert.equal((html.match(/<main class="paper">/g) || []).length, 2, 'two copies');
+    assert.match(html, /12 Lê Lợi, Đà Lạt/);
+    assert.match(html, /Hẹn gặp lại &lt;3/, 'escaped');
+    assert.match(html, /Đã gồm VAT 10%/);
+    assert.match(html, /Máy in: XP-58 quầy/);
+    const sample = await (await admin.get('/admin/pos/receipt/sample')).text();
+    assert.match(sample, /HÓA ĐƠN IN THỬ/);
+    const pos = await (await admin.get('/admin/pos')).text();
+    assert.match(pos, /"autoPrint":false/);
+
+    // back to defaults for the other tests
+    await admin.post('/admin/settings/printer', { _csrf: token, _back: '/admin/settings', paperMm: '80', copies: '1', vatRate: '8', autoPrint: '1', showVat: '1', footer: '' });
+  });
+
   await t.test('POS: open order of a busy table is returned for editing', async () => {
     const { c } = await fx.login('thungan', PASSWORD);
     let j = await (await c.get('/admin/pos/orders/42')).json();

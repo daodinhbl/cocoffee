@@ -111,4 +111,30 @@ async function ensureDemoAccount() {
   }
 }
 
-module.exports = { bootstrapIfEmpty, ensureDemoAccount };
+/**
+ * Additive schema upgrades for databases created by an older schema.sql (production keeps its data, so
+ * schema.sql is never re-applied there). Only CREATE TABLE IF NOT EXISTS / additive statements belong here.
+ * Never throws: a failure is logged and the feature that needs the table degrades to its defaults.
+ */
+const UPGRADES = [
+  `CREATE TABLE IF NOT EXISTS app_settings (
+     setting_key   VARCHAR(64)  NOT NULL,
+     setting_value TEXT         NULL,
+     updated_by    INT UNSIGNED NULL,
+     updated_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+     PRIMARY KEY (setting_key)
+   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+];
+
+async function ensureSchemaUpgrades() {
+  const { pool } = require('./db');
+  try {
+    for (const sql of UPGRADES) await pool.query(sql);
+    return 'ok';
+  } catch (err) {
+    logger.error('Schema upgrade failed', err);
+    return 'failed';
+  }
+}
+
+module.exports = { bootstrapIfEmpty, ensureDemoAccount, ensureSchemaUpgrades };
