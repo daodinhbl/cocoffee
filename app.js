@@ -38,7 +38,9 @@ app.use((req, _res, next) => { if (req.body === undefined) req.body = {}; next()
 // Static files: receipt images served to Zalo + Zalo domain-verification file (drop it into /public).
 app.use(express.static(path.join(__dirname, 'public'), { index: false, redirect: false, dotfiles: 'ignore', maxAge: '1h' }));
 
-app.get('/', (_req, res) => res.json({ service: 'cocoffee-fnb', status: 'ok' }));
+// The domain root is what people type: send them to the Web Admin (it redirects to login when signed out).
+// Machine checks use /health.
+app.get('/', (_req, res) => res.redirect(302, '/admin/dashboard'));
 app.get('/health', async (_req, res) => {
   try {
     await pool.query('SELECT 1');
