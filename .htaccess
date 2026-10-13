@@ -1,0 +1,32 @@
+# =============================================================================
+#  Hostinger shared hosting (cPanel + CloudLinux Node.js Selector + Phusion Passenger)
+#
+#  Normally cPanel > "Setup Node.js App" writes the Passenger block below for you when you
+#  create/save the app. Place this file in the DOCUMENT ROOT of cocoffee.tasotek-giaiphapso.com
+#  (e.g. /home/<USER>/public_html or the subdomain's folder) and replace the <PLACEHOLDERS>
+#  to match what the Node.js App screen shows. Keep the application root (where app.js,
+#  node_modules and .env live) OUTSIDE public_html.
+# =============================================================================
+
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION BEGIN
+PassengerAppRoot "/home/<USER>/cocoffee_app"
+PassengerBaseURI "/"
+PassengerNodejs "/home/<USER>/nodevenv/cocoffee_app/<NODE_MAJOR>/bin/node"
+PassengerAppType node
+PassengerStartupFile app.js
+PassengerAppLogFile "/home/<USER>/logs/cocoffee_passenger.log"
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END
+
+# ---- Force HTTPS (Zalo requires an https webhook URL) -----------------------
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTPS} !=on
+  RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
+# ---- Never serve secrets / source from the document root --------------------
+<FilesMatch "^(\.env.*|package(-lock)?\.json|.*\.sql|.*\.md)$">
+  Require all denied
+</FilesMatch>
+Options -Indexes

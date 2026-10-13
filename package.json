@@ -1,0 +1,29 @@
+{
+  "name": "cocoffee-fnb",
+  "version": "1.0.0",
+  "description": "Coffee shop POS & management backend (Express MVC, MySQL, Zalo OA ordering bot)",
+  "main": "app.js",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node app.js",
+    "db:init": "node scripts/init-db.js",
+    "create-admin": "node scripts/create-admin.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "axios": "^1.20.0",
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^18.0.7",
+    "express": "^5.3.0",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "mysql2": "^3.24.5",
+    "nodemon": "^3.1.14"
+  },
+  "optionalDependencies": {
+    "pureimage": "^0.4.20"
+  }
+}
