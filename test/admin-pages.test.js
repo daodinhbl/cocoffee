@@ -428,6 +428,15 @@ test('admin pages', async (t) => {
     assert.doesNotMatch(plain, /Tiền thối/, 'no cash block without ?given=');
   });
 
+  await t.test('dashboard charts: best sellers, low stock, overstock, debtors named from customers', async () => {
+    const html = await (await admin.get('/admin/dashboard')).text();
+    for (const title of ['Món bán chạy', 'Hàng sắp hết', 'Nguyên liệu tồn kho nhiều', 'Khách hàng công nợ nhiều nhất']) assert.match(html, new RegExp(title));
+    assert.match(html, /Chị Lan/);
+    assert.match(html, /120\.000đ/);
+    assert.match(html, /Sắp hết|Nguy cấp/, 'low-stock rows carry a text badge, not colour alone');
+    assert.match(html, /1\.400\.000đ/, 'stock value of the biggest item');
+  });
+
   await t.test('printer settings: saved from the settings page and applied to the receipt', async () => {
     const page = await (await admin.get('/admin/settings')).text();
     assert.match(page, /Máy in hóa đơn/);

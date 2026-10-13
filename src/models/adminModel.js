@@ -136,7 +136,25 @@ async function zaloPendingDrafts(limit = 20, conn) {
   return rows;
 }
 
+/**
+ * Customers owing money: Zalo orders that were confirmed (completed, stock deducted) but not paid, grouped
+ * by the Zalo user who placed them, named from `customers` when that user is known.
+ */
+async function topDebtors(limit = 6, conn) {
+  const [rows] = await db(conn).query(
+    `SELECT o.zalo_user_id, MAX(c.id) AS customer_id, MAX(c.name) AS customer_name, MAX(c.phone) AS customer_phone,
+            COUNT(*) AS orders, SUM(o.total) AS amount, MIN(o.completed_at) AS oldest
+       FROM orders o LEFT JOIN customers c ON c.zalo_user_id = o.zalo_user_id
+      WHERE o.status = 'completed' AND o.payment_status = 'unpaid' AND o.zalo_user_id IS NOT NULL
+      GROUP BY o.zalo_user_id
+      ORDER BY amount DESC LIMIT ?`,
+    [limit]
+  );
+  return rows;
+}
+
 module.exports = {
+  topDebtors,
   queueCounts, receiptErrors, salesByDay, salesByHour, salesBySource, salesByPayment, topProducts,
   recentPurchases, zaloEventStats, zaloRecentEvents, zaloPendingDrafts,
 };

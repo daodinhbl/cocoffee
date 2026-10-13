@@ -12,7 +12,8 @@
     "dev": "nodemon app.js",
     "db:init": "node scripts/init-db.js",
     "create-admin": "node scripts/create-admin.js",
-    "test": "node --test"
+    "test": "node --test",
+    "seed:customers": "node scripts/seed-customers.js"
   },
   "dependencies": {
     "axios": "^1.20.0",

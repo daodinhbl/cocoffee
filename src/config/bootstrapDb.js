@@ -124,6 +124,18 @@ const UPGRADES = [
      updated_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
      PRIMARY KEY (setting_key)
    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  `CREATE TABLE IF NOT EXISTS customers (
+     id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
+     name          VARCHAR(120) NOT NULL,
+     phone         VARCHAR(20)  NULL,
+     zalo_user_id  VARCHAR(64)  NULL,
+     note          VARCHAR(255) NULL,
+     created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     updated_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+     PRIMARY KEY (id),
+     UNIQUE KEY uq_customers_phone (phone),
+     UNIQUE KEY uq_customers_zalo (zalo_user_id)
+   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 ];
 
 async function ensureSchemaUpgrades() {

@@ -137,3 +137,36 @@
     </ul>
   </section>
 </div>
+
+<%
+  const qtyFmt = (n) => num(n);
+  const chartList = [
+    {
+      id: 'best', title: 'Món bán chạy', subtitle: '30 ngày gần nhất · theo số ly/món bán ra',
+      link: { href: '/admin/reports', label: 'Báo cáo' }, empty: 'Chưa có đơn hoàn tất trong 30 ngày.',
+      rows: charts.bestSellers.map((p) => ({ label: p.name, value: p.qty, display: `${num(p.qty)} món`, detail: `${num(p.qty)} món · doanh thu ${money(p.revenue)}` })),
+    },
+    {
+      id: 'low', title: 'Hàng sắp hết', subtitle: 'Tồn kho so với mức tối thiểu · thấp nhất trước',
+      link: { href: '/admin/inventory?low=1', label: 'Nhập kho' }, empty: 'Không có nguyên liệu nào dưới mức tối thiểu.',
+      rows: charts.lowStock.map((i) => ({ label: i.name, href: `/admin/receiving?item=${i.id}`, value: Math.round(i.ratio * 100), display: `${Math.round(i.ratio * 100)}%`,
+        tone: i.ratio < 0.5 ? 'critical' : 'warning', detail: `còn ${num(i.qty)} / tối thiểu ${num(i.min)} ${i.unit}` })),
+    },
+    {
+      id: 'over', title: 'Nguyên liệu tồn kho nhiều', subtitle: 'Giá trị tồn (số lượng × giá vốn bình quân)',
+      link: { href: '/admin/inventory', label: 'Kho' }, empty: 'Chưa có giá trị tồn kho.',
+      rows: charts.overstock.map((i) => ({ label: i.name, href: `/admin/inventory/${i.id}`, value: i.value, display: money(i.value),
+        detail: `${num(i.qty)} ${i.unit}${i.cover ? ` · gấp ${num(Math.round(i.cover * 10) / 10)} lần mức tối thiểu` : ''}` })),
+    },
+    {
+      id: 'debt', title: 'Khách hàng công nợ nhiều nhất', subtitle: 'Đơn Zalo đã giao nhưng chưa thu tiền',
+      link: { href: '/admin/orders?status=completed&payment=unpaid', label: 'Đơn chờ thu' }, empty: 'Không có khách nào đang nợ.',
+      rows: charts.debtors.map((d) => ({ label: d.who, value: d.amount, display: money(d.amount),
+        detail: `${d.orders} đơn chưa thu${d.oldest ? ` · cũ nhất ${fmtTime(d.oldest)}` : ''}` })),
+    },
+  ];
+%>
+<h2 class="mt-8 text-lg font-semibold text-navy-darker">Phân tích nhanh</h2>
+<div class="mt-3 grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2">
+  <% chartList.forEach((chart) => { %><%- include('../partials/barchart', { chart }) %><% }) %>
+</div>

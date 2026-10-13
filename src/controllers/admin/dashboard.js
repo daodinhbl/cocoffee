@@ -18,13 +18,17 @@ async function dashboard(req, res) {
   const today = shopDay();
   const t = rangeFor(today);
   const y = rangeFor(shopDay(new Date(), -1));
-  const [cur, prev, counts, recent, low, hours] = await Promise.all([
+  const m = dayBounds(shopDay(new Date(), -29), today);              // last 30 days, today included
+  const [cur, prev, counts, recent, low, hours, best, stock, debtors] = await Promise.all([
     orderModel.summary(t.from, t.to),
     orderModel.summary(y.from, y.to),
     adminModel.queueCounts(),
     orderModel.list({ limit: 5 }),
     inventoryModel.list({ lowStockOnly: true }),
     adminModel.salesByHour(t.from, t.to),
+    adminModel.topProducts(m.from, m.to, 8),
+    inventoryModel.listAll(),
+    adminModel.topDebtors(6),
   ]);
 
   const margin = cur.revenue > 0 ? (cur.gross_profit / cur.revenue) * 100 : 0;
@@ -41,6 +45,16 @@ async function dashboard(req, res) {
     kpis, ordersToday: cur.orders, recentOrders: recent, lowStock: low, counts, margin,
     // 06:00-22:00 opening hours, empty hours included so the chart keeps its shape
     hourly: Array.from({ length: 17 }, (_, i) => { const h = i + 6; const r = hours.find((x) => Number(x.hour) === h); return { hour: h, revenue: r ? Number(r.revenue) : 0, orders: r ? Number(r.orders) : 0 }; }),
+    charts: {
+      bestSellers: best.map((p) => ({ name: p.product_name, qty: Number(p.qty), revenue: Number(p.revenue) })),
+      lowStock: low.map((i) => ({ id: i.id, name: i.name, unit: i.unit, qty: Number(i.quantity_on_hand), min: Number(i.min_stock), ratio: Number(i.min_stock) > 0 ? Number(i.quantity_on_hand) / Number(i.min_stock) : 0 }))
+        .sort((a, b) => a.ratio - b.ratio).slice(0, 8),
+      // Most capital tied up in stock (quantity x moving-average cost), active items only
+      overstock: stock.filter((i) => i.is_active && Number(i.stock_value) > 0)
+        .map((i) => ({ id: i.id, name: i.name, unit: i.unit, qty: Number(i.quantity_on_hand), value: Number(i.stock_value), cover: Number(i.min_stock) > 0 ? Number(i.quantity_on_hand) / Number(i.min_stock) : null }))
+        .sort((a, b) => b.value - a.value).slice(0, 8),
+      debtors: debtors.map((d) => ({ who: d.customer_name || `Khách Zalo …${String(d.zalo_user_id).slice(-4)}`, phone: d.customer_phone || null, orders: Number(d.orders), amount: Number(d.amount), oldest: d.oldest })),
+    },
     greetingName: (req.user && (req.user.full_name || req.user.username)) || '',
   });
 }

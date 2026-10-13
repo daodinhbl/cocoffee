@@ -6,7 +6,7 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
-DROP TABLE IF EXISTS app_settings, zalo_tokens, zalo_events, zalo_sessions, payments, inventory_movements,
+DROP TABLE IF EXISTS customers, app_settings, zalo_tokens, zalo_events, zalo_sessions, payments, inventory_movements,
                      order_items, orders, dining_tables, recipes, product_aliases, products,
                      inventory_items, categories, users;
 
@@ -285,4 +285,19 @@ CREATE TABLE app_settings (
   updated_by    INT UNSIGNED NULL,
   updated_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (setting_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Customers (regulars, Zalo buyers who owe). Orders link by zalo_user_id (Zalo orders) for now.
+-- Also created at startup on older databases (ensureSchemaUpgrades).
+CREATE TABLE customers (
+  id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name          VARCHAR(120) NOT NULL,
+  phone         VARCHAR(20)  NULL,
+  zalo_user_id  VARCHAR(64)  NULL,
+  note          VARCHAR(255) NULL,
+  created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_customers_phone (phone),
+  UNIQUE KEY uq_customers_zalo (zalo_user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

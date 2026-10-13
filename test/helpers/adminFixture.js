@@ -141,6 +141,7 @@ async function start() {
   mock.method(adminModel, 'recentPurchases', async () => [{ id: 1, inventory_item_id: 1, item_name: 'Cà phê rang xay', unit: 'g', quantity_change: 1000, unit_cost: 280, balance_after: 5000, note: 'NCC A', created_at: NOW, user_name: 'Chủ Quán' }]);
   mock.method(adminModel, 'zaloEventStats', async () => ({ received: 0, processed: 10, ignored: 2, failed: 1, lastEventAt: NOW }));
   mock.method(adminModel, 'zaloRecentEvents', async () => [{ id: 1, event_name: 'user_send_text', status: 'failed', error: 'boom <script>', num_retry: 1, received_at: NOW }]);
+  mock.method(adminModel, 'topDebtors', async () => [{ zalo_user_id: 'z-1234', customer_name: 'Chị Lan', orders: 2, amount: 120000, oldest: NOW }]);
   mock.method(adminModel, 'zaloPendingDrafts', async () => [{ id: 1, chat_type: 'user', last_activity_at: NOW, expires_at: NOW, order_id: 50, order_code: 'CF-D', total: 35000 }]);
   const SETTINGS = new Map();   // app_settings, in memory
   mock.method(settingsModel, 'getByPrefix', async (prefix) => Object.fromEntries([...SETTINGS].filter(([k]) => k.startsWith(prefix))));
