@@ -8,3 +8,4 @@ assets/fonts/*.ttf
 .vscode/
 .claude/
 .admin-credentials.txt
+database/import_full.sql
