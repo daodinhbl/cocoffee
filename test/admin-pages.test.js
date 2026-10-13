@@ -36,8 +36,8 @@ test('admin pages', async (t) => {
     assert.ok(!/\son[a-z]+\s*=/i.test(html));
   });
 
-  await t.test('wrong password / unknown user / cashier are all refused without a session', async () => {
-    for (const [u, p, status, msg] of [['boss', 'nope-nope-nope', 401, /Sai tên đăng nhập/], ['ghost', PASSWORD, 401, /Sai tên đăng nhập/], ['thungan', PASSWORD, 403, /không có quyền quản trị/]]) {
+  await t.test('wrong password / unknown user are refused without a session', async () => {
+    for (const [u, p, status, msg] of [['boss', 'nope-nope-nope', 401, /Sai tên đăng nhập/], ['ghost', PASSWORD, 401, /Sai tên đăng nhập/]]) {
       const { c, res } = await fx.login(u, p);
       assert.equal(res.status, status, u);
       assert.match(await res.text(), msg);
@@ -335,6 +335,96 @@ test('admin pages', async (t) => {
       Object.assign(env.demo, before);
     }
     assert.doesNotMatch(await (await fx.client().get('/admin/login')).text(), /Tài khoản demo/, 'hidden when DEMO_MODE is off');
+  });
+
+  await t.test('POS: cashier signs in straight to the POS and cannot open management pages', async () => {
+    const { c, res } = await fx.login('thungan', PASSWORD);
+    assert.equal(res.headers.get('location'), '/admin/pos');
+    const page = await c.get('/admin/pos');
+    assert.equal(page.status, 200);
+    const html = await page.text();
+    assert.match(html, /Bán hàng POS/);
+    assert.match(html, /Times New Roman/);
+    assert.doesNotMatch(html, /href="\/admin\/dashboard"/, 'no "Quản lý" switch for a cashier');
+    assert.doesNotMatch(html, /Trà đào <b>/, 'product names are JSON-escaped');
+    assert.ok(!/\son[a-z]+\s*=/i.test(html), 'no inline handlers');
+    for (const p of ['/admin/dashboard', '/admin/orders', '/admin/settings']) {
+      assert.equal((await c.get(p)).headers.get('location'), '/admin/pos', p);
+    }
+    const tok = /"csrf":"([0-9a-f]+)"/.exec(html)[1];
+    reset();
+    const post = await c.post('/admin/tables', { _csrf: tok, _back: '/admin/tables', code: 'X', name: 'X' });
+    assert.equal(post.status, 403);
+    assert.equal(called('table.create').length, 0);
+  });
+
+  await t.test('POS: checkout creates + pays; a failed payment cancels the new order; hold needs a table', async () => {
+    const { c } = await fx.login('thungan', PASSWORD);
+    const html = await (await c.get('/admin/pos')).text();
+    const tok = /"csrf":"([0-9a-f]+)"/.exec(html)[1];
+    const items = [{ product_id: 1, quantity: 2 }];
+
+    reset();
+    let r = await c.postJson('/admin/pos/checkout', { _csrf: tok, table_id: 2, items, method: 'cash', discount: 5000, tendered: 100000 });
+    let j = await r.json();
+    assert.equal(j.ok, true);
+    assert.equal(called('order.createPos')[0].args[0].table_id, 2);
+    assert.deepEqual(called('order.createPos')[0].args[0].items, items);
+    assert.deepEqual(called('order.pay')[0].args, [77, { method: 'cash', tendered: 100000, discount: 5000, userId: 2 }]);
+
+    reset();   // existing open order of a busy table: items replaced, then paid
+    r = await c.postJson('/admin/pos/checkout', { _csrf: tok, order_id: 42, items, method: 'transfer' });
+    assert.equal((await r.json()).ok, true);
+    assert.equal(called('order.createPos').length, 0);
+    assert.equal(called('order.replaceItems')[0].args[0], 42);
+
+    const orderService = require('../src/services/orderService');
+    const { AppError } = require('../src/utils/httpError');
+    const original = orderService.payOrder;
+    orderService.payOrder = async () => { throw new AppError(422, 'INSUFFICIENT_STOCK', 'x', { short: [{ name: 'Sữa', needed: 40, available: 10, unit: 'ml' }] }); };
+    try {
+      reset();
+      r = await c.postJson('/admin/pos/checkout', { _csrf: tok, items, method: 'cash' });
+      j = await r.json();
+      assert.equal(r.status, 422);
+      assert.match(j.message, /Không đủ tồn kho: Sữa/);
+      assert.equal(called('order.cancel')[0].args[0], 77, 'the order created for this checkout is cancelled');
+    } finally {
+      orderService.payOrder = original;
+    }
+
+    reset();
+    r = await c.postJson('/admin/pos/checkout', { _csrf: tok, items: [], method: 'cash' });
+    assert.equal((await r.json()).ok, false);
+    r = await c.postJson('/admin/pos/checkout', { _csrf: tok, items, method: 'bitcoin' });
+    assert.equal((await r.json()).ok, false);
+    r = await c.postJson('/admin/pos/hold', { _csrf: tok, items });
+    assert.match((await r.json()).message, /Chọn bàn/);
+    r = await c.postJson('/admin/pos/hold', { _csrf: tok, table_id: 2, items });
+    assert.equal((await r.json()).ok, true);
+    assert.equal(called('order.createPos').length, 1);
+    assert.equal(called('order.pay').length, 0, 'hold never takes payment');
+
+    reset();   // wrong CSRF never reaches the service
+    r = await c.postJson('/admin/pos/checkout', { _csrf: 'nope', items, method: 'cash' });
+    assert.equal(r.status, 303);
+    assert.equal(called('order.createPos').length, 0);
+  });
+
+  await t.test('POS: open order of a busy table is returned for editing', async () => {
+    const { c } = await fx.login('thungan', PASSWORD);
+    let j = await (await c.get('/admin/pos/orders/42')).json();
+    assert.equal(j.ok, false, 'a completed order is not reopened');
+    const orderService = require('../src/services/orderService');
+    const original = orderService.getWithItems;
+    orderService.getWithItems = async () => ({ ...fx.ORDER, status: 'open' });
+    try {
+      j = await (await c.get('/admin/pos/orders/42')).json();
+      assert.equal(j.ok, true);
+      assert.deepEqual(j.order.items, [{ productId: 1, qty: 2 }, { productId: 2, qty: 1 }]);
+    } finally {
+      orderService.getWithItems = original;
+    }
   });
 
   await t.test('logout clears the session and the cookie no longer works', async () => {

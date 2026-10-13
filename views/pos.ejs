@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#0f172a">
+  <title>Bán hàng · <%= shopName %> POS</title>
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script nonce="<%= nonce %>">
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            navy: { darker: '#0f172a', DEFAULT: '#1e3a8a', accent: '#1d4ed8', 50: '#eff6ff', 100: '#dbeafe' },
+            amber: { 300: '#fcd34d', 400: '#fbbf24', 500: '#f59e0b' },
+            dark: '#1f2937',
+          },
+          // Times New Roman everywhere, like the Web Admin (system font, nothing to download). Its digits are
+          // fixed-width, which keeps prices aligned.
+          fontFamily: {
+            sans: ['"Times New Roman"', 'Times', '"Liberation Serif"', 'Tinos', 'serif'],
+            mono: ['"Times New Roman"', 'Times', '"Liberation Serif"', 'Tinos', 'serif'],
+          },
+          boxShadow: { cta: '0 12px 28px -8px rgba(245,158,11,.65)', card: '0 1px 2px rgba(15,23,42,.06), 0 4px 12px -4px rgba(15,23,42,.08)' },
+        },
+      },
+    };
+  </script>
+  <style>
+    html, body { -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
+    .tnum { font-variant-numeric: tabular-nums; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { scrollbar-width: none; }
+    .thin-scroll::-webkit-scrollbar { width: 6px; }
+    .thin-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+    :focus-visible { outline: 3px solid #1d4ed8; outline-offset: 2px; }
+    @keyframes pop { 0% { transform: scale(1); } 40% { transform: scale(1.05); } 100% { transform: scale(1); } }
+    .pop { animation: pop .22s ease-out; }
+    @keyframes slidein { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .slidein { animation: slidein .18s ease-out; }
+    dialog::backdrop { background: rgba(15, 23, 42, .55); }
+    @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+    @media (max-width: 767px) { input, select { font-size: 16px !important; } }
+  </style>
+</head>
+<body class="h-screen overflow-hidden bg-gray-50 font-sans text-dark antialiased select-none">
+<div class="flex h-full flex-col">
+
+  <!-- ============================== HEADER ============================== -->
+  <header class="relative z-20 flex h-16 shrink-0 items-center gap-4 bg-navy-darker px-4 text-white shadow-lg sm:px-6">
+    <div class="flex min-w-0 items-center gap-3">
+      <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#FBF6EF] p-1" aria-hidden="true"><img src="/brand/mark.png" alt="" width="256" height="200" class="h-full w-full object-contain"></span>
+      <div class="min-w-0 leading-tight">
+        <p class="truncate text-lg font-bold"><%= shopName %></p>
+        <p class="flex items-center gap-1.5 text-xs text-slate-400">
+          <span class="h-2 w-2 rounded-full <%= zalo.state === 'ok' ? 'bg-emerald-400' : (zalo.state === 'warn' ? 'bg-amber-400' : 'bg-slate-500') %>" aria-hidden="true"></span>
+          <%= zalo.label %>
+        </p>
+      </div>
+    </div>
+
+    <!-- App switcher -->
+    <nav aria-label="Chuyển ứng dụng" class="absolute left-1/2 -translate-x-1/2">
+      <div class="flex rounded-xl bg-white/10 p-1 ring-1 ring-white/10">
+        <% if (isAdmin) { %>
+        <a href="/admin/dashboard" class="flex h-12 min-w-[120px] items-center justify-center gap-2 rounded-lg px-4 text-base font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white">
+          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+          Quản lý
+        </a>
+        <% } %>
+        <span aria-current="page" class="flex h-12 min-w-[150px] items-center justify-center gap-2 rounded-lg bg-amber-400 px-4 text-base font-bold text-navy-darker shadow">
+          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 7h18l-2 11H5L3 7z"/><path d="M8 7V5a4 4 0 0 1 8 0v2"/></svg>
+          Bán hàng POS
+        </span>
+      </div>
+    </nav>
+
+    <div class="ml-auto flex items-center gap-3">
+      <div class="hidden text-right leading-tight md:block">
+        <p class="text-xl font-semibold tnum" id="clock">--:--</p>
+        <p class="text-xs text-slate-400" id="date">—</p>
+      </div>
+      <div class="flex items-center gap-2 rounded-xl bg-white/5 py-1.5 pl-1.5 pr-1.5 ring-1 ring-white/10">
+        <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-navy text-sm font-bold" aria-hidden="true"><%= (user.full_name || user.username).split(/\s+/).slice(-2).map((w) => w[0]).join('').toUpperCase() %></span>
+        <div class="hidden leading-tight lg:block">
+          <p class="text-sm font-semibold"><%= user.full_name || user.username %></p>
+          <p class="text-xs text-slate-400"><%= isAdmin ? 'Quản trị' : 'Thu ngân' %></p>
+        </div>
+        <form method="post" action="/admin/logout">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <button type="submit" title="Đăng xuất" aria-label="Đăng xuất" class="flex h-12 w-12 items-center justify-center rounded-lg text-slate-400 hover:bg-white/10 hover:text-white">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg>
+          </button>
+        </form>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============================== BODY 65 / 35 ============================== -->
+  <div class="flex min-h-0 flex-1">
+
+    <!-- Menu & products -->
+    <main class="flex min-w-0 basis-[65%] flex-col bg-gray-50">
+      <div class="shrink-0 space-y-3 px-4 pt-4 sm:px-6">
+        <label class="relative block">
+          <span class="sr-only">Tìm món</span>
+          <svg class="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="search" type="search" placeholder="Tìm món… (phím /)" autocomplete="off"
+                 class="h-12 w-full select-text rounded-xl border border-slate-200 bg-white pl-12 pr-4 text-base shadow-sm placeholder:text-slate-400 focus:border-navy-accent focus:outline-none focus:ring-2 focus:ring-navy-accent/30">
+        </label>
+        <div id="categories" role="tablist" aria-label="Danh mục" class="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1"></div>
+      </div>
+      <div class="thin-scroll min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-3 sm:px-6">
+        <div id="grid" class="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4"></div>
+        <p id="empty-grid" class="hidden py-16 text-center text-lg text-slate-400">Không tìm thấy món phù hợp.</p>
+      </div>
+    </main>
+
+    <!-- Order / cart -->
+    <aside class="relative z-10 flex min-w-[340px] basis-[35%] flex-col border-l border-slate-200 bg-white shadow-xl" aria-label="Đơn hàng">
+      <div class="shrink-0 space-y-3 border-b border-slate-100 p-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xl font-bold text-navy-darker">Đơn hiện tại</h2>
+          <span id="order-code" class="rounded-md bg-slate-100 px-2 py-1 text-sm font-semibold text-slate-600 tnum">Đơn mới</span>
+        </div>
+        <label class="block">
+          <span class="sr-only">Chọn bàn</span>
+          <select id="table" class="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-base font-semibold text-dark focus:border-navy-accent focus:outline-none focus:ring-2 focus:ring-navy-accent/30"></select>
+        </label>
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" id="btn-note" class="flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 text-base font-semibold text-slate-700 transition hover:border-navy-accent hover:text-navy-accent active:scale-[.98]">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 20h4L20 8l-4-4L4 16v4z"/></svg>
+            <span id="note-label">Ghi chú</span>
+          </button>
+          <button type="button" id="btn-hold" class="flex h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 text-base font-semibold text-slate-700 transition hover:border-navy-accent hover:text-navy-accent active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4V3z"/></svg>
+            Giữ đơn
+          </button>
+        </div>
+      </div>
+
+      <button type="button" id="zalo-banner"
+        class="mx-4 mt-3 hidden shrink-0 items-center gap-3 rounded-xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-amber-50 px-4 py-3 text-left transition hover:border-emerald-300 active:scale-[.99]">
+        <span class="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-lg text-white" aria-hidden="true">🔔
+          <span class="absolute -right-0.5 -top-0.5 h-3 w-3 animate-ping rounded-full bg-amber-400"></span>
+        </span>
+        <span class="min-w-0 flex-1">
+          <span class="block text-base font-bold text-emerald-900">Có <span id="zalo-count">0</span> đơn Zalo đang chờ xác nhận</span>
+          <span class="block text-sm text-emerald-800/80">Khách đang xác nhận qua Zalo — chạm để xem</span>
+        </span>
+        <svg class="h-5 w-5 shrink-0 text-emerald-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>
+      </button>
+
+      <div class="thin-scroll min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        <ul id="cart" class="space-y-2" aria-live="polite"></ul>
+        <div id="cart-empty" class="flex h-full flex-col items-center justify-center py-10 text-center text-slate-400">
+          <span class="text-5xl" aria-hidden="true">🧾</span>
+          <p class="mt-3 text-lg font-semibold text-slate-500">Chưa có món nào</p>
+          <p class="text-base">Chạm vào món bên trái để thêm vào đơn</p>
+        </div>
+      </div>
+
+      <div class="shrink-0 border-t border-slate-200 bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <dl class="space-y-1.5 text-base">
+          <div class="flex justify-between text-slate-600"><dt>Tạm tính</dt><dd class="font-semibold tnum" id="subtotal">0đ</dd></div>
+          <div class="flex items-center justify-between text-slate-600">
+            <dt>Giảm giá</dt>
+            <dd><button type="button" id="btn-discount" class="flex h-12 min-w-[48px] items-center justify-center rounded-lg border border-dashed border-slate-300 px-3 font-semibold text-navy-accent hover:bg-navy-50"><span id="discount">0đ</span></button></dd>
+          </div>
+          <div class="flex justify-between text-sm text-slate-500"><dt>Trong đó VAT (8%)</dt><dd class="tnum" id="tax">0đ</dd></div>
+        </dl>
+        <div class="mt-3 flex items-end justify-between border-t border-dashed border-slate-200 pt-3">
+          <span class="text-base font-semibold uppercase tracking-wide text-slate-500">Tổng thanh toán</span>
+          <span id="total" class="text-5xl font-bold leading-none text-navy-darker tnum">0đ</span>
+        </div>
+        <button type="button" id="btn-pay" disabled
+          class="mt-4 flex min-h-[72px] w-full items-center justify-center gap-3 rounded-2xl bg-amber-400 text-2xl font-bold tracking-wide text-navy-darker shadow-cta transition hover:bg-amber-500 active:scale-[.98] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none">
+          <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20M6 15h4"/></svg>
+          THANH TOÁN <span class="text-lg font-semibold opacity-70">(Enter)</span>
+        </button>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<!-- Payment -->
+<dialog id="pay-dialog" class="w-[min(560px,calc(100vw-2rem))] rounded-2xl p-0 shadow-2xl">
+  <div class="p-6">
+    <div class="flex items-start justify-between">
+      <div>
+        <h3 class="text-2xl font-bold text-navy-darker">Thanh toán</h3>
+        <p class="text-base text-slate-500" id="pay-sub">—</p>
+      </div>
+      <button type="button" data-close class="flex h-12 w-12 items-center justify-center rounded-xl text-xl text-slate-400 hover:bg-slate-100" aria-label="Đóng">✕</button>
+    </div>
+    <p class="mt-4 text-center text-6xl font-bold text-navy-darker tnum" id="pay-total">0đ</p>
+    <div class="mt-5 grid grid-cols-3 gap-2" role="radiogroup" aria-label="Hình thức thanh toán">
+      <button type="button" data-method="cash" class="method h-14 rounded-xl border-2 text-lg font-bold">💵 Tiền mặt</button>
+      <button type="button" data-method="transfer" class="method h-14 rounded-xl border-2 text-lg font-bold">🏦 Chuyển khoản</button>
+      <button type="button" data-method="card" class="method h-14 rounded-xl border-2 text-lg font-bold">💳 Thẻ</button>
+    </div>
+    <div id="cash-box" class="mt-4">
+      <p class="mb-2 text-base font-semibold text-slate-600">Khách đưa</p>
+      <div class="grid grid-cols-4 gap-2" id="quick-cash"></div>
+      <div class="mt-3 flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3">
+        <span class="text-lg font-semibold text-slate-600">Tiền thối</span>
+        <span class="text-3xl font-bold text-emerald-600 tnum" id="change">—</span>
+      </div>
+    </div>
+    <p id="pay-error" role="alert" class="mt-4 hidden rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-base text-red-800"></p>
+    <button type="button" id="pay-confirm" class="mt-5 flex min-h-[64px] w-full items-center justify-center rounded-2xl bg-amber-400 text-xl font-bold text-navy-darker shadow-cta hover:bg-amber-500 active:scale-[.98] disabled:opacity-60">XÁC NHẬN THANH TOÁN</button>
+  </div>
+</dialog>
+
+<!-- Zalo drafts (read-only: the customer confirms in Zalo) -->
+<dialog id="zalo-dialog" class="w-[min(520px,calc(100vw-2rem))] rounded-2xl p-0 shadow-2xl">
+  <div class="p-6">
+    <div class="flex items-center justify-between">
+      <h3 class="text-2xl font-bold text-navy-darker">Đơn Zalo chờ khách xác nhận</h3>
+      <button type="button" data-close class="flex h-12 w-12 items-center justify-center rounded-xl text-xl text-slate-400 hover:bg-slate-100" aria-label="Đóng">✕</button>
+    </div>
+    <p class="mt-1 text-base text-slate-500">Khi khách trả lời "ok" trên Zalo, đơn tự hoàn tất và trừ kho.</p>
+    <ul id="zalo-list" class="mt-4 space-y-3"></ul>
+  </div>
+</dialog>
+
+<!-- Text / number prompt -->
+<dialog id="prompt-dialog" class="w-[min(440px,calc(100vw-2rem))] rounded-2xl p-0 shadow-2xl">
+  <form method="dialog" class="p-6">
+    <h3 class="text-xl font-bold text-navy-darker" id="prompt-title">—</h3>
+    <input id="prompt-input" class="mt-4 h-14 w-full select-text rounded-xl border border-slate-200 px-4 text-lg focus:border-navy-accent focus:outline-none focus:ring-2 focus:ring-navy-accent/30">
+    <div class="mt-5 grid grid-cols-2 gap-2">
+      <button value="cancel" class="h-12 rounded-xl border border-slate-200 text-base font-semibold text-slate-600 hover:bg-slate-50">Hủy</button>
+      <button value="ok" class="h-12 rounded-xl bg-navy text-base font-semibold text-white hover:bg-navy-accent">Lưu</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toast" class="pointer-events-none fixed bottom-6 left-1/2 z-50 -translate-x-1/2"></div>
+
+<script type="application/json" id="pos-data"><%- safeJson({ ...data, csrf }) %></script>
+<script src="/pos/pos.js?v=<%= posV %>" defer></script>
+</body>
+</html>

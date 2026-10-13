@@ -3,17 +3,19 @@ const fs = require('fs');
 const path = require('path');
 const env = require('../config/env');
 
-// Cache-busting for /admin/admin.js. Static files are cached for an hour, while the HTML is never cached,
+// Cache-busting for page scripts. Static files are cached for an hour, while the HTML is never cached,
 // so after a deploy fresh markup could otherwise run against a stale script. The URL carries a content hash.
-const ADMIN_JS = path.join(env.rootDir, 'public', 'admin', 'admin.js');
-let jsHash = { mtime: 0, v: '0' };
-function assetVersion() {
+const hashes = new Map();
+function versionOf(relPath) {
+  const file = path.join(env.rootDir, 'public', relPath);
+  const known = hashes.get(file) || { mtime: 0, v: '0' };
   try {
-    const mtime = fs.statSync(ADMIN_JS).mtimeMs;
-    if (mtime !== jsHash.mtime) jsHash = { mtime, v: crypto.createHash('md5').update(fs.readFileSync(ADMIN_JS)).digest('hex').slice(0, 10) };
+    const mtime = fs.statSync(file).mtimeMs;
+    if (mtime !== known.mtime) hashes.set(file, { mtime, v: crypto.createHash('md5').update(fs.readFileSync(file)).digest('hex').slice(0, 10) });
   } catch (_) { /* file missing: keep the last value */ }
-  return jsHash.v;
+  return (hashes.get(file) || known).v;
 }
+const assetVersion = () => versionOf('admin/admin.js');
 
 /**
  * Per-request CSP nonce + headers for the server-rendered admin pages.
@@ -53,4 +55,4 @@ function pageRenderer(req, res, next) {
   next();
 }
 
-module.exports = { adminSecurity, pageRenderer };
+module.exports = { adminSecurity, pageRenderer, versionOf };

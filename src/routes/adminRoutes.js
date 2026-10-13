@@ -1,6 +1,6 @@
 const express = require('express');
 const { adminSecurity, pageRenderer } = require('../middlewares/adminSecurity');
-const { flash, loadSession, requireAdmin, requireCsrf } = require('../middlewares/adminAuth');
+const { flash, loadSession, requireStaff, requireAdmin, requireCsrf } = require('../middlewares/adminAuth');
 const rateLimit = require('../middlewares/rateLimit');
 const { AppError } = require('../utils/httpError');
 const logger = require('../utils/logger');
@@ -17,6 +17,7 @@ const bom = require('../controllers/admin/bom');
 const reports = require('../controllers/admin/reports');
 const zalo = require('../controllers/admin/zalo');
 const settings = require('../controllers/admin/settings');
+const pos = require('../controllers/admin/pos');
 
 const router = express.Router();
 
@@ -27,8 +28,14 @@ router.use(adminSecurity, pageRenderer, express.urlencoded({ extended: false, li
 router.get('/login', auth.loginForm);
 router.post('/login', rateLimit({ windowMs: 15 * 60 * 1000, max: 20 }), auth.login);
 
+// POS screen: admins and cashiers. JSON endpoints echo the session CSRF token in the body (_csrf).
+router.post('/logout', requireStaff, requireCsrf, auth.logout);
+router.get('/pos', requireStaff, pos.page);
+router.get('/pos/orders/:id', requireStaff, pos.openOrder);
+router.post('/pos/checkout', requireStaff, requireCsrf, pos.json(pos.checkout));
+router.post('/pos/hold', requireStaff, requireCsrf, pos.json(pos.hold));
+
 router.use(requireAdmin, requireCsrf);
-router.post('/logout', auth.logout);
 
 router.get('/', (_req, res) => res.redirect(302, '/admin/dashboard'));
 router.get('/dashboard', dashboard.dashboard);

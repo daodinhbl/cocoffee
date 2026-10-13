@@ -75,7 +75,7 @@ suite('admin UI (jsdom)', async (t) => {
     assert.ok($$('.grid-cols-12').length >= 2);
     assert.equal($('aside#sidebar').className.includes('w-sidebar'), true);
     const hrefs = $$('#sidebar nav a').map((a) => a.getAttribute('href'));
-    assert.deepEqual(hrefs, ['/admin/dashboard', '/admin/tables', '/admin/orders', '/admin/menu', '/admin/inventory', '/admin/bom-recipes', '/admin/receiving', '/admin/reports', '/admin/zalo', '/admin/settings']);
+    assert.deepEqual(hrefs, ['/admin/dashboard', '/admin/pos', '/admin/tables', '/admin/orders', '/admin/menu', '/admin/inventory', '/admin/bom-recipes', '/admin/receiving', '/admin/reports', '/admin/zalo', '/admin/settings']);
     assert.equal($$('#sidebar [aria-disabled]').length, 0, 'no "coming soon" placeholders left');
     const logout = $('#sidebar form[action="/admin/logout"]');
     assert.equal(logout.method, 'post');

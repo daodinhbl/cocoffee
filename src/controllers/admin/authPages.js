@@ -30,8 +30,12 @@ async function login(req, res) {
   if (!user || !user.is_active || !ok || !password) {
     return renderLogin(res, { status: 401, error: 'Sai tên đăng nhập hoặc mật khẩu.', username, next });
   }
+  if (user.role === 'cashier') {                         // cashiers only get the POS screen
+    startSession(res, user, { mustChangePassword: false });
+    return res.redirect(303, '/admin/pos');
+  }
   if (user.role !== 'admin') {
-    return renderLogin(res, { status: 403, error: 'Tài khoản này không có quyền quản trị. Thu ngân dùng ứng dụng POS.', username, next });
+    return renderLogin(res, { status: 403, error: 'Tài khoản này không có quyền vào hệ thống.', username, next });
   }
   const weak = password.length < MIN_PASSWORD && !isDemoAccount(user);   // covers the factory admin/admin
   startSession(res, user, { mustChangePassword: weak });

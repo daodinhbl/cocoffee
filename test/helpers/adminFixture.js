@@ -75,12 +75,18 @@ async function start() {
   mock.method(orderModel, 'getById', async () => ORDER);
   mock.method(orderService, 'getWithItems', async (id) => { if (id === 404) { const { AppError } = require('../../src/utils/httpError'); throw new AppError(404, 'NOT_FOUND', 'Order not found'); } return ORDER; });
   mock.method(orderService, 'cancelOrder', rec('order.cancel', ORDER));
+  mock.method(orderService, 'createPosOrder', rec('order.createPos', { ...ORDER, id: 77, order_code: 'CF-NEW', status: 'open' }));
+  mock.method(orderService, 'replaceOpenOrderItems', rec('order.replaceItems', { ...ORDER, status: 'open' }));
   mock.method(orderService, 'payOrder', rec('order.pay', { order: ORDER, change: 0 }));
   mock.method(receiptService, 'sendReceipt', rec('receipt.send', { sent: true }));
 
   mock.method(tableModel, 'listAll', async () => [
     { id: 1, code: 'B01', name: 'Bàn 1', capacity: 4, status: 'serving', current_order_id: 42, current_order_code: ORDER.order_code, current_order_total: 79000, is_active: 1 },
     { id: 2, code: 'B02', name: 'Bàn 2', capacity: 2, status: 'available', current_order_id: null, is_active: 1 },
+  ]);
+  mock.method(tableModel, 'list', async () => [
+    { id: 1, code: 'B01', name: 'Bàn 1', status: 'serving', current_order_id: 42 },
+    { id: 2, code: 'B02', name: 'Bàn 2', status: 'available', current_order_id: null },
   ]);
   mock.method(tableModel, 'getById', async (id) => ({ id, status: id === 1 ? 'serving' : 'available', is_active: 1 }));
   mock.method(tableModel, 'create', rec('table.create', 5));
@@ -111,6 +117,10 @@ async function start() {
   mock.method(productModel, 'getById', async (id) => (id === 1
     ? { id: 1, name: 'Cà phê sữa đá', sku: 'CF-SUA-DA', stock_mode: 'bom', inventory_item_id: null, aliases: ['Cà phê sữa đá', 'cf sữa'], recipe: [] }
     : id === 2 ? { id: 2, name: 'Thuốc lá 555', sku: 'T555', stock_mode: 'direct', inventory_item_id: 3, aliases: ['Thuốc lá 555'], recipe: [] } : null));
+  mock.method(productModel, 'list', async () => [
+    { id: 1, category_id: 1, category_name: 'Đồ uống', name: 'Cà phê sữa đá', price: 25000, is_active: 1 },
+    { id: 4, category_id: 1, category_name: 'Đồ uống', name: 'Trà đào <b>', price: 35000, is_active: 1 },
+  ]);
   mock.method(productModel, 'create', rec('product.create', 11));
   mock.method(productModel, 'update', rec('product.update'));
   mock.method(productModel, 'setActive', rec('product.setActive'));
@@ -149,16 +159,16 @@ async function start() {
     const jar = new Map();
     const store = (res) => { for (const c of res.headers.getSetCookie()) { const [pair] = c.split(';'); const i = pair.indexOf('='); const k = pair.slice(0, i); const v = pair.slice(i + 1); if (v === '' || /expires=Thu, 01 Jan 1970/i.test(c)) jar.delete(k); else jar.set(k, v); } };
     const cookie = () => [...jar].map(([k, v]) => `${k}=${v}`).join('; ');
-    async function req(path, { method = 'GET', form, headers = {} } = {}) {
+    async function req(path, { method = 'GET', form, json, headers = {} } = {}) {
       const res = await fetch(base + path, {
         method, redirect: 'manual',
-        headers: { cookie: cookie(), ...(form ? { 'content-type': 'application/x-www-form-urlencoded' } : {}), ...headers },
-        body: form ? encode(form) : undefined,
+        headers: { cookie: cookie(), ...(form ? { 'content-type': 'application/x-www-form-urlencoded' } : {}), ...(json ? { 'content-type': 'application/json' } : {}), ...headers },
+        body: form ? encode(form) : json ? JSON.stringify(json) : undefined,
       });
       store(res);
       return res;
     }
-    return { req, jar, get: (p) => req(p), post: (p, form) => req(p, { method: 'POST', form }) };
+    return { req, jar, get: (p) => req(p), post: (p, form) => req(p, { method: 'POST', form }), postJson: (p, json) => req(p, { method: 'POST', json }) };
   }
 
   /** Log in as `username` and return a client whose later requests carry the session. */

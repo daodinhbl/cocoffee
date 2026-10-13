@@ -6,7 +6,8 @@ const userModel = require('../models/userModel');
 /**
  * Cookie session for the server-rendered Web Admin.
  *  - HttpOnly + SameSite=Strict cookie holding a signed JWT (audience "admin-web", so an API bearer token
- *    can never be replayed as an admin session). Only active users with role "admin" get in.
+ *    can never be replayed as an admin session). Active "admin" users get the whole admin; active "cashier"
+ *    users get only the POS screen (/admin/pos) and logout.
  *  - The JWT carries a per-session CSRF token; every POST must echo it in the `_csrf` form field.
  *  - `mcp` (must change password) is set when the account still uses the factory password: every page then
  *    redirects to the change-password form until it is replaced.
@@ -14,6 +15,7 @@ const userModel = require('../models/userModel');
  *  - One-shot flash message in a short-lived cookie (shown once, escaped by the template).
  */
 const SESSION_COOKIE = 'cc_admin';
+const STAFF_ROLES = ['admin', 'cashier'];
 const FLASH_COOKIE = 'cc_flash';
 const AUDIENCE = 'admin-web';
 const COOKIE_BASE = { httpOnly: true, sameSite: 'strict', path: '/admin', secure: env.nodeEnv === 'production' };
@@ -79,7 +81,7 @@ async function loadSession(req, res, next) {
     try {
       const p = jwt.verify(token, env.jwt.secret, { algorithms: ['HS256'], audience: AUDIENCE });
       const user = await userModel.findById(p.sub);
-      if (user && user.is_active && user.role === 'admin' && p.pws === user.pw_stamp) {
+      if (user && user.is_active && STAFF_ROLES.includes(user.role) && p.pws === user.pw_stamp) {
         req.user = user;
         req.session = { csrf: p.csrf, mustChangePassword: p.mcp === 1 };
       }
@@ -91,11 +93,25 @@ async function loadSession(req, res, next) {
   next();
 }
 
-/** Gate for everything except /login: redirect to the login form, or to the forced password change. */
-function requireAdmin(req, res, next) {
+/** Any signed-in staff member (admin or cashier): the POS screen and logout. */
+function requireStaff(req, res, next) {
   if (!req.user) {
     const target = req.method === 'GET' ? safeBack(req.originalUrl, '') : '';
     return res.redirect(303, target ? `/admin/login?next=${encodeURIComponent(target)}` : '/admin/login');
+  }
+  if (req.session.mustChangePassword && req.path !== '/logout') {
+    if (req.method === 'GET') return res.redirect(303, '/admin/settings/password');
+    return res.status(403).type('text').send('Đổi mật khẩu mặc định trước khi tiếp tục.');
+  }
+  return next();
+}
+
+/** Gate for the management pages: admins only (a cashier is sent to the POS screen). */
+function requireAdmin(req, res, next) {
+  if (!req.user) return requireStaff(req, res, next);
+  if (req.user.role !== 'admin') {
+    if (req.method === 'GET') return res.redirect(303, '/admin/pos');
+    return res.status(403).type('text').send('Chỉ quản trị viên được thực hiện thao tác này.');
   }
   if (req.session.mustChangePassword && !/^\/settings\/password$|^\/logout$/.test(req.path)) {
     if (req.method === 'GET') return res.redirect(303, '/admin/settings/password');
@@ -117,4 +133,4 @@ function requireCsrf(req, res, next) {
   return next();
 }
 
-module.exports = { startSession, endSession, flash, loadSession, requireAdmin, requireCsrf, safeBack, readCookies };
+module.exports = { startSession, endSession, flash, loadSession, requireStaff, requireAdmin, requireCsrf, safeBack, readCookies, STAFF_ROLES };
