@@ -160,6 +160,8 @@ UPGRADES.push(
 /** Columns added to existing tables: [table, column, ALTER statement]. MySQL 8 has no ADD COLUMN IF NOT EXISTS. */
 const COLUMNS = [
   ['orders', 'customer_id', 'ALTER TABLE orders ADD COLUMN customer_id INT UNSIGNED NULL AFTER note, ADD KEY idx_orders_customer (customer_id)'],
+  ['products', 'image_url', 'ALTER TABLE products ADD COLUMN image_url VARCHAR(255) NULL'],
+  ['inventory_items', 'image_url', 'ALTER TABLE inventory_items ADD COLUMN image_url VARCHAR(255) NULL'],
 ];
 
 /**

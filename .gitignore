@@ -9,3 +9,5 @@ assets/fonts/*.ttf
 .claude/
 .admin-credentials.txt
 database/import_full.sql
+public/uploads/*
+!public/uploads/.gitkeep

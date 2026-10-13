@@ -15,7 +15,7 @@ async function list({ categoryId, activeOnly = true } = {}, conn) {
   if (categoryId) { where.push('p.category_id = ?'); params.push(categoryId); }
   const [rows] = await db(conn).query(
     `SELECT p.id, p.category_id, c.name AS category_name, p.sku, p.name, p.price,
-            p.stock_mode, p.inventory_item_id, p.is_active
+            p.stock_mode, p.inventory_item_id, p.is_active, p.image_url
        FROM products p JOIN categories c ON c.id = p.category_id
       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
       ORDER BY c.sort_order, p.name`,

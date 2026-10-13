@@ -13,7 +13,8 @@
     "db:init": "node scripts/init-db.js",
     "create-admin": "node scripts/create-admin.js",
     "test": "node --test",
-    "seed:customers": "node scripts/seed-customers.js"
+    "seed:customers": "node scripts/seed-customers.js",
+    "sync:images": "node scripts/sync_images.js"
   },
   "dependencies": {
     "axios": "^1.20.0",

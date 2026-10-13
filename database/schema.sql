@@ -54,6 +54,7 @@ CREATE TABLE inventory_items (
   avg_cost         DECIMAL(14,4) NOT NULL DEFAULT 0,
   min_stock        DECIMAL(14,3) NOT NULL DEFAULT 0,
   is_active        TINYINT(1)    NOT NULL DEFAULT 1,
+  image_url        VARCHAR(255)  NULL,
   created_at       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -72,6 +73,7 @@ CREATE TABLE products (
   stock_mode        ENUM('bom','direct') NOT NULL,
   inventory_item_id INT UNSIGNED  NULL,          -- required when stock_mode='direct' (enforced in code)
   is_active         TINYINT(1)    NOT NULL DEFAULT 1,
+  image_url         VARCHAR(255)  NULL,
   created_at        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at        TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
