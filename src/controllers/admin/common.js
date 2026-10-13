@@ -13,8 +13,9 @@ const logger = require('../../utils/logger');
  * @returns {Promise<{state:'ok'|'warn'|'off'|'unknown', label:string}>}
  */
 async function zaloStatus() {
-  if (env.zalo.mode !== 'oa') {
-    if (!env.zalo.botWebhookSecret || (env.zalo.mode === 'platform' && !env.zalo.botToken)) return { state: 'off', label: 'Zalo bot: chưa cấu hình' };
+  const zcfg = await require('../../services/zalo/zaloConfig').get();
+  if (zcfg.mode !== 'oa') {
+    if (!zcfg.botWebhookSecret || (zcfg.mode === 'platform' && !zcfg.botToken)) return { state: 'off', label: 'Zalo bot: chưa cấu hình' };
     try {
       const { lastEventAt } = await adminModel.zaloEventStats(24);
       const fresh = lastEventAt && Date.now() - new Date(lastEventAt).getTime() < 24 * 3600 * 1000;

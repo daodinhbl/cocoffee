@@ -6,15 +6,21 @@ const { render } = require('./common');
 const orders = require('./orders');
 const { AppError } = require('../../utils/httpError');
 const zaloBot = require('../../services/zalo/zaloBotPlatform');
+const zaloConfig = require('../../services/zalo/zaloConfig');
 
 /** Connection facts for the Zalo screen. Secret / token VALUES are never read into the view model. */
 async function connection() {
-  if (env.zalo.mode !== 'oa') {
+  const cfg = await zaloConfig.get();
+  if (cfg.mode !== 'oa') {
     return {
-      mode: env.zalo.mode,
-      platform: env.zalo.mode === 'platform',
-      tokenSet: Boolean(env.zalo.botToken),
-      configured: Boolean(env.zalo.botWebhookSecret) && (env.zalo.mode !== 'platform' || Boolean(env.zalo.botToken)),
+      mode: cfg.mode,
+      platform: cfg.mode === 'platform',
+      tokenSet: Boolean(cfg.botToken),
+      tokenSource: cfg.tokenSource,
+      tokenHint: cfg.tokenHint,
+      secretSource: cfg.secretSource,
+      explicitMode: ['platform', 'bot', 'oa'].includes(process.env.ZALO_MODE),
+      configured: Boolean(cfg.botWebhookSecret) && (cfg.mode !== 'platform' || Boolean(cfg.botToken)),
       webhookUrl: `${env.publicBaseUrl || 'https://<tên-miền-của-bạn>'}/api/zalo/webhook`,
       draftTtlMinutes: env.zalo.draftTtlMinutes,
     };
@@ -52,10 +58,11 @@ async function page(_req, res) {
  * owner never has to copy the token anywhere else. Zalo test-calls the webhook right away and reports back.
  */
 async function registerWebhook() {
-  if (env.zalo.mode !== 'platform') throw new AppError(409, 'NOT_PLATFORM', 'Chưa có ZALO_BOT_TOKEN: đặt biến này trong hPanel trước.');
-  const secret = env.zalo.botWebhookSecret;
+  const cfg = await zaloConfig.get();
+  if (cfg.mode !== 'platform') throw new AppError(409, 'NOT_PLATFORM', 'Chưa có Bot Token: nhập token ở ô "Zalo Bot Platform" trước.');
+  const secret = cfg.botWebhookSecret;
   if (!secret || secret.length < 8 || secret.length > 256) throw new AppError(400, 'VALIDATION', 'BOT_WEBHOOK_SECRET phải dài 8–256 ký tự (đặt trong hPanel).');
-  if (!/^https:\/\//.test(env.publicBaseUrl || '')) throw new AppError(400, 'VALIDATION', 'PUBLIC_BASE_URL phải là địa chỉ https công khai của app.');
+  if (!/^https:\/\//.test(env.publicBaseUrl || '')) throw new AppError(400, 'VALIDATION', `Zalo chỉ gọi được địa chỉ https công khai, còn app này đang chạy ở ${env.publicBaseUrl || '(chưa đặt PUBLIC_BASE_URL)'}. Hãy đăng ký webhook trên site thật (trang /admin/zalo của tên miền https).`);
   const url = `${env.publicBaseUrl.replace(/\/+$/, '')}/api/zalo/webhook`;
   let me;
   let result;
@@ -75,4 +82,19 @@ async function registerWebhook() {
   };
 }
 
-module.exports = { page, connection, registerWebhook, resendReceipt: orders.resendReceipt };
+/** Save the Bot Token typed in the admin (checked with getMe first), then register the webhook. */
+async function saveBotToken(req) {
+  const token = typeof req.body.botToken === 'string' ? req.body.botToken.trim() : '';
+  if (!/^[A-Za-z0-9:_\-.]{10,200}$/.test(token)) throw new AppError(400, 'VALIDATION', 'Bot Token không hợp lệ: dán đúng chuỗi token lấy ở bot.zaloplatforms.com.');
+  if (env.zalo.botToken) throw new AppError(409, 'ENV_TOKEN', 'Token đang được đặt trong hPanel (ZALO_BOT_TOKEN); sửa ở đó.');
+  try {
+    await zaloBot.getMe(token);
+  } catch (err) {
+    throw new AppError(400, 'ZALO_BOT_API', `Zalo không chấp nhận token này: ${err.message.replace(/^Zalo Bot \w+ failed: /, '')}`);
+  }
+  await zaloConfig.saveBotToken(token, req.user.id);
+  const reg = await registerWebhook();
+  return { message: `Đã lưu Bot Token. ${reg.message}`, to: '/admin/zalo' };
+}
+
+module.exports = { page, connection, registerWebhook, saveBotToken, resendReceipt: orders.resendReceipt };

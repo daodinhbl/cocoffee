@@ -1,5 +1,4 @@
 const crypto = require('crypto');
-const env = require('../../config/env');
 const logger = require('../../utils/logger');
 const keyedQueue = require('../../utils/keyedQueue');
 const orderModel = require('../../models/orderModel');
@@ -7,6 +6,7 @@ const { eventModel } = require('../../models/zaloModel');
 const receiptService = require('../../services/receiptService');
 const zaloBot = require('../../services/zalo/zaloBotPlatform');
 const conversation = require('./zaloConversationService');
+const zaloConfig = require('../../services/zalo/zaloConfig');
 
 /**
  * POST /api/zalo/webhook  (ZALO_MODE=platform: official Zalo Bot Platform, https://bot.zapps.me/docs)
@@ -19,8 +19,7 @@ const conversation = require('./zaloConversationService');
  * and answer with sendMessage to chat.id. Groups are Beta on Zalo's side; the bot stays silent on group
  * chatter (only orders / commands of the sender with a draft are answered).
  */
-function authorized(req) {
-  const secret = env.zalo.botWebhookSecret;
+function authorized(req, secret) {
   const got = String(req.get('x-bot-api-secret-token') || '');
   if (!secret || !got) return false;
   const a = crypto.createHash('sha256').update(got).digest();
@@ -37,8 +36,9 @@ async function billText(orderId) {
 }
 
 async function handle(req, res) {
-  if (!env.zalo.botToken || !env.zalo.botWebhookSecret) return res.status(503).json({ ok: false, error: 'zalo_bot_not_configured' });
-  if (!authorized(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  const cfg = await zaloConfig.get();
+  if (!cfg.botToken || !cfg.botWebhookSecret) return res.status(503).json({ ok: false, error: 'zalo_bot_not_configured' });
+  if (!authorized(req, cfg.botWebhookSecret)) return res.status(401).json({ ok: false, error: 'unauthorized' });
 
   const update = req.body?.result || req.body || {};
   const msg = update.message || {};

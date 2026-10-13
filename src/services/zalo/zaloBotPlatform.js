@@ -1,5 +1,5 @@
 const axios = require('axios');
-const env = require('../../config/env');
+const zaloConfig = require('./zaloConfig');
 
 /**
  * Zalo Bot Platform (official bot API, https://bot.zapps.me/docs).
@@ -19,11 +19,13 @@ class ZaloBotError extends Error {
   }
 }
 
-async function call(method, params = {}) {
-  if (!env.zalo.botToken) throw new ZaloBotError(method, 'ZALO_BOT_TOKEN is not set');
+/** `token` overrides the configured one (used to check a token before saving it). */
+async function call(method, params = {}, token = null) {
+  const botToken = token || (await zaloConfig.get()).botToken;
+  if (!botToken) throw new ZaloBotError(method, 'chưa có Bot Token');
   let res;
   try {
-    res = await axios.post(`${API}/bot${env.zalo.botToken}/${method}`, params, { timeout: 15000, validateStatus: () => true });
+    res = await axios.post(`${API}/bot${botToken}/${method}`, params, { timeout: 15000, validateStatus: () => true });
   } catch (err) {
     throw new ZaloBotError(method, err.code || 'network error');        // no err.config: it holds the token URL
   }
@@ -48,7 +50,7 @@ async function sendText(chatId, text) {
   for (const part of chunks(text)) await call('sendMessage', { chat_id: String(chatId), text: part });
 }
 
-const getMe = () => call('getMe');
+const getMe = (token = null) => call('getMe', {}, token);
 const setWebhook = (url, secretToken) => call('setWebhook', { url, secret_token: secretToken });
 const getWebhookInfo = () => call('getWebhookInfo');
 

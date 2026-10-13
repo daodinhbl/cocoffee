@@ -82,7 +82,8 @@ async function buildImage(order, items) {
  * @returns {Promise<{sent:boolean,error?:string}>}
  */
 async function sendReceipt(orderId) {
-  if (env.zalo.mode === 'platform') {
+  const { mode } = await require('./zalo/zaloConfig').get();
+  if (mode === 'platform') {
     try {
       const order = await orderModel.getById(orderId);
       if (!order || order.source !== 'zalo' || !order.zalo_chat_id) return { sent: false, error: 'not a Zalo order' };
@@ -96,7 +97,7 @@ async function sendReceipt(orderId) {
     }
   }
   // Bot Client mode: the server cannot push into Zalo; bills travel in the webhook response when the customer confirms.
-  if (env.zalo.mode !== 'oa') return { sent: false, error: 'Chế độ Zalo bot: bill được gửi vào nhóm khi khách chốt đơn. Hãy in hóa đơn hoặc gửi tay.' };
+  if (mode !== 'oa') return { sent: false, error: 'Chế độ Zalo bot: bill được gửi vào nhóm khi khách chốt đơn. Hãy in hóa đơn hoặc gửi tay.' };
   try {
     const order = await orderModel.getById(orderId);
     if (!order || order.source !== 'zalo' || !order.zalo_chat_id) return { sent: false, error: 'not a Zalo order' };

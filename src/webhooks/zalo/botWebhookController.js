@@ -1,11 +1,11 @@
 const crypto = require('crypto');
-const env = require('../../config/env');
 const logger = require('../../utils/logger');
 const keyedQueue = require('../../utils/keyedQueue');
 const orderModel = require('../../models/orderModel');
 const { eventModel } = require('../../models/zaloModel');
 const receiptService = require('../../services/receiptService');
 const conversation = require('./zaloConversationService');
+const zaloConfig = require('../../services/zalo/zaloConfig');
 
 /**
  * POST /api/zalo/webhook  (ZALO_MODE=bot, the default)
@@ -25,8 +25,7 @@ const conversation = require('./zaloConversationService');
 const MAX_TEXT = 2000;
 
 /** Constant-time comparison of the bearer token (hashing first equalizes the lengths). */
-function authorized(req) {
-  const secret = env.zalo.botWebhookSecret;
+function authorized(req, secret) {
   const header = String(req.get('authorization') || '');
   const token = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
   if (!secret || !token) return false;
@@ -46,8 +45,9 @@ async function billText(orderId) {
 }
 
 async function handle(req, res) {
-  if (!env.zalo.botWebhookSecret) return res.status(503).json({ ok: false, error: 'bot_not_configured' });
-  if (!authorized(req)) return res.status(401).json({ ok: false, error: 'unauthorized' });
+  const { botWebhookSecret } = await zaloConfig.get();
+  if (!botWebhookSecret) return res.status(503).json({ ok: false, error: 'bot_not_configured' });
+  if (!authorized(req, botWebhookSecret)) return res.status(401).json({ ok: false, error: 'unauthorized' });
 
   const body = req.body || {};
   const message = str(body.message, MAX_TEXT);

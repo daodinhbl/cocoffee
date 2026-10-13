@@ -428,6 +428,45 @@ test('admin pages', async (t) => {
     assert.doesNotMatch(plain, /Tiền thối/, 'no cash block without ?given=');
   });
 
+  await t.test('Zalo Bot Platform token entered in the admin: checked, stored, secret generated, webhook registered', async () => {
+    const axios = require('axios');
+    const calls = [];
+    const original = axios.post;
+    axios.post = async (url, body) => {
+      const method = url.split('/').pop();
+      calls.push({ method, body, tokenOk: url.includes('/bot1234567890:GOOD-TOKEN/') });
+      if (!url.includes('GOOD-TOKEN')) return { status: 401, data: { ok: false, description: 'invalid token', error_code: 401 } };
+      if (method === 'getMe') return { status: 200, data: { ok: true, result: { id: 'b1', account_name: 'CoCoffee Bot' } } };
+      return { status: 200, data: { ok: true, result: { url: body.url, verification: { ok: true, outcome: 'webhook.ok' } } } };
+    };
+    try {
+      const page = await (await admin.get('/admin/zalo')).text();
+      assert.match(page, /Zalo Bot Platform/);
+      assert.match(page, /name="botToken" type="password"/);
+
+      reset();
+      let r = await admin.post('/admin/zalo/bot-token', { _csrf: token, _back: '/admin/zalo', botToken: '1234567890:BAD-TOKEN' });
+      assert.equal(r.headers.get('location'), '/admin/zalo');
+      assert.equal(called('settings.setMany').length, 0, 'a token Zalo rejects is not stored');
+
+      r = await admin.post('/admin/zalo/bot-token', { _csrf: token, _back: '/admin/zalo', botToken: '1234567890:GOOD-TOKEN' });
+      const saved = called('settings.setMany')[0].args[0];
+      assert.equal(saved['zalo.botToken'], '1234567890:GOOD-TOKEN');
+      assert.match(saved['zalo.webhookSecret'], /^[0-9a-f]{48}$/, 'webhook secret generated');
+      const hook = calls.find((c) => c.method === 'setWebhook');
+      assert.ok(hook.tokenOk);
+      assert.match(hook.body.url, /\/api\/zalo\/webhook$/);
+      assert.equal(hook.body.secret_token, saved['zalo.webhookSecret']);
+
+      const after = await (await admin.get('/admin/zalo')).text();
+      assert.match(after, /Đã có token …OKEN/);
+      assert.doesNotMatch(after, /GOOD-TOKEN/, 'the token is never shown back');
+    } finally {
+      axios.post = original;
+      require('../src/services/zalo/zaloConfig').invalidate();
+    }
+  });
+
   await t.test('dashboard charts: best sellers, low stock, overstock, debtors named from customers', async () => {
     const html = await (await admin.get('/admin/dashboard')).text();
     for (const title of ['Món bán chạy', 'Hàng sắp hết', 'Nguyên liệu tồn kho nhiều', 'Khách hàng công nợ nhiều nhất']) assert.match(html, new RegExp(title));
