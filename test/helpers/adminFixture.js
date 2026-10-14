@@ -168,6 +168,7 @@ async function start() {
   mock.method(customerModel, 'reconciliation', async () => [{ id: 5, name: 'Chị Lan', phone: '0909000111', opening: 50000, increase: 100000, decrease: 30000, closing: 120000 }]);
   mock.method(customerModel, 'statement', async () => ({ opening: 50000, increase: 100000, decrease: 30000, closing: 120000,
     entries: [{ id: 1, entry_type: 'debt', amount: 100000, created_at: NOW, order_code: ORDER.order_code, balance: 150000 }, { id: 2, entry_type: 'payment', amount: -30000, method: 'transfer', created_at: NOW, balance: 120000 }] }));
+  mock.method(customerModel, 'zaloSenders', async () => [{ zalo_user_id: 'z-5678', display_name: 'Anh Tuấn', last_seen_at: NOW, order_count: 2 }]);
   mock.method(customerModel, 'create', rec('customer.create', 9));
   mock.method(customerModel, 'update', rec('customer.update'));
   mock.method(customerService, 'collect', rec('customer.collect', { amount: 50000, balance: 70000, settled: [ORDER.order_code] }));

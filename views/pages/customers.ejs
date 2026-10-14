@@ -1,5 +1,5 @@
 <%
-  const { input, btnPrimary, btnSecondary } = ui;
+  const { input, label, btnPrimary, btnSecondary, btnGhost, sheet, grabber } = ui;
   const sel = (a, b) => (a === b ? 'selected' : '');
   const card = 'rounded-xl border border-milk-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,.04)]';
   const swipe = 'min-w-[60%] shrink-0 snap-start sm:min-w-0';
@@ -108,7 +108,7 @@
           </td>
           <td data-label="Liên hệ" class="px-4 py-3">
             <% if (c.phone) { %><span class="block font-mono text-[13px]"><%= c.phone %></span><% } %>
-            <% if (c.zalo_user_id) { %><%- badge('Zalo', 'info') %><% } %>
+            <% if (c.zalo_user_id) { %><span class="inline-flex items-center gap-1" title="Zalo ID <%= c.zalo_user_id %>"><%- badge('Zalo', 'info') %><span class="font-mono text-[11px] text-milk-500"><%= c.zalo_user_id %></span></span><% } %>
             <% if (!c.phone && !c.zalo_user_id) { %><span class="text-milk-400">—</span><% } %>
           </td>
           <td data-label="Đơn hàng" class="px-4 py-3 text-right font-mono text-milk-500 tnum"><%= c.order_count %></td>
@@ -118,6 +118,8 @@
           <td data-label="Cập nhật" class="px-4 py-3 text-sm text-milk-500 tnum"><%= fmtTime(c.updated_at) %></td>
           <td data-label="" class="rt-actions px-4 py-3 text-right">
             <div class="inline-flex items-center gap-1">
+              <button type="button" data-modal-open="#zalo-dialog" data-action="/admin/customers/<%= c.id %>/zalo" data-title="Gán Zalo · <%= c.name %>" data-fill="<%= safeJson({ zalo_user_id: c.zalo_user_id || '' }) %>"
+                class="<%= ui.btnGhost %>" title="<%= c.zalo_user_id ? 'Đổi / gỡ Zalo ID' : 'Gán Zalo ID' %>" aria-label="Gán Zalo cho <%= c.name %>"><%- icon('chat','h-4 w-4') %></button>
               <a href="/admin/customers/<%= c.id %>/edit" class="<%= ui.btnGhost %>" title="Sửa khách hàng" aria-label="Sửa <%= c.name %>"><%- icon('pencil','h-4 w-4') %></a>
               <a href="/admin/customers/<%= c.id %>" class="inline-flex h-9 items-center rounded-lg border border-milk-200 px-3 text-xs font-semibold text-navy hover:border-navy-accent hover:bg-blue-50">Xem</a>
             </div>
@@ -141,3 +143,44 @@
     <% if (page < pages) { %><a href="<%= pageUrl(page + 1) %>" rel="next" class="inline-flex h-10 items-center rounded-lg border border-milk-200 bg-white px-3 text-sm hover:border-navy-accent">Sau →</a><% } %>
   </nav>
 <% } %>
+
+<!-- Gán Zalo: pick one of the accounts that messaged the bot (not linked yet), or type the ID the customer got from "id" -->
+<dialog id="zalo-dialog" aria-labelledby="zalo-title" class="max-w-md <%= sheet %>">
+  <form method="post" action="/admin/customers" class="flex flex-col">
+    <%- include('../partials/csrf') %>
+    <%- grabber %>
+    <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4">
+      <h2 id="zalo-title" data-dialog-title class="text-lg font-semibold">Gán Zalo</h2>
+      <button type="button" data-modal-close aria-label="Đóng" class="<%= btnGhost %>"><%- icon('x', 'h-5 w-5') %></button>
+    </div>
+    <div class="space-y-4 px-4 py-4 sm:px-6 sm:py-5">
+      <div>
+        <label for="z-id" class="<%= label %>">Zalo ID (User ID)</label>
+        <input id="z-id" name="zalo_user_id" list="zalo-senders" maxlength="64" class="<%= input %> font-mono" autocomplete="off" placeholder="Chọn trong danh sách hoặc dán ID">
+        <datalist id="zalo-senders">
+          <% zaloSenders.forEach((z) => { %>
+            <option value="<%= z.zalo_user_id %>"><%= z.display_name || 'Khách Zalo' %> · <%= z.order_count %> đơn · <%= fmtTime(z.last_seen_at) %></option>
+          <% }) %>
+        </datalist>
+        <p class="mt-1.5 text-xs text-milk-500">
+          <% if (zaloSenders.length) { %>Gợi ý: <%= zaloSenders.length %> tài khoản đã nhắn bot gần đây chưa gán khách nào (chạm vào ô để chọn).<% } else { %>Chưa có tài khoản Zalo nào nhắn bot mà chưa được gán.<% } %>
+          Khách nhắn riêng cho bot chữ <code class="font-mono">id</code> để nhận User ID. Để trống rồi Lưu để gỡ liên kết.
+        </p>
+      </div>
+      <% if (zaloSenders.length) { %>
+      <ul class="max-h-48 divide-y divide-milk-200 overflow-y-auto rounded-lg border border-milk-200 text-sm">
+        <% zaloSenders.forEach((z) => { %>
+          <li class="flex items-center justify-between gap-3 px-3 py-2">
+            <span class="min-w-0"><span class="block truncate font-medium"><%= z.display_name || 'Khách Zalo' %></span><span class="block font-mono text-[11px] text-milk-500"><%= z.zalo_user_id %></span></span>
+            <span class="shrink-0 text-xs text-milk-500 tnum"><%= z.order_count %> đơn · <%= fmtTime(z.last_seen_at) %></span>
+          </li>
+        <% }) %>
+      </ul>
+      <% } %>
+    </div>
+    <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-4 py-3 max-sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
+      <button type="button" data-modal-close class="<%= btnSecondary %> max-sm:flex-1">Hủy</button>
+      <button type="submit" class="<%= btnPrimary %> max-sm:flex-[2]">Lưu</button>
+    </div>
+  </form>
+</dialog>

@@ -56,10 +56,12 @@ async function hold(cart, userId) {
 /** Payment fields of a checkout body. Only cash / transfer / card at the counter. */
 function readPayment(body = {}) {
   const blank = (x) => (x === '' || x == null ? undefined : x);
+  const reference = v.str(blank(body.reference), 'Mã tham chiếu', { max: 100, required: false });
   return {
     method: v.oneOf(body.method, 'Hình thức thanh toán', METHODS),
     discount: v.num(blank(body.discount), 'Giảm giá', { min: 0, required: false }),
     tendered: v.num(blank(body.tendered), 'Tiền khách đưa', { min: 0, required: false }),
+    ...(reference ? { reference } : {}),          // card / transfer reference, kept out of the object when absent
   };
 }
 
@@ -68,10 +70,10 @@ function readPayment(body = {}) {
  * never leaves a half-done sale behind.
  * @returns {Promise<{ order: object, change: number }>} order with items
  */
-async function checkout(cart, { method, discount, tendered }, userId) {
+async function checkout(cart, { method, discount, tendered, reference }, userId) {
   const { order, created } = await saveOpen(cart, userId);
   try {
-    const result = await orderService.payOrder(order.id, { method, tendered, discount, userId });
+    const result = await orderService.payOrder(order.id, { method, tendered, ...(reference ? { reference } : {}), discount, userId });
     return { order: result.order, change: Number(result.change) || 0 };
   } catch (err) {
     if (created) await orderService.cancelOrder(order.id).catch((e) => logger.warn('POS: could not cancel unpaid order', e));

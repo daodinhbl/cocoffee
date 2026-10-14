@@ -61,6 +61,7 @@ router.post('/customers', act(customers.create));
 router.get('/customers/:id', customers.detail);
 router.get('/customers/:id/edit', customers.editForm);
 router.post('/customers/:id', act(customers.update));
+router.post('/customers/:id/zalo', act(customers.linkZalo));
 router.post('/customers/:id/collect', act(customers.collect));
 router.post('/customers/:id/adjust', act(customers.adjust));
 

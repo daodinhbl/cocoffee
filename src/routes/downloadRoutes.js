@@ -1,0 +1,83 @@
+const express = require('express');
+const { adminSecurity } = require('../middlewares/adminSecurity');
+const appRelease = require('../services/appRelease');
+const env = require('../config/env');
+const { formatShopTime } = require('../utils/text');
+
+/**
+ * Public download point for the Android app (no sign-in: staff open it on their phone from the QR code on the
+ * login page). The APK and its manifest live in releases/android/ (see services/appRelease.js).
+ *   GET /download                landing page: version, size, install steps, the QR code to share
+ *   GET /download/cocoffee.apk   the APK (stable URL; the saved file name carries the version)
+ *   GET /download/manifest.json  version/size/sha256 for an in-app update check
+ *   GET /download/qr.svg         QR code of the landing page URL (printed on the login page)
+ */
+const router = express.Router();
+const APK_PATH = '/download/cocoffee.apk';
+
+const describe = (req, r) => ({
+  ...r,
+  downloadName: appRelease.downloadName(r),
+  sizeLabel: appRelease.sizeLabel(r.size),
+  android: appRelease.androidLabel(r.min_sdk),
+  apkUrl: `${APK_PATH}?v=${r.sha256.slice(0, 12)}`,     // a new build gets a new URL: no stale browser cache
+  builtAtLabel: formatShopTime(r.built_at),
+});
+
+router.get('/', adminSecurity, (req, res) => {
+  const release = appRelease.current();
+  const base = appRelease.baseUrl(req);
+  res.render('download', {
+    shopName: env.business.shopName,
+    release: release ? describe(req, release) : null,
+    pageUrl: `${base}/download`,
+    host: base.replace(/^https?:\/\//, ''),
+  });
+});
+
+router.get('/manifest.json', (req, res) => {
+  const r = appRelease.current();
+  if (!r) return res.status(404).json({ error: { code: 'NO_RELEASE', message: 'Chưa có bản cài đặt nào.' } });
+  const base = appRelease.baseUrl(req);
+  res.set('Cache-Control', 'no-cache');
+  return res.json({
+    app_name: r.app_name,
+    package: r.package,
+    version_name: r.version_name,
+    version_code: r.version_code,
+    min_sdk: r.min_sdk,
+    size: r.size,
+    sha256: r.sha256,
+    built_at: r.built_at,
+    file: appRelease.downloadName(r),
+    url: `${base}${APK_PATH}`,
+    page: `${base}/download`,
+  });
+});
+
+router.get('/cocoffee.apk', (req, res, next) => {
+  const r = appRelease.current();
+  if (!r) return res.status(404).type('text').send('Chưa có bản cài đặt nào.');
+  res.set({ 'Cache-Control': 'no-cache', 'X-Checksum-SHA256': r.sha256, 'X-Content-Type-Options': 'nosniff' });
+  // send() keeps a Content-Type that is already set, handles HEAD, Range and conditional requests.
+  return res.download(r.path, appRelease.downloadName(r), { headers: { 'Content-Type': appRelease.APK_MIME }, cacheControl: false, dotfiles: 'deny' }, (err) => {
+    if (err && !res.headersSent) next(err);
+  });
+});
+
+router.get('/qr.svg', async (req, res, next) => {
+  try {
+    const svg = await appRelease.qrSvg(`${appRelease.baseUrl(req)}/download`);
+    res.set({
+      'Content-Type': 'image/svg+xml; charset=utf-8',
+      'Cache-Control': 'public, max-age=3600',
+      'X-Content-Type-Options': 'nosniff',
+      'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'",
+    });
+    res.send(svg);
+  } catch (err) { next(err); }
+});
+
+router.use((_req, res) => res.status(404).type('text').send('Không tìm thấy.'));
+
+module.exports = router;

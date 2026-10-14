@@ -42,6 +42,7 @@ function friendlyDbError(err) {
 async function list(req, res) {
   const f = readFilters(req.query);
   const { customers, stats, total, page, pages } = await customerQuery.listPage(f);
+  const zaloSenders = await customerModel.zaloSenders().catch(() => []);   // the picker is a convenience, never a blocker
 
   // Build a page URL helper that keeps active filters.
   const params = new URLSearchParams();
@@ -59,7 +60,7 @@ async function list(req, res) {
     title: 'Khách hàng', activeMenu: 'customers',
     breadcrumbs: [{ label: 'Vận hành', href: '#' }, { label: 'Khách hàng' }],
   }, {
-    customers, filters: f, stats,
+    customers, filters: f, stats, zaloSenders,
     total, page, pages, pageSize: PAGE_SIZE, pageUrl,
     hasFilter: !!(f.q || f.debtOnly || f.zaloOnly),
     from: (page - 1) * PAGE_SIZE + 1,
@@ -170,6 +171,26 @@ async function update(req) {
   return { message: 'Đã cập nhật thông tin khách hàng.', to: `/admin/customers/${id}` };
 }
 
+/**
+ * POST /admin/customers/:id/zalo { zalo_user_id } — "Gán Zalo" from the customers list: links the Zalo account
+ * (chosen among recent bot senders, or typed) to the customer; an empty id unlinks. Same uniqueness rule as the form.
+ */
+async function linkZalo(req) {
+  const id = v.id(req.params.id);
+  const customer = await customerModel.getById(id);
+  if (!customer) throw new AppError(404, 'NOT_FOUND', 'Không tìm thấy khách hàng.');
+  const zaloId = v.str(optional(req.body.zalo_user_id), 'Zalo ID', { max: 64, required: false }) || null;
+  if (zaloId && !/^[A-Za-z0-9_.:-]+$/.test(zaloId)) throw new AppError(400, 'VALIDATION', 'Zalo ID chỉ gồm chữ, số và . _ : -');
+  try {
+    await customerModel.update(id, { zalo_user_id: zaloId });
+  } catch (err) {
+    const msg = friendlyDbError(err);
+    if (msg) throw new AppError(400, 'DUPLICATE', msg);
+    throw err;
+  }
+  return { message: zaloId ? `Đã gán Zalo ID ${zaloId} cho ${customer.name}.` : `Đã gỡ liên kết Zalo của ${customer.name}.` };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /admin/customers/:id/collect  (thu nợ, partial allowed)  — act()
 // POST /admin/customers/:id/adjust   (điều chỉnh công nợ)         — act()
@@ -237,4 +258,4 @@ async function statementPage(req, res) {
   });
 }
 
-module.exports = { list, newForm, editForm, detail, create, update, collect, adjust, reconciliation, statementPage, readPeriod };
+module.exports = { list, newForm, editForm, detail, create, update, linkZalo, collect, adjust, reconciliation, statementPage, readPeriod };

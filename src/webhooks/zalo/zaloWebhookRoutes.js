@@ -2,6 +2,7 @@ const express = require('express');
 const rateLimit = require('../../middlewares/rateLimit');
 const zaloConfig = require('../../services/zalo/zaloConfig');
 const debtQr = require('../../services/zalo/debtQr');
+const billMedia = require('../../services/zalo/billMedia');
 const bot = require('./botWebhookController');
 const platform = require('./platformWebhookController');
 const oa = require('./zaloWebhookController');
@@ -40,5 +41,24 @@ router.get('/qr/:file', rateLimit({ windowMs: 60 * 1000, max: 60 }), async (req,
     return next(err);
   }
 });
+
+// Receipt PNG (80 mm) and payment VietQR of a confirmed order (signed, expiring links: services/zalo/billMedia.js).
+const png = (kind) => async (req, res, next) => {
+  try {
+    const m = /^(.+).png$/.exec(req.params.file);
+    const data = m ? billMedia.verify(m[1]) : null;
+    const buf = data && data.kind === kind ? await billMedia.pngFor(data) : null;
+    if (!buf) return res.status(404).json({ ok: false, error: 'not_found' });
+    res.set({
+      'Content-Type': 'image/png', 'Cache-Control': 'private, max-age=3600', 'Content-Length': String(buf.length),
+      'Cross-Origin-Resource-Policy': 'cross-origin',
+    });
+    return res.end(buf);
+  } catch (err) {
+    return next(err);
+  }
+};
+router.get('/receipt/:file', rateLimit({ windowMs: 60 * 1000, max: 60 }), png('receipt'));
+router.get('/pay-qr/:file', rateLimit({ windowMs: 60 * 1000, max: 60 }), png('payQr'));
 
 module.exports = router;

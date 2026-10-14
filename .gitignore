@@ -11,3 +11,10 @@ assets/fonts/*.ttf
 database/import_full.sql
 public/uploads/*
 !public/uploads/.gitkeep
+# Android app build published for download (scripts/publish-apk.js adds it to the deploy archive)
+releases/android/*
+!releases/android/.gitkeep
+# deploy archives (scripts/package-deploy.js)
+dist/
+# stray installers
+*.exe

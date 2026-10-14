@@ -8,6 +8,7 @@ process.env.DB_NAME ||= 'x'; process.env.DB_USER ||= 'x'; process.env.DB_PASSWOR
 process.env.ZALO_MODE = 'bot';
 process.env.BOT_WEBHOOK_SECRET = 'test-bot-secret-0123456789';
 process.env.DEMO_MODE = 'false';
+process.env.RECEIPT_SAVE_DIR = require('node:path').join(require('node:os').tmpdir(), 'cc-bills-' + process.pid);   // never write into the real uploads folder
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -89,8 +90,12 @@ test('bot webhook', async (t) => {
     j = await (await send({ groupId: 'g1', senderId: 'u1', message: 'oke', messageId: 'm4' })).json();
     assert.equal(j.action, 'confirmed');
     assert.equal(confirmed.length, 1);
-    assert.match(j.replies[0].text, /HÓA ĐƠN CF261013-00100/);
-    assert.match(j.replies[0].text, /TỔNG CỘNG: 79\.000đ/);
+    // the bill is the 80 mm PNG (no bank account configured here, so nothing follows it)
+    assert.equal(j.replies.length, 1);
+    assert.equal(j.replies[0].type, 'image');
+    assert.equal(j.replies[0].mime, 'image/png');
+    assert.match(j.replies[0].url, /\/api\/zalo\/receipt\/[\w-]+\.[\w-]{22}\.png$/);
+    assert.deepEqual(Buffer.from(j.replies[0].base64, 'base64').subarray(1, 4), Buffer.from('PNG'));
   });
 
   await t.test('a retried messageId is answered once only (no double order / double confirm)', async () => {

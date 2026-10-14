@@ -9,6 +9,7 @@ process.env.ZALO_BOT_TOKEN = '123456:SECRET-TOKEN';
 process.env.BOT_WEBHOOK_SECRET = 'platform-secret-123';
 process.env.PUBLIC_BASE_URL = 'https://cafe.example.test';   // sendPhoto needs a public picture URL
 process.env.DEMO_MODE = 'false';
+process.env.RECEIPT_SAVE_DIR = require('node:path').join(require('node:os').tmpdir(), 'cc-bills-' + process.pid);   // never write into the real uploads folder
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -90,7 +91,10 @@ test('zalo bot platform', async (t) => {
 
     await post(update('ok', { id: 'p2' }));
     await settle(2);
-    assert.match(sent[1].body.text, /HÓA ĐƠN CF261013-00500/);
+    // the bill is the 80 mm PNG, sent with sendPhoto and the signed public URL of the picture
+    assert.equal(sent[1].method, 'sendPhoto');
+    assert.equal(sent[1].body.chat_id, 'u1');
+    assert.match(sent[1].body.photo, /^https:\/\/cafe\.example\.test\/api\/zalo\/receipt\/[\w-]+\.[\w-]{22}\.png$/);
   });
 
   await t.test('group: "@Bot 1 cafe sua" is understood; chatter and bot messages are ignored', async () => {

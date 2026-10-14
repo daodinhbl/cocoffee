@@ -31,7 +31,7 @@ router.get('/zalo/status', shell.status);
 router.get('/zalo/drafts', shell.drafts);
 router.get('/pos/bootstrap', pos.bootstrap);
 router.post('/pos/checkout', idempotency(), pos.checkout);
-router.post('/pos/hold', pos.hold);
+router.post('/pos/hold', idempotency(), pos.hold);
 router.get('/settings/printer', pos.printer);
 
 router.get('/tables', tables.list);                                       // ?all=1 is admin-only (checked inside)
@@ -61,7 +61,7 @@ router.post('/orders', idempotency(), orders.create);
 router.get('/orders/:id', orders.get);
 router.get('/orders/:id/receipt', orders.receipt);
 router.put('/orders/:id/items', orders.replaceItems);
-router.post('/orders/:id/pay', orders.pay);                              // debt settlement: admin only (orderService)
+router.post('/orders/:id/pay', idempotency(), orders.pay);                              // debt settlement: admin only (orderService)
 router.post('/orders/:id/cancel', orders.cancel);
 router.post('/orders/:id/resend-receipt', orders.resendReceipt);
 

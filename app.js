@@ -16,6 +16,7 @@ const logger = require('./src/utils/logger');
 const routes = require('./src/routes');
 const adminRoutes = require('./src/routes/adminRoutes');
 const mediaRoutes = require('./src/routes/mediaRoutes');
+const downloadRoutes = require('./src/routes/downloadRoutes');
 const viewHelpers = require('./src/utils/viewHelpers');
 const { notFound, errorHandler } = require('./src/middlewares/errorHandler');
 
@@ -56,6 +57,9 @@ app.get('/health', async (_req, res) => {
     res.status(503).json({ status: 'degraded', db: 'down' });
   }
 });
+
+// Android app for staff phones: landing page, APK, manifest, QR code (public; see routes/downloadRoutes.js).
+app.use('/download', downloadRoutes);
 
 app.use('/admin', adminRoutes);
 app.use('/api', routes);

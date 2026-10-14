@@ -94,6 +94,20 @@
           </form>
         </div>
 
+        <% if (locals.appDownload) { %>
+          <aside class="mt-5 flex items-center gap-4 rounded-xl border border-roast-200 bg-white p-4" aria-labelledby="app-dl-title">
+            <a href="/download" class="hidden shrink-0 sm:block" aria-hidden="true" tabindex="-1">
+              <img src="/download/qr.svg" alt="" width="96" height="96" class="h-24 w-24 rounded border border-roast-100 bg-white p-1">
+            </a>
+            <div class="min-w-0">
+              <p id="app-dl-title" class="text-sm font-semibold text-roast-800">Ứng dụng Android · <%= appDownload.app_name %> <span class="font-normal text-gray-400">v<%= appDownload.version_name %></span></p>
+              <p class="mt-0.5 text-xs text-gray-500">Quét mã QR bằng camera điện thoại để tải bản cài đặt (<%= appDownload.sizeLabel %>), hoặc mở liên kết này trên điện thoại.</p>
+              <a href="/download" class="mt-1.5 inline-flex items-center gap-1 text-sm font-semibold text-roast-700 hover:underline">Tải ứng dụng
+                <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+            </div>
+          </aside>
+        <% } %>
+
         <p class="mt-6 text-center text-xs text-gray-500 lg:text-left">Quản trị viên vào trang quản lý; thu ngân vào thẳng màn hình bán hàng.</p>
         <p class="mt-1 text-center text-xs text-gray-400 lg:text-left">© <%= new Date().getFullYear() %> <%= shopName %></p>
       </div>

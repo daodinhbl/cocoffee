@@ -467,6 +467,28 @@ test('admin pages', async (t) => {
     }
   });
 
+  await t.test('customers: "Gán Zalo" picker on the list links / unlinks a Zalo account', async () => {
+    const customerModel = require('../src/models/customerModel');
+    const html = await (await admin.get('/admin/customers')).text();
+    assert.match(html, /data-action="\/admin\/customers\/5\/zalo"/, 'every row has a Gán Zalo button');
+    assert.match(html, /<datalist id="zalo-senders">[\s\S]*value="z-5678"[\s\S]*Anh Tuấn · 2 đơn/, 'recent unlinked bot senders are offered');
+    assert.match(html, /Để trống rồi Lưu để gỡ liên kết/);
+    const token = await fx.csrfOf(admin, '/admin/customers');
+    customerModel.update.mock.resetCalls();
+    let r = await admin.post('/admin/customers/5/zalo', { _csrf: token, _back: '/admin/customers', zalo_user_id: ' z-5678 ' });
+    assert.equal(r.status, 303);
+    assert.equal(r.headers.get('location'), '/admin/customers');
+    assert.deepEqual(customerModel.update.mock.calls.at(-1).arguments.slice(0, 2), [5, { zalo_user_id: 'z-5678' }]);
+    assert.match(decodeURIComponent(r.headers.getSetCookie().join(';')), /Đã gán Zalo ID z-5678 cho Chị Lan/);
+    r = await admin.post('/admin/customers/5/zalo', { _csrf: token, _back: '/admin/customers', zalo_user_id: '' });
+    assert.deepEqual(customerModel.update.mock.calls.at(-1).arguments.slice(0, 2), [5, { zalo_user_id: null }]);
+    r = await admin.post('/admin/customers/5/zalo', { _csrf: token, _back: '/admin/customers', zalo_user_id: 'bad id!' });
+    assert.match(decodeURIComponent(r.headers.getSetCookie().join(';')), /chỉ gồm chữ, số/);
+    r = await admin.post('/admin/customers/999/zalo', { _csrf: token, _back: '/admin/customers', zalo_user_id: 'z-1' });
+    assert.equal(r.status, 303);   // act(): the error becomes a flash message on the list
+    assert.match(decodeURIComponent(r.headers.getSetCookie().join(';')), /Không tìm thấy khách hàng/);
+  });
+
   await t.test('customers & debt: list, detail, collect (partial), adjust, reconciliation, printable statement', async () => {
     for (const [p, re] of [
       ['/admin/customers', /Chị Lan[\s\S]*120\.000đ/],

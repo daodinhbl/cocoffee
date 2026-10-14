@@ -189,6 +189,30 @@ async function findByZaloUser(zaloUserId, conn) {
   return rows[0] || null;
 }
 
+/**
+ * Zalo accounts that messaged the bot in the last `days` days and are not linked to a customer yet: id, the
+ * display name Zalo sent (Bot Platform: message.from.display_name; Bot Client: senderName), last message time
+ * and how many Zalo orders they placed. For the "Gán Zalo" picker on the customers page.
+ */
+async function zaloSenders({ days = 60, limit = 50 } = {}, conn) {
+  const [rows] = await db(conn).query(
+    `SELECT e.sender_id AS zalo_user_id,
+            MAX(COALESCE(JSON_UNQUOTE(JSON_EXTRACT(e.payload, '$.message.from.display_name')),
+                         JSON_UNQUOTE(JSON_EXTRACT(e.payload, '$.senderName')))) AS display_name,
+            MAX(e.received_at) AS last_seen_at,
+            (SELECT COUNT(*) FROM orders o WHERE o.source = 'zalo' AND o.zalo_user_id = e.sender_id) AS order_count
+       FROM zalo_events e
+       LEFT JOIN customers c ON c.zalo_user_id = e.sender_id
+      WHERE e.sender_id IS NOT NULL AND e.sender_id <> '' AND c.id IS NULL
+        AND e.received_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+      GROUP BY e.sender_id
+      ORDER BY last_seen_at DESC
+      LIMIT ?`,
+    [days, limit]
+  );
+  return rows.map((r) => ({ ...r, display_name: r.display_name === 'null' ? null : r.display_name }));
+}
+
 async function linkOrder(orderId, customerId, conn) {
   await db(conn).query('UPDATE orders SET customer_id = ? WHERE id = ?', [customerId, orderId]);
 }
@@ -222,6 +246,7 @@ async function topBalances(limit = 6, conn) {
 }
 
 module.exports = {
+  zaloSenders,
   // Admin CRUD & queries
   list, count, summary, getById, create, update, ledgerHistory, orderHistory, reconciliation, statement,
   // Zalo / POS integration (used by webhooks and order service)

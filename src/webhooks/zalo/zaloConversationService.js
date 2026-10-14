@@ -9,6 +9,7 @@ const orderService = require('../../services/orderService');
 const customerModel = require('../../models/customerModel');
 const chatbotInfo = require('../../services/zalo/chatbotInfo');
 const debtQr = require('../../services/zalo/debtQr');
+const billMedia = require('../../services/zalo/billMedia');
 const parser = require('./zaloOrderParser');
 
 /**
@@ -22,7 +23,9 @@ const parser = require('./zaloOrderParser');
  *                       (only when no item matched; in groups only when the bot is @mentioned)
  *   text with items  -> DRAFT order saved, summary replied, session = awaiting_confirm
  *   "ok" / "oke"     -> ONE transaction: draft -> completed, stock deducted, COGS fixed, session cleared
- *                       -> after COMMIT the bill goes out through io.onConfirmed
+ *                       -> after COMMIT: the 80 mm PNG receipt (io.image; the text bill through io.onConfirmed when the
+ *                          picture cannot be made or sent), then the shop's bank account and a VietQR code for the
+ *                          order amount (when configured in Admin > Zalo > "Trả lời tự động & chuyển khoản")
  *   "huy"            -> draft cancelled
  * In GROUP chats the bot stays silent unless the message is clearly meant for it
  * (order items, or a command while a draft exists), otherwise every "ok" in a group would trigger it.
@@ -162,6 +165,50 @@ async function handleText({ chatType, chatId, userId, text, msgId, mentioned = f
   }
 }
 
+// --------------------------------------------------------------------------- bill + payment info
+/**
+ * After COMMIT. 1) the receipt as a PNG for 80 mm paper, built by the web server; the plain-text bill is the fallback
+ * when the picture cannot be drawn or the channel refuses it. 2) the shop's bank account with a VietQR code for this
+ * order. Nothing here can undo the sale: every failure is logged and the next step still runs.
+ */
+async function deliverBill(ctx, orderId) {
+  let billSent = false;
+  if (ctx.io.image) {
+    try {
+      const picture = await billMedia.receipt(orderId);
+      if (picture) {
+        await ctx.io.image({ ...picture, caption: '🧾 Hóa đơn của bạn' });
+        await orderModel.markReceipt(orderId, null).catch(() => {});
+        billSent = true;
+      }
+    } catch (err) {
+      logger.warn(`Receipt picture of order ${orderId} not delivered, sending the text bill`, err);
+    }
+  }
+  if (!billSent) {
+    try {
+      await ctx.io.onConfirmed(orderId);
+    } catch (err) {
+      logger.warn(`Order ${orderId} completed but the bill was not delivered`, err);
+    }
+  }
+  await sendPaymentInfo(ctx, orderId);
+}
+
+/** Bank account + VietQR for an order that is still to be paid. Silent when no bank account is set. */
+async function sendPaymentInfo(ctx, orderId) {
+  try {
+    const [order, info] = await Promise.all([orderModel.getById(orderId), chatbotInfo.get()]);
+    if (!order || order.payment_status === 'paid' || !chatbotInfo.bankReady(info)) return;
+    await ctx.io.reply(billMedia.paymentText(order, info));
+    if (!ctx.io.image) return;
+    const qr = await billMedia.payQr(orderId, info);
+    if (qr) await ctx.io.image({ ...qr, caption: `Quét mã để chuyển ${formatVnd(order.total)}đ (nội dung ${billMedia.transferNote(order)})` });
+  } catch (err) {
+    logger.warn(`Payment info of order ${orderId} not delivered`, err);   // the bill above already went out
+  }
+}
+
 // --------------------------------------------------------------------------- confirm
 async function confirm(ctx) {
   const { chatType, chatId, userId, isGroup } = ctx;
@@ -194,11 +241,7 @@ async function confirm(ctx) {
   switch (outcome.status) {
     case 'ok':
       // After COMMIT: a delivery problem must never undo the sale (the transport records it on the order).
-      try {
-        await ctx.io.onConfirmed(outcome.orderId);
-      } catch (err) {
-        logger.warn(`Order ${outcome.orderId} completed but the bill was not delivered`, err);
-      }
+      await deliverBill(ctx, outcome.orderId);
       return 'confirmed';
     case 'expired': return say(ctx, TXT.expired(env.zalo.draftTtlMinutes), 'expired');
     default: return isGroup ? 'ignored' : say(ctx, TXT.noDraft, 'ignored');

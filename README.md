@@ -15,6 +15,9 @@ src/services/zalo/          zaloApiService · zaloAuthService (rotating tokens) 
 src/webhooks/zalo/          controller · routes · order parser · conversation state machine
 src/controllers/admin/      one controller per Web Admin module (dashboard, tables, orders, menu, inventory, bom, reports, zalo, settings)
 src/middlewares/adminAuth   cookie session (HttpOnly, SameSite=Strict, audience "admin-web") + CSRF + flash + forced password change
+src/routes/downloadRoutes   /download: Android app landing page, APK, manifest.json, QR code (public) · src/services/appRelease.js
+releases/android/           the published APK + manifest.json (git-ignored; scripts/publish-apk.js writes them, package-deploy.js ships them)
+mobile/                     Flutter Android app "Tasotek FnB" (own README/CONVENTIONS; not part of the server deploy)
 views/                      layout.ejs · login.ejs · partials/{header,sidebar,footer,mobile_nav,csrf} · pages/<module>.ejs
 public/admin/admin.js       vanilla JS (sidebar, tabs, dialogs, filter, cost calculator) — no framework
 test/                       parser/signature unit tests · admin pages + jsdom UI tests (faked data layer, no DB) · MySQL integration tests
@@ -58,8 +61,30 @@ npm test                        # unit + admin/UI tests (no DB needed); add RUN_
 
 1. Create the database for the site with **Setup website database** (name `cocoffee`; Hostinger prefixes it, e.g. `u123456789_cocoffee`). The platform generates the password and writes `DB_HOST/PORT/NAME/USER/PASSWORD` into the app's environment — nobody has to see or paste it.
 2. Set `AUTO_BOOTSTRAP_DB=true`, `SEED_DEMO=true` and `BOOTSTRAP_ADMIN_PASSWORD=<strong password>` for the first boot (the last one replaces the factory `admin/admin`; delete it afterwards — if it is missing or shorter than 10 characters a random admin password is generated and printed once in the app log, so `admin/admin` is never live). Set these variables **before** "Setup website database": that call keeps existing variables and appends `DB_*`, whereas the API's replace call would wipe the unreadable `DB_PASSWORD`. The app builds the schema **only if the database holds no data** (zero tables, or a half-finished bootstrap: only our tables, all empty), so later redeploys never touch data. Turn `SEED_DEMO` off afterwards if you do not want demo data on a fresh database.
-3. Upload the source (no `node_modules`, no `.env`) and run the Node.js build: Express, entry file `app.js`.
+3. Build the archive with `node scripts/package-deploy.js` (→ `dist/app.zip`: the committed tree minus tests/docs/`mobile/`, plus the published Android APK), upload it and run the Node.js build: Express, Node 22, entry file `app.js`. A deploy replaces every file on the host, so the APK must be in every archive (`--no-apk` deploys without it).
 4. Zalo chatbot: recommended is the official Zalo Bot Platform: set `ZALO_BOT_TOKEN` and `BOT_WEBHOOK_SECRET` in hPanel, deploy, then run `node scripts/zalo-bot-setup.js` once. Fallback: set `BOT_WEBHOOK_SECRET` in hPanel (edit single variables there; the API's replace call wipes the ones you leave out) and run the Bot Client on a PC/VPS with the same secret. Payload/response contract: [docs/zalo-bot.md](docs/zalo-bot.md). The legacy Zalo OA receiver is still available with `ZALO_MODE=oa`.
+
+## Android app for staff phones (`/download`)
+
+The Flutter app in `mobile/` is distributed from the server itself, not from a store. The login page shows a QR code
+(`/download/qr.svg`) that opens `/download`: version, size, Android requirement, install steps for a sideloaded APK and a
+one-tap download of `/download/cocoffee.apk` (stable URL, `Content-Disposition` carries the version, Range/HEAD supported).
+`/download/manifest.json` exposes version, size and SHA-256 for an in-app update check.
+
+Release a new build (Windows, see `mobile/CONVENTIONS.md` for the Flutter toolchain):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scriptsuild-apk.ps1   # flutter build apk --release, then scripts/publish-apk.js
+node scripts/package-deploy.js                                   # dist/app.zip with the APK inside; upload + build on Hostinger
+```
+
+`publish-apk.js` copies the APK to `releases/android/cocoffee-<version>-<code>.apk` (one release at a time) and writes
+`manifest.json` from the APK's own metadata (`aapt`, falling back to `pubspec.yaml`). Bump `version:` in `mobile/pubspec.yaml`
+before each release: Android only installs an update with a higher version code.
+
+Signing: `mobile/android/key.properties` + the keystore it names (both git-ignored) sign release builds; without them the
+APK is signed with the debug key. The keystore is the app's identity on every phone: **back up both files**. A build signed
+with a different key cannot update an installed app (uninstall + reinstall, losing the saved login).
 
 ## Security checklist
 
