@@ -161,6 +161,10 @@ async function render({ order, items, printer = {}, shopName = env.business.shop
     ctx.fillText(op.text, x, op.y);
   }
 
+  return toPng(img);
+}
+
+async function toPng(img) {
   const chunks = [];
   const sink = new PassThrough();
   sink.on('data', (c) => chunks.push(c));
@@ -171,4 +175,83 @@ async function render({ order, items, printer = {}, shopName = env.business.shop
   return Buffer.concat(chunks);
 }
 
-module.exports = { render, WIDTH, wrap, layout, setup };
+/**
+ * A titled table as a PNG (debt statements). spec:
+ *   width (default 720), shopName, title, lines: string[] (centered, under the title),
+ *   columns: [{ label, w (relative width), align: 'left'|'right'|'center' }],
+ *   rows: [{ cells: string[], bold?, shade? }]  (cells wrap inside their column; at most maxRows rows are drawn),
+ *   notes: string[] (small print under the table), fontSize (default 19).
+ * Returns null when the picture cannot be drawn (font / pureimage missing).
+ */
+async function renderTable(spec) {
+  if (!setup()) return null;
+  const W = spec.width || 720;
+  const M = 20;
+  const FS = spec.fontSize || 19;
+  const LH = FS + 6;
+  const PAD = 7;
+  const inner = W - 2 * M;
+  const weight = spec.columns.reduce((t, c) => t + c.w, 0);
+  const colW = spec.columns.map((c) => Math.floor((inner * c.w) / weight));
+  colW[colW.length - 1] += inner - colW.reduce((a, b) => a + b, 0);
+  const colX = colW.map((_, i) => M + colW.slice(0, i).reduce((a, b) => a + b, 0));
+  const measure = PImage.make(8, 8).getContext('2d');
+  const ops = [];
+  let y = 26;
+
+  const center = (text, size, bold, gap) => {
+    for (const line of wrap(measure, text, inner, font(size, bold))) {
+      ops.push({ t: 'text', x: W / 2, y: y + size, text: line, size, bold, align: 'center' });
+      y += size + gap;
+    }
+  };
+  if (spec.shopName) center(String(spec.shopName).toUpperCase(), 32, true, 8);
+  if (spec.title) center(spec.title, 26, true, 8);
+  for (const line of spec.lines || []) center(line, 19, false, 5);
+  y += 10;
+
+  const tableTop = y;
+  const addRow = (cells, { bold = false, shade = null } = {}) => {
+    const lines = cells.map((c, i) => wrap(measure, String(c ?? ''), colW[i] - 2 * PAD, font(FS, bold)));
+    const h = Math.max(...lines.map((l) => l.length)) * LH + 2 * PAD - 4;
+    if (shade) ops.push({ t: 'rect', x: M, y, w: inner, h, color: shade });
+    lines.forEach((ls, i) => ls.forEach((line, k) => {
+      ops.push({ t: 'text', x: spec.columns[i].align === 'right' ? colX[i] + colW[i] - PAD : spec.columns[i].align === 'center' ? colX[i] + colW[i] / 2 : colX[i] + PAD, y: y + PAD + FS + k * LH - 2, text: line, size: FS, bold, align: spec.columns[i].align || 'left' });
+    }));
+    y += h;
+    ops.push({ t: 'hline', y });
+  };
+  addRow(spec.columns.map((c) => c.label), { bold: true, shade: '#e5e7eb' });
+  const maxRows = spec.maxRows || 80;
+  const rows = spec.rows || [];
+  rows.slice(0, maxRows).forEach((r) => addRow(r.cells, { bold: r.bold, shade: r.shade }));
+  if (rows.length > maxRows) addRow([`… và ${rows.length - maxRows} dòng nữa`, ...spec.columns.slice(1).map(() => '')], {});
+  const tableBottom = y;
+  y += 14;
+  for (const note of spec.notes || []) {
+    for (const line of wrap(measure, note, inner, font(17, false))) { ops.push({ t: 'text', x: M, y: y + 17, text: line, size: 17, bold: false, align: 'left', gray: true }); y += 23; }
+  }
+  const H = y + 20;
+
+  const img = PImage.make(W, H);
+  const ctx = img.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+  for (const op of ops) {
+    if (op.t === 'rect') { ctx.fillStyle = op.color; ctx.fillRect(op.x, op.y, op.w, op.h); }
+  }
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(M, tableTop, inner, 2);
+  for (const op of ops) if (op.t === 'hline') ctx.fillRect(M, op.y, inner, 1);
+  for (const x of [...colX, M + inner]) ctx.fillRect(x, tableTop, 1, tableBottom - tableTop);
+  for (const op of ops) {
+    if (op.t !== 'text') continue;
+    ctx.fillStyle = op.gray ? '#4b5563' : '#000000';
+    ctx.font = font(op.size, op.bold);
+    const w = ctx.measureText(op.text).width;
+    ctx.fillText(op.text, op.align === 'center' ? op.x - w / 2 : op.align === 'right' ? op.x - w : op.x, op.y);
+  }
+  return toPng(img);
+}
+
+module.exports = { render, renderTable, WIDTH, wrap, layout, setup };

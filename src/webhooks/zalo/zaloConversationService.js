@@ -10,6 +10,10 @@ const customerModel = require('../../models/customerModel');
 const chatbotInfo = require('../../services/zalo/chatbotInfo');
 const debtQr = require('../../services/zalo/debtQr');
 const billDelivery = require('../../services/zalo/billDelivery');
+const billMedia = require('../../services/zalo/billMedia');
+const statementService = require('../../services/zalo/statementService');
+const customerQuery = require('../../services/customerQueryService');
+const zaloConfig = require('../../services/zalo/zaloConfig');
 const parser = require('./zaloOrderParser');
 
 /**
@@ -35,7 +39,7 @@ const parser = require('./zaloOrderParser');
  */
 
 const TXT = {
-  help: 'Chào bạn 👋 Nhắn tên món để đặt, ví dụ: "2 cà phê sữa ít đường, 1 bạc xỉu". Nhắn "menu" để xem thực đơn, "check nợ" để xem công nợ.',
+  help: 'Chào bạn 👋 Nhắn tên món để đặt, ví dụ: "2 cà phê sữa ít đường, 1 bạc xỉu". Nhắn "menu" để xem thực đơn, "check nợ" để xem công nợ, "đối chiếu công nợ" để nhận bảng chi tiết.',
   debtPrivate: 'Vì bảo mật, bạn nhắn riêng cho quán "check nợ" nhé.',
   debtUnknown: 'Tài khoản Zalo này chưa được liên kết với khách hàng nào của quán. Bạn nhắn quán để được hỗ trợ nhé.',
   debtNone: (name) => `Chào ${name}, bạn hiện không còn nợ quán. Cảm ơn bạn! 🙏`,
@@ -113,6 +117,66 @@ async function debt(ctx) {
   return 'debt';
 }
 
+// --------------------------------------------------------------------------- bảng đối chiếu công nợ
+/**
+ * "đối chiếu công nợ" / "sao kê" / "liệt kê công nợ" [tháng trước | tháng N | tất cả | năm nay]:
+ *   - the shop owner's chat (Admin > Zalo > "nhận thông báo công nợ"): the reconciliation of ALL customers;
+ *   - a customer in a private chat: their own statement, then the account + VietQR when something is still owed.
+ * A text summary first, then the table as a picture (the table as text when the picture cannot be sent).
+ */
+async function statement(ctx, text) {
+  const period = statementService.periodFromText(parser.statementPeriodText(text));
+  const cfg = await zaloConfig.get();
+  const isOwner = Boolean(cfg.debtOwnerChatId) && String(cfg.debtOwnerChatId) === String(ctx.chatId) && cfg.debtOwnerChatType === ctx.chatType;
+  if (isOwner) return ownerStatement(ctx, period);
+  if (ctx.isGroup) return say(ctx, TXT.debtPrivate, 'statement');
+  const linked = await customerModel.findByZaloUser(ctx.userId);
+  if (!linked) return say(ctx, TXT.debtUnknown, 'statement');
+  const { customer, st } = await statementService.loadCustomer(linked.id, period);
+  if (!customer) return say(ctx, TXT.debtUnknown, 'statement');
+
+  await say(ctx, statementService.customerText(customer, period, st), 'statement');
+  await sendTable(ctx, () => billMedia.statementPicture({ customerId: customer.id, ...period }), st.entries.length ? statementService.customerTableText(st) : '');
+  const balance = Math.round(Number(customer.balance) || 0);
+  const info = await chatbotInfo.get();
+  if (balance > 0 && chatbotInfo.bankReady(info)) {
+    const note = debtQr.transferNote(customer.id);
+    await say(ctx, `Chuyển khoản: ${chatbotInfo.bankLine(info)}\nNội dung: ${note}`, 'statement');
+    if (ctx.io.image) {
+      try {
+        const picture = await debtQr.image({ customerId: customer.id, amount: balance }, info);
+        if (picture) await ctx.io.image({ ...picture, caption: `Quét mã để chuyển ${formatVnd(balance)}đ (nội dung ${note})` });
+      } catch (err) {
+        logger.warn('Debt QR not delivered', err);
+      }
+    }
+  }
+  return 'statement';
+}
+
+async function ownerStatement(ctx, period) {
+  const data = await statementService.loadAll(period);
+  await say(ctx, statementService.allText(period, data), 'statement');
+  await sendTable(ctx, () => billMedia.reconciliationPicture(period), '');
+  return 'statement';
+}
+
+/** The table picture; when it cannot be made or sent, `fallbackText` (if any) goes out instead. Never throws. */
+async function sendTable(ctx, makePicture, fallbackText) {
+  try {
+    if (ctx.io.image) {
+      const picture = await makePicture();
+      if (picture) {
+        await ctx.io.image({ ...picture, caption: '📋 Bảng đối chiếu công nợ' });
+        return;
+      }
+    }
+  } catch (err) {
+    logger.warn('Statement picture not delivered', err);
+  }
+  if (fallbackText) await say(ctx, fallbackText, 'statement');
+}
+
 // --------------------------------------------------------------------------- entry point
 /**
  * @param {object} m
@@ -139,6 +203,7 @@ async function handleText({ chatType, chatId, userId, text, msgId, mentioned = f
     if (isGroup && !mentioned && !parser.isMentioned(text) && !parser.isStrictMenu(text)) return 'ignored';   // group chatter ("quán có gì") is not for the bot
     return say(ctx, await menuText(), 'menu');
   }
+  if (command === 'statement') return statement(ctx, text);
   if (command === 'debt') return debt(ctx);
 
   const parsed = parser.parseOrder(text, await productModel.listForMatching());

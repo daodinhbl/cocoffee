@@ -9,6 +9,8 @@ const printerSettings = require('../printerSettings');
 const receiptImage = require('../receiptImage');
 const vietQr = require('../vietQr');
 const chatbotInfo = require('./chatbotInfo');
+const statementService = require('./statementService');
+const { parseDay } = require('../../utils/shopTime');
 
 /**
  * Pictures the chatbot sends after a customer confirms an order:
@@ -23,16 +25,22 @@ const chatbotInfo = require('./chatbotInfo');
 const TTL_MS = 7 * 24 * 3600 * 1000;
 const KEY = crypto.createHmac('sha256', env.jwt.secret).update('cocoffee-fnb:bill-media:v1').digest();
 const mac = (body) => crypto.createHmac('sha256', KEY).update(body).digest('base64url').slice(0, 22);
-const KINDS = { receipt: 'r', payQr: 'q' };
+const KINDS = { receipt: 'r', payQr: 'q', statement: 's', reconciliation: 'c' };
+// Debt tables carry customers' balances: their links live one day, not a week (Zalo fetches the picture at once).
+const STATEMENT_TTL_MS = 24 * 3600 * 1000;
 
-function sign(kind, orderId, now = Date.now()) {
-  const body = Buffer.from(JSON.stringify({ k: KINDS[kind], o: orderId, e: now + TTL_MS })).toString('base64url');
+function signData(kind, data, ttl, now = Date.now()) {
+  const body = Buffer.from(JSON.stringify({ k: KINDS[kind], ...data, e: now + ttl })).toString('base64url');
   return `${body}.${mac(body)}`;
 }
 
-/** @returns {{kind:'receipt'|'payQr', orderId:number}|null} */
+function sign(kind, orderId, now = Date.now()) {
+  return signData(kind, { o: orderId }, TTL_MS, now);
+}
+
+/** @returns {{kind:'receipt'|'payQr', orderId:number}|{kind:'statement', customerId:number, from:string, to:string}|{kind:'reconciliation', from:string, to:string}|null} */
 function verify(token, now = Date.now()) {
-  const m = /^([A-Za-z0-9_-]{10,120})\.([A-Za-z0-9_-]{22})$/.exec(String(token || ''));
+  const m = /^([A-Za-z0-9_-]{10,200})\.([A-Za-z0-9_-]{22})$/.exec(String(token || ''));
   if (!m) return null;
   const expected = Buffer.from(mac(m[1]));
   const given = Buffer.from(m[2]);
@@ -40,7 +48,18 @@ function verify(token, now = Date.now()) {
   let data;
   try { data = JSON.parse(Buffer.from(m[1], 'base64url').toString('utf8')); } catch { return null; }
   const kind = Object.keys(KINDS).find((k) => KINDS[k] === data.k);
-  if (!kind || !Number.isInteger(data.o) || data.o <= 0 || !(data.e > now)) return null;
+  if (!kind || !(data.e > now)) return null;
+  if (kind === 'statement') {
+    const from = parseDay(data.f);
+    const to = parseDay(data.t);
+    return Number.isInteger(data.c) && data.c > 0 && from && to ? { kind, customerId: data.c, from, to } : null;
+  }
+  if (kind === 'reconciliation') {
+    const from = parseDay(data.f);
+    const to = parseDay(data.t);
+    return from && to ? { kind, from, to } : null;
+  }
+  if (!Number.isInteger(data.o) || data.o <= 0) return null;
   return { kind, orderId: data.o };
 }
 
@@ -70,8 +89,10 @@ async function payQrPng(orderId, info) {
 }
 
 /** PNG for a verified link token. */
-async function pngFor({ kind, orderId }) {
-  return kind === 'receipt' ? receiptPng(orderId) : payQrPng(orderId);
+async function pngFor(t) {
+  if (t.kind === 'statement') return statementService.customerPng(t);
+  if (t.kind === 'reconciliation') return statementService.allPng(t);
+  return t.kind === 'receipt' ? receiptPng(t.orderId) : payQrPng(t.orderId);
 }
 
 const urlFor = (kind, route, orderId) => (env.publicBaseUrl ? `${env.publicBaseUrl}/api/zalo/${route}/${sign(kind, orderId)}.png` : null);
@@ -151,4 +172,20 @@ function paymentText(order, info) {
   ].join('\n');
 }
 
-module.exports = { sign, verify, pngFor, receipt, payQr, paymentText, transferNote, receiptPng, payQrPng, saveCopy, SAVE_DIR, TTL_MS };
+/** { url, base64, mime } of a customer's debt statement picture, or null. The link is good for a day. */
+async function statementPicture({ customerId, from, to }) {
+  const buf = await statementService.customerPng({ customerId, from, to });
+  if (!buf) return null;
+  const url = env.publicBaseUrl ? `${env.publicBaseUrl}/api/zalo/statement/${signData('statement', { c: customerId, f: from, t: to }, STATEMENT_TTL_MS)}.png` : null;
+  return { url, base64: buf.toString('base64'), mime: 'image/png' };
+}
+
+/** { url, base64, mime } of the all-customers reconciliation picture (for the shop owner), or null. */
+async function reconciliationPicture({ from, to }) {
+  const buf = await statementService.allPng({ from, to });
+  if (!buf) return null;
+  const url = env.publicBaseUrl ? `${env.publicBaseUrl}/api/zalo/reconciliation/${signData('reconciliation', { f: from, t: to }, STATEMENT_TTL_MS)}.png` : null;
+  return { url, base64: buf.toString('base64'), mime: 'image/png' };
+}
+
+module.exports = { statementPicture, reconciliationPicture, signData, sign, verify, pngFor, receipt, payQr, paymentText, transferNote, receiptPng, payQrPng, saveCopy, SAVE_DIR, TTL_MS };

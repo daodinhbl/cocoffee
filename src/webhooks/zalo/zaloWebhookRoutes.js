@@ -60,5 +60,7 @@ const png = (kind) => async (req, res, next) => {
 };
 router.get('/receipt/:file', rateLimit({ windowMs: 60 * 1000, max: 60 }), png('receipt'));
 router.get('/pay-qr/:file', rateLimit({ windowMs: 60 * 1000, max: 60 }), png('payQr'));
+router.get('/statement/:file', rateLimit({ windowMs: 60 * 1000, max: 60 }), png('statement'));          // a customer's debt statement (link good for a day)
+router.get('/reconciliation/:file', rateLimit({ windowMs: 60 * 1000, max: 60 }), png('reconciliation'));   // all customers, for the owner (link good for a day)
 
 module.exports = router;

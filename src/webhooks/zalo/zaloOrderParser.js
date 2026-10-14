@@ -16,6 +16,13 @@ const CONFIRM_RE = /^(o+k+(e+|ie|ay|i)?|dong y|xac nhan|xac nhan don|chot|chot d
 const CANCEL_RE = /^(huy|huy don|huy het|cancel)( (nhe|nha|em))?$/;
 // "menu", "xem menu", "cho mình xin menu", "quán có gì uống", "quán bán gì"
 const MENU_RE = /^(?:(?:cho|gui|xin|xem|lay)(?: (?:minh|em|toi|anh|chi))?(?: xin)? )?(?:menu|thuc don)(?: (?:di|nhe|nha|voi|a|shop|quan))?$|^(?:quan )?co (?:gi|nhung mon gi)(?: (?:uong|an|ban))?(?: (?:khong|ko|vay|the))?$|^quan ban gi$/;
+// "đối chiếu công nợ", "bảng đối chiếu công nợ tháng trước", "sao kê", "liệt kê công nợ", "danh sách nợ", "chi tiết công nợ",
+// "công nợ tháng 9", "bảng công nợ": the debt table (reconciliation / statement), not just the balance of "check nợ".
+const PERIOD = '(?:thang (?:nay|truoc|\\d{1,2})|tat ca|nam nay)';
+const STATEMENT_RE = new RegExp(
+  `^(?:(?:gui|cho|xem|lay)(?: (?:minh|em|toi|anh|chi))?(?: xin)? )?(?:(?:bang|file|anh) )?(?:(?:doi chieu|sao ke)(?: (?:cong no|no))?|(?:liet ke|danh sach|chi tiet)(?: cac khoan)? (?:cong no|no))(?: ${PERIOD})?(?: (?:nhe|nha|voi|a|shop|giup))?$` +
+  `|^(?:bang |chi tiet )?(?:cong no|so no)(?: chi tiet| ${PERIOD})$|^bang (?:cong no|no)(?: ${PERIOD})?$`
+);
 const ID_RE = /^(id|chat id|ma chat|lay id|lay ma chat)$/;
 // "check nợ", "xem công nợ", "mình còn nợ bao nhiêu"... The whole message must be the question, so an order
 // such as "ghi nợ giúp mình 1 bạc xỉu" stays an order. A bare "nợ" is not taken: without accents it is "no".
@@ -48,13 +55,14 @@ const stripMentions = (text) => String(text || '').replace(/\[@[^\]]*\]/g, ' ');
 /** True when the message addresses someone ("@Bot ..." or a "[@id]" token): in groups the bot answers questions only then. */
 const isMentioned = (text) => /\[@[^\]]*\]|^\s*@\S/.test(String(text || ''));
 
-/** @returns {'identity'|'confirm'|'cancel'|'menu'|'debt'|null} */
+/** @returns {'identity'|'confirm'|'cancel'|'menu'|'statement'|'debt'|null} */
 function detectCommand(text) {
   const n = normalize(stripMentions(text));
   if (ID_RE.test(n)) return 'identity';
   if (CONFIRM_RE.test(n)) return 'confirm';
   if (CANCEL_RE.test(n)) return 'cancel';
   if (MENU_RE.test(n)) return 'menu';
+  if (STATEMENT_RE.test(n)) return 'statement';
   if (DEBT_RE.test(n)) return 'debt';
   return null;
 }
@@ -276,4 +284,7 @@ function parseOrder(text, catalog) {
 /** The plain "menu" forms that are safe to answer in a group; the chatty ones ("quán có gì") only in private or when mentioned. */
 const isStrictMenu = (text) => /^(menu|thuc don|xem menu)$/.test(normalize(stripMentions(text)));
 
-module.exports = { isStrictMenu, detectCommand, detectFaq, isMentioned, parseOrder, extractQuantity, extractOptions, matchProduct, stripMentions, splitByQuantity, suggest };
+/** The period asked for in a statement message, normalized ("thang truoc", "thang 9", "tat ca"...), '' = this month. */
+const statementPeriodText = (text) => (new RegExp(PERIOD).exec(normalize(stripMentions(text))) || [''])[0];
+
+module.exports = { statementPeriodText, isStrictMenu, detectCommand, detectFaq, isMentioned, parseOrder, extractQuantity, extractOptions, matchProduct, stripMentions, splitByQuantity, suggest };
