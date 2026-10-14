@@ -14,7 +14,8 @@
     "create-admin": "node scripts/create-admin.js",
     "test": "node --test",
     "seed:customers": "node scripts/seed-customers.js",
-    "sync:images": "node scripts/sync_images.js"
+    "sync:images": "node scripts/sync_images.js",
+    "seed:menu": "node scripts/seed-menu.js"
   },
   "dependencies": {
     "axios": "^1.20.0",

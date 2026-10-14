@@ -9,6 +9,8 @@ const helmet = require('helmet');
 const env = require('./src/config/env');
 const { pool } = require('./src/config/db');
 const { bootstrapIfEmpty, ensureDemoAccount, ensureSchemaUpgrades } = require('./src/config/bootstrapDb');
+const { ensureMenuSeed } = require('./src/config/menuSeed');
+const { ensureMenuPhotos } = require('./src/config/menuPhotos');
 const productModel = require('./src/models/productModel');
 const logger = require('./src/utils/logger');
 const routes = require('./src/routes');
@@ -71,6 +73,8 @@ async function start() {
   const bootstrap = await bootstrapIfEmpty();           // never throws; logs its own outcome
   if (bootstrap === 'applied') productModel.invalidateCatalog();
   await ensureSchemaUpgrades();                         // additive tables for older databases; never throws
+  await ensureMenuSeed();                               // printed menu, once per database; never throws
+  await ensureMenuPhotos();                             // shipped public/menu photos for items without one; never throws
   await ensureDemoAccount();                            // DEMO_MODE only; never throws
 
   const isPassenger = typeof PhusionPassenger !== 'undefined'; // eslint-disable-line no-undef
