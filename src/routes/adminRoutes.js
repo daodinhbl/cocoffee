@@ -92,6 +92,7 @@ router.post('/zalo/orders/:id/resend-receipt', act(zalo.resendReceipt));
 router.post('/zalo/register-webhook', act(zalo.registerWebhook));
 router.post('/zalo/bot-token', act(zalo.saveBotToken));
 router.post('/zalo/debt-recipient', act(zalo.saveDebtRecipient));
+router.post('/zalo/chatbot-info', act(zalo.saveChatbotInfo));
 
 router.get('/settings', settings.page);
 router.get('/settings/password', settings.page);

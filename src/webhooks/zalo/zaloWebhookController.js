@@ -74,6 +74,10 @@ async function handle(req, res) {
       chatType, chatId: String(chatId), userId: senderId, text: event.message.text, msgId: event.message.msg_id,
     }, {
       reply: (text) => zaloApi.sendText({ chatType, chatId: String(chatId) }, text),
+      image: async ({ url, caption }) => {
+        if (!url) throw new Error('PUBLIC_BASE_URL is not set: no public URL for the picture');
+        await zaloApi.sendImageWithText({ chatType, chatId: String(chatId) }, caption || '', url);
+      },
       onConfirmed: async (orderId) => {
         const result = await receiptService.sendReceipt(orderId);
         if (!result.sent) logger.warn(`Order ${orderId} completed but receipt not delivered: ${result.error}`);

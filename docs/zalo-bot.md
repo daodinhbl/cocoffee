@@ -96,11 +96,22 @@ Khi khách nhắn `ok` / `oke`:
 }
 ```
 
-**Bot Client chỉ cần làm một việc:** gửi lần lượt từng `replies[i].text` vào `chat.groupId` (nếu có), nếu không thì gửi vào chat riêng với `chat.senderId`. `replies` rỗng nghĩa là không trả lời. Trong group, bot bỏ qua tin trò chuyện bình thường.
+**Bot Client chỉ cần làm một việc:** gửi lần lượt từng phần tử của `replies` vào `chat.groupId` (nếu có), nếu không thì gửi vào chat riêng với `chat.senderId`. `replies` rỗng nghĩa là không trả lời. Trong group, bot bỏ qua tin trò chuyện bình thường.
+
+Có hai loại phần tử:
+
+| `type` | Trường | Gửi thế nào |
+|---|---|---|
+| `text` | `text` | Gửi tin nhắn văn bản. |
+| `image` | `base64` (PNG), `mime`, `caption`, `url` | Ghi `base64` ra file tạm rồi gửi kèm ảnh (ví dụ ảnh VietQR của "check nợ"). `url` là link công khai có chữ ký, hết hạn sau 7 ngày (`/api/zalo/qr/<token>.png`), chỉ có khi đã đặt `PUBLIC_BASE_URL`. |
+
+Với Zalo Bot Platform, server tự gửi ảnh bằng `sendPhoto` với link công khai đó, nên cần `PUBLIC_BASE_URL`.
 
 | `action` | Khi nào |
 |---|---|
-| `draft` | Tin nhắn có món: đã tạo hoặc cập nhật đơn nháp. Nhắn lại món để thay đơn, nhắn `thêm ...` để bổ sung. |
+| `draft` | Tin nhắn có món: đã tạo hoặc cập nhật đơn nháp. Nhắn lại món để thay đơn, nhắn `thêm ...` để bổ sung. Tùy chọn `ít/nhiều/không đường`, `ít/nhiều/không đá`, `đá riêng`, `size S/M/L` (hoặc `ly lớn/nhỏ`) được ghi vào ghi chú của dòng món. |
+| `debt` | `check nợ`, `xem công nợ`, `mình còn nợ bao nhiêu`...: chỉ trả lời trong chat riêng, cho khách đã liên kết Zalo; kèm ảnh VietQR khi quán đã nhập tài khoản. |
+| `faq` | Hỏi địa chỉ, wifi, giờ mở cửa, số tài khoản (không có món nào trong tin). Trong nhóm chỉ trả lời khi bot được @nhắc tên. Nội dung sửa ở **Admin → Zalo → Trả lời tự động & chuyển khoản**. |
 | `confirmed` | `ok` / `oke`: đã chốt đơn, `replies` chứa bill. |
 | `cancelled` | `huy`: đã hủy đơn nháp. |
 | `expired` | Đơn nháp quá `ZALO_DRAFT_TTL_MINUTES` phút: đã hủy, khách cần đặt lại. |
@@ -151,6 +162,18 @@ zalo.onMessage(async (msg) => {
   });
   if (!res.ok) return console.error('webhook', res.status);
   const { chat, replies } = await res.json();
-  for (const r of replies) await zalo.sendText(chat.groupId || chat.senderId, r.text, { isGroup: Boolean(chat.groupId) });
+  const to = chat.groupId || chat.senderId;
+  for (const r of replies) {
+    if (r.type === 'image') {                                       // ảnh VietQR của "check nợ"
+      const file = require('path').join(require('os').tmpdir(), `qr-${Date.now()}.png`);
+      require('fs').writeFileSync(file, Buffer.from(r.base64, 'base64'));
+      await zalo.sendImage(to, file, r.caption, { isGroup: Boolean(chat.groupId) });
+      require('fs').rmSync(file, { force: true });
+    } else {
+      await zalo.sendText(to, r.text, { isGroup: Boolean(chat.groupId) });
+    }
+  }
 });
 ```
+
+Với thư viện `zca-js` (bản 2.x, ESM), gửi ảnh từ file là `api.sendMessage({ msg: caption, attachments: [file] }, threadId, type)` và phải khai báo `imageMetadataGetter` khi tạo `new Zalo({...})` (xem README của thư viện). Thư viện không chính thức này có thể làm tài khoản bị khóa: chỉ trả lời khi khách nhắn, giới hạn tốc độ gửi (ví dụ 20 tin/phút, cách nhau ≥ 2 giây trong một chat), không nhắn hàng loạt và không mở Zalo Web của tài khoản đó ở nơi khác (một tài khoản chỉ chạy được một listener).

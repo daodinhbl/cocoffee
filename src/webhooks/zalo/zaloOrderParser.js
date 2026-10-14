@@ -16,18 +16,65 @@ const CONFIRM_RE = /^(o+k+(e+|ie|ay|i)?|dong y|xac nhan)( (nhe|nha|nhen|em|a|ah|
 const CANCEL_RE = /^(huy|huy don|huy het|cancel)( (nhe|nha|em))?$/;
 const MENU_RE = /^(menu|thuc don|xem menu)$/;
 const ID_RE = /^(id|chat id|ma chat|lay id|lay ma chat)$/;
+// "check nợ", "xem công nợ", "mình còn nợ bao nhiêu"... The whole message must be the question, so an order
+// such as "ghi nợ giúp mình 1 bạc xỉu" stays an order. A bare "nợ" is not taken: without accents it is "no".
+const DEBT_RE = /^(?:check|xem|kiem tra|tra|hoi) ?(?:cong )?no(?: (?:cua )?(?:minh|toi|em|anh|chi))?(?: (?:nhe|nha|voi|a|shop))?$|^(?:cong no|so no)$|^(?:minh|toi|em|anh|chi) (?:con )?no(?: shop)? bao nhieu(?: (?:vay|the|a|nhi))?$/;
+
+/** Questions answered from the shop's settings (services/zalo/chatbotInfo.js). Only used when no item matched. */
+const FAQ = [
+  { key: 'address', re: / (?:dia chi|o dau|cho nao|duong nao|map|ban do|address) / },
+  { key: 'wifi', re: / (?:wifi|wi fi|pass(?:word)? wifi|mat khau wifi|pass wf) / },
+  { key: 'bank', re: / (?:stk|so tai khoan|chuyen khoan|ngan hang|bank) / },   // not "ck": in chat it also means "chồng"
+  { key: 'hours', re: / (?:may gio|gio mo cua|mo cua|dong cua|open) / },
+];
+
+// Drink options, removed from a segment before the product is matched and kept as the line note.
+const OPTIONS = [
+  { re: / (?:khong|ko|k|0) (?:duong|ngot) /, label: 'không đường' },
+  { re: / it (?:duong|ngot) /, label: 'ít đường' },
+  { re: / nhieu (?:duong|ngot) /, label: 'nhiều đường' },
+  { re: / (?:khong|ko|k) da /, label: 'không đá' },
+  { re: / it da /, label: 'ít đá' },
+  { re: / (?:nhieu|them) da /, label: 'nhiều đá' },
+  { re: / (?:da rieng|tach da) /, label: 'đá riêng' },
+  { re: / (?:size|sz) ?(s|m|l) /, label: (m) => `size ${m[1].toUpperCase()}` },
+  { re: / (?:ly|coc) (lon|nho) /, label: (m) => (m[1] === 'lon' ? 'size L' : 'size S') },
+];
 
 /** Zalo group mentions arrive as "[@id]" tokens. */
 const stripMentions = (text) => String(text || '').replace(/\[@[^\]]*\]/g, ' ');
 
-/** @returns {'confirm'|'cancel'|'menu'|null} */
+/** True when the message addresses someone ("@Bot ..." or a "[@id]" token): in groups the bot answers questions only then. */
+const isMentioned = (text) => /\[@[^\]]*\]|^\s*@\S/.test(String(text || ''));
+
+/** @returns {'identity'|'confirm'|'cancel'|'menu'|'debt'|null} */
 function detectCommand(text) {
   const n = normalize(stripMentions(text));
   if (ID_RE.test(n)) return 'identity';
   if (CONFIRM_RE.test(n)) return 'confirm';
   if (CANCEL_RE.test(n)) return 'cancel';
   if (MENU_RE.test(n)) return 'menu';
+  if (DEBT_RE.test(n)) return 'debt';
   return null;
+}
+
+/** @returns {'address'|'wifi'|'bank'|'hours'|null} */
+function detectFaq(text) {
+  const padded = ` ${normalize(stripMentions(text))} `;
+  return (FAQ.find((f) => f.re.test(padded)) || {}).key || null;
+}
+
+/** "cf sữa đá ít đường size L" -> { rest: "cf sua da", note: "ít đường, size L" } */
+function extractOptions(segment) {
+  let rest = ` ${normalize(segment)} `;
+  const found = [];
+  for (const o of OPTIONS) {
+    const m = o.re.exec(rest);
+    if (!m) continue;
+    found.push(typeof o.label === 'function' ? o.label(m) : o.label);
+    rest = rest.replace(m[0], ' ');
+  }
+  return { rest: rest.replace(/\s+/g, ' ').trim(), note: found.join(', ') };
 }
 
 function splitSegments(text) {
@@ -97,7 +144,8 @@ function matchProduct(name, catalog) {
 /**
  * @param {string} text     raw customer message
  * @param {Array<{id,name,price,keywords:Set<string>}>} catalog  from productModel.listForMatching()
- * @returns {{ items:Array<{productId,name,quantity}>, unmatched:string[], append:boolean }}
+ * @returns {{ items:Array<{productId,name,quantity,note}>, unmatched:string[], append:boolean }}
+ *   note: drink options ("ít đường, size L"), '' when none; the same drink with other options is another line
  */
 function parseOrder(text, catalog) {
   const segments = splitSegments(text);
@@ -111,18 +159,19 @@ function parseOrder(text, catalog) {
   const unmatched = [];
   for (const raw of segments) {
     if (!raw) continue;
-    let { quantity, name } = extractQuantity(raw);
+    const { rest, note } = extractOptions(raw);
+    let { quantity, name } = extractQuantity(rest);
     let product = matchProduct(name, catalog);
     if (!product) {                              // e.g. bare "555": the "quantity" was really the name
-      const whole = normalize(raw);
-      product = matchProduct(whole, catalog);
+      product = matchProduct(rest, catalog);
       if (product) quantity = 1;
     }
     if (!product) { unmatched.push(raw.trim()); continue; }
-    const cur = merged.get(product.id);
-    merged.set(product.id, { productId: product.id, name: product.name, quantity: Math.min(MAX_QTY, (cur?.quantity || 0) + quantity) });
+    const key = `${product.id}|${note}`;
+    const cur = merged.get(key);
+    merged.set(key, { productId: product.id, name: product.name, quantity: Math.min(MAX_QTY, (cur?.quantity || 0) + quantity), note });
   }
   return { items: [...merged.values()], unmatched, append };
 }
 
-module.exports = { detectCommand, parseOrder, extractQuantity, matchProduct, stripMentions };
+module.exports = { detectCommand, detectFaq, isMentioned, parseOrder, extractQuantity, extractOptions, matchProduct, stripMentions };

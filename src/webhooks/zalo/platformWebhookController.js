@@ -65,8 +65,14 @@ async function handle(req, res) {
   const text = chatType === 'group' ? stripMention(msg.text) : msg.text.trim();
   if (!text) return eventModel.mark(key, 'ignored').catch(() => {});
 
+  const mentioned = chatType === 'group' && /^\s*@\S/.test(msg.text);   // stripped above, but FAQ answers in groups need it
   const io = {
     reply: (t) => zaloBot.sendText(chatId, t),
+    // sendPhoto takes a public URL (served by GET /api/zalo/qr/<signed token>.png)
+    image: async ({ url, caption }) => {
+      if (!url) throw new Error('PUBLIC_BASE_URL is not set: no public URL for the picture');
+      await zaloBot.sendPhoto(chatId, url, caption);
+    },
     onConfirmed: async (orderId) => {
       try {
         await zaloBot.sendText(chatId, await billText(orderId));
@@ -78,7 +84,7 @@ async function handle(req, res) {
     },
   };
   return keyedQueue
-    .run(`${chatType}:${chatId}:${senderId}`, () => conversation.handleText({ chatType, chatId, userId: senderId, text, msgId: messageId || null }, io))
+    .run(`${chatType}:${chatId}:${senderId}`, () => conversation.handleText({ chatType, chatId, userId: senderId, text, msgId: messageId || null, mentioned }, io))
     .then((action) => eventModel.mark(key, action === 'ignored' ? 'ignored' : 'processed'))
     .catch((err) => {
       logger.error(`Zalo bot event ${key} failed`, err);

@@ -50,8 +50,15 @@ async function sendText(chatId, text) {
   for (const part of chunks(text)) await call('sendMessage', { chat_id: String(chatId), text: part });
 }
 
+/** Picture by public URL (https://bot.zapps.me/docs/apis/sendPhoto/); caption 1-2000 characters. */
+async function sendPhoto(chatId, photoUrl, caption) {
+  const params = { chat_id: String(chatId), photo: String(photoUrl) };
+  if (caption) params.caption = String(caption).slice(0, MAX_TEXT);
+  return call('sendPhoto', params);
+}
+
 const getMe = (token = null) => call('getMe', {}, token);
 const setWebhook = (url, secretToken) => call('setWebhook', { url, secret_token: secretToken });
 const getWebhookInfo = () => call('getWebhookInfo');
 
-module.exports = { call, sendText, getMe, setWebhook, getWebhookInfo, chunks, ZaloBotError };
+module.exports = { call, sendText, sendPhoto, getMe, setWebhook, getWebhookInfo, chunks, ZaloBotError };

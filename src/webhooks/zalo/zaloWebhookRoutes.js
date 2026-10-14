@@ -1,6 +1,7 @@
 const express = require('express');
 const rateLimit = require('../../middlewares/rateLimit');
 const zaloConfig = require('../../services/zalo/zaloConfig');
+const debtQr = require('../../services/zalo/debtQr');
 const bot = require('./botWebhookController');
 const platform = require('./platformWebhookController');
 const oa = require('./zaloWebhookController');
@@ -22,5 +23,22 @@ const dispatch = (name) => async (req, res, next) => {
 
 router.post('/webhook', rateLimit({ windowMs: 60 * 1000, max: 120 }), dispatch('handle'));
 router.get('/webhook', dispatch('ping'));
+
+// VietQR picture of a "check nợ" answer (signed, expiring link: see services/zalo/debtQr.js). Zalo fetches it.
+router.get('/qr/:file', rateLimit({ windowMs: 60 * 1000, max: 60 }), async (req, res, next) => {
+  try {
+    const m = /^(.+)\.png$/.exec(req.params.file);
+    const data = m ? debtQr.verify(m[1]) : null;
+    const buf = data ? await debtQr.png(data) : null;
+    if (!buf) return res.status(404).json({ ok: false, error: 'not_found' });   // bad/expired link or no bank account
+    res.set({
+      'Content-Type': 'image/png', 'Cache-Control': 'private, max-age=3600', 'Content-Length': String(buf.length),
+      'Cross-Origin-Resource-Policy': 'cross-origin',            // helmet's same-origin default would block Zalo Web
+    });
+    return res.end(buf);
+  } catch (err) {
+    return next(err);
+  }
+});
 
 module.exports = router;

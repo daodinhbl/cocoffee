@@ -76,6 +76,8 @@ async function handle(req, res) {
   const replies = [];
   const io = {
     reply: async (text) => { replies.push({ type: 'text', text }); },
+    // The PNG inline (base64) so the Bot Client can send it without fetching; url when PUBLIC_BASE_URL is set.
+    image: async ({ url, base64, mime, caption }) => { replies.push({ type: 'image', mime, base64, url: url || null, caption: caption || '' }); },
     onConfirmed: async (orderId) => { replies.push({ type: 'text', text: await billText(orderId) }); },
   };
 

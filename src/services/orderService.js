@@ -121,7 +121,7 @@ async function cancelOrder(orderId) {
 /**
  * Create or update the draft behind a Zalo session. Caller holds the session row lock.
  * mode 'replace' (default) rebuilds the draft from this message; 'append' ("them ...") adds to it.
- * @param items [{ productId, quantity }]
+ * @param items [{ productId, quantity, note? }]  same product with another note = another line ("ít đường")
  * @returns {Promise<number>} draft order id
  */
 async function upsertZaloDraft(conn, { session, chatType, chatId, userId, items, mode = 'replace' }) {
@@ -135,18 +135,20 @@ async function upsertZaloDraft(conn, { session, chatType, chatId, userId, items,
     if (existing && existing.status === 'draft') order = existing;
   }
 
-  const lines = new Map(); // product_id -> line
+  const lines = new Map(); // "product_id|note" -> line
+  const lineKey = (productId, note) => `${productId}|${note || ''}`;
   if (order && mode === 'append') {
     for (const l of await orderModel.getItems(order.id, conn)) {
-      lines.set(l.product_id, { product_id: l.product_id, product_name: l.product_name, unit_price: l.unit_price, quantity: l.quantity });
+      lines.set(lineKey(l.product_id, l.note), { product_id: l.product_id, product_name: l.product_name, unit_price: l.unit_price, quantity: l.quantity, note: l.note || null });
     }
   }
-  for (const { productId, quantity } of items) {
+  for (const { productId, quantity, note } of items) {
     const product = products.get(productId);
     if (!product || !product.is_active) continue; // deactivated since the catalog cache was built
-    const line = lines.get(productId) || { product_id: product.id, product_name: product.name, unit_price: product.price, quantity: 0 };
+    const key = lineKey(productId, note);
+    const line = lines.get(key) || { product_id: product.id, product_name: product.name, unit_price: product.price, quantity: 0, note: note || null };
     line.quantity = Math.min(MAX_QTY, line.quantity + quantity);
-    lines.set(productId, line);
+    lines.set(key, line);
   }
   if (!lines.size) throw new AppError(422, 'PRODUCT_UNAVAILABLE', 'No available products in this message');
 

@@ -6,13 +6,20 @@ const productModel = require('../../models/productModel');
 const orderModel = require('../../models/orderModel');
 const { sessionModel } = require('../../models/zaloModel');
 const orderService = require('../../services/orderService');
+const customerModel = require('../../models/customerModel');
+const chatbotInfo = require('../../services/zalo/chatbotInfo');
+const debtQr = require('../../services/zalo/debtQr');
 const parser = require('./zaloOrderParser');
 
 /**
  * Chat flow (per chat + sender, state in zalo_sessions). Transport-agnostic: the caller passes
  *   io.reply(text)            - how a message reaches the chat (bot HTTP response, or the OA API)
  *   io.onConfirmed(orderId)   - what to do with the bill after COMMIT
+ *   io.image({url, base64, mime, caption}) - optional: a picture (the VietQR code of "check nợ")
  *
+ *   "check nợ"       -> private chat only: balance of the customer linked to this Zalo user + VietQR code
+ *   "quán ở đâu"...  -> address / wifi / bank account / opening hours from the shop's settings
+ *                       (only when no item matched; in groups only when the bot is @mentioned)
  *   text with items  -> DRAFT order saved, summary replied, session = awaiting_confirm
  *   "ok" / "oke"     -> ONE transaction: draft -> completed, stock deducted, COGS fixed, session cleared
  *                       -> after COMMIT the bill goes out through io.onConfirmed
@@ -25,7 +32,10 @@ const parser = require('./zaloOrderParser');
  */
 
 const TXT = {
-  help: 'Chào bạn 👋 Nhắn tên món để đặt, ví dụ: "2 cà phê sữa, 1 bạc xỉu". Nhắn "menu" để xem thực đơn.',
+  help: 'Chào bạn 👋 Nhắn tên món để đặt, ví dụ: "2 cà phê sữa ít đường, 1 bạc xỉu". Nhắn "menu" để xem thực đơn, "check nợ" để xem công nợ.',
+  debtPrivate: 'Vì bảo mật, bạn nhắn riêng cho quán "check nợ" nhé.',
+  debtUnknown: 'Tài khoản Zalo này chưa được liên kết với khách hàng nào của quán. Bạn nhắn quán để được hỗ trợ nhé.',
+  debtNone: (name) => `Chào ${name}, bạn hiện không còn nợ quán. Cảm ơn bạn! 🙏`,
   noDraft: 'Bạn chưa có đơn nào đang chờ xác nhận. Nhắn tên món để đặt nhé!',
   expired: (min) => `Đơn tạm đã hết hạn (quá ${min} phút). Bạn nhắn lại món giúp mình nhé!`,
   cancelled: 'Đã hủy đơn tạm. Cần đặt món khác cứ nhắn nhé!',
@@ -47,7 +57,7 @@ async function say(ctx, text, action) {
 function draftSummary(order, unmatched) {
   const lines = [
     '🧾 ĐƠN TẠM (chưa xác nhận)',
-    ...order.items.map((i) => `• ${i.quantity} x ${i.product_name} — ${formatVnd(i.line_total)}đ`),
+    ...order.items.map((i) => `• ${i.quantity} x ${i.product_name}${i.note ? ` (${i.note})` : ''} — ${formatVnd(i.line_total)}đ`),
     `TỔNG: ${formatVnd(order.total)}đ`,
   ];
   if (unmatched.length) lines.push(`⚠️ Chưa tìm thấy: ${unmatched.map((s) => `"${s}"`).join(', ')}`);
@@ -66,8 +76,46 @@ async function menuText() {
   return out.join('\n').slice(0, 1900);
 }
 
+// --------------------------------------------------------------------------- check nợ
+/**
+ * Balance of the customer whose Zalo id sent the message, with a VietQR code for exactly that amount and the
+ * transfer content "NO KH<id>" so the payment can be matched. Never in a group, never for anyone else.
+ */
+async function debt(ctx) {
+  if (ctx.isGroup) return say(ctx, TXT.debtPrivate, 'debt');
+  const linked = await customerModel.findByZaloUser(ctx.userId);
+  const customer = linked ? await customerModel.getById(linked.id) : null;
+  if (!customer) return say(ctx, TXT.debtUnknown, 'debt');
+  const balance = Math.round(Number(customer.balance) || 0);
+  if (balance <= 0) return say(ctx, TXT.debtNone(customer.name), 'debt');
+
+  const info = await chatbotInfo.get();
+  const note = debtQr.transferNote(customer.id);
+  const lines = ['📌 CÔNG NỢ', `Khách hàng: ${customer.name}`, `Số dư hiện tại: ${formatVnd(balance)}đ`];
+  if (chatbotInfo.bankReady(info)) {
+    lines.push(`Chuyển khoản: ${chatbotInfo.bankLine(info)}`, `Nội dung: ${note}`);
+  } else {
+    lines.push('Bạn vui lòng thanh toán tại quầy nhé.');
+  }
+  await say(ctx, lines.join('\n'), 'debt');
+
+  if (chatbotInfo.bankReady(info) && ctx.io.image) {
+    try {
+      const picture = await debtQr.image({ customerId: customer.id, amount: balance }, info);
+      if (picture) await ctx.io.image({ ...picture, caption: `Quét mã để chuyển ${formatVnd(balance)}đ (nội dung ${note})` });
+    } catch (err) {
+      logger.warn('Debt QR not delivered', err);                 // the text above already has the account
+    }
+  }
+  return 'debt';
+}
+
 // --------------------------------------------------------------------------- entry point
-async function handleText({ chatType, chatId, userId, text, msgId }, io) {
+/**
+ * @param {object} m
+ * @param {boolean} [m.mentioned]  the message addressed the bot ("@Bot ..."): groups get FAQ answers only then
+ */
+async function handleText({ chatType, chatId, userId, text, msgId, mentioned = false }, io) {
   const isGroup = chatType === 'group';
   const ctx = { io, chatType, chatId, userId, msgId, isGroup };
 
@@ -85,9 +133,15 @@ async function handleText({ chatType, chatId, userId, text, msgId }, io) {
   if (command === 'confirm') return confirm(ctx);
   if (command === 'cancel') return cancel(ctx);
   if (command === 'menu') return say(ctx, await menuText(), 'menu');
+  if (command === 'debt') return debt(ctx);
 
   const parsed = parser.parseOrder(text, await productModel.listForMatching());
   if (!parsed.items.length) {
+    const faq = parser.detectFaq(text);
+    if (faq && (!isGroup || mentioned || parser.isMentioned(text))) {
+      const answer = chatbotInfo.faqAnswer(faq, await chatbotInfo.get());
+      if (answer) return say(ctx, answer, 'faq');
+    }
     if (isGroup) return 'ignored';                                   // ignore group chatter
     return say(ctx, parsed.unmatched.length ? TXT.notFound(parsed.unmatched) : TXT.help, 'help');
   }

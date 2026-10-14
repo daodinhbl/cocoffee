@@ -7,6 +7,8 @@ const orders = require('./orders');
 const { AppError } = require('../../utils/httpError');
 const zaloBot = require('../../services/zalo/zaloBotPlatform');
 const zaloConfig = require('../../services/zalo/zaloConfig');
+const chatbotInfo = require('../../services/zalo/chatbotInfo');
+const { BANKS } = require('../../services/vietQr');
 
 /** Connection facts for the Zalo screen. Secret / token VALUES are never read into the view model. */
 async function connection() {
@@ -49,12 +51,13 @@ async function connection() {
 }
 
 async function page(_req, res) {
-  const [conn, stats, events, drafts, failed] = await Promise.all([
+  const [conn, stats, events, drafts, failed, chatbot] = await Promise.all([
     connection(), adminModel.zaloEventStats(24), adminModel.zaloRecentEvents(25), adminModel.zaloPendingDrafts(20), adminModel.receiptErrors(10),
+    chatbotInfo.get(),
   ]);
   await render(res, 'zalo', {
     title: conn.mode === 'oa' ? 'Zalo OA' : 'Zalo bot', activeMenu: 'zalo', breadcrumbs: [{ label: 'Phân tích', href: '#' }, { label: conn.mode === 'oa' ? 'Zalo OA' : 'Zalo bot' }],
-  }, { conn, stats, events, drafts, failed });
+  }, { conn, stats, events, drafts, failed, chatbot, banks: BANKS });
 }
 
 /**
@@ -115,4 +118,10 @@ async function saveDebtRecipient(req) {
   };
 }
 
-module.exports = { page, connection, registerWebhook, saveBotToken, saveDebtRecipient, resendReceipt: orders.resendReceipt };
+/** Bank account for the "check nợ" QR and the answers to address / wifi / opening-hours questions. */
+async function saveChatbotInfo(req) {
+  await chatbotInfo.save(req.body, req.user.id);
+  return { message: 'Đã lưu nội dung trả lời tự động.', to: '/admin/zalo' };
+}
+
+module.exports = { page, connection, registerWebhook, saveBotToken, saveDebtRecipient, saveChatbotInfo, resendReceipt: orders.resendReceipt };

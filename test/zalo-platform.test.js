@@ -7,6 +7,7 @@ process.env.DB_NAME ||= 'x'; process.env.DB_USER ||= 'x'; process.env.DB_PASSWOR
 process.env.ZALO_MODE = '';
 process.env.ZALO_BOT_TOKEN = '123456:SECRET-TOKEN';
 process.env.BOT_WEBHOOK_SECRET = 'platform-secret-123';
+process.env.PUBLIC_BASE_URL = 'https://cafe.example.test';   // sendPhoto needs a public picture URL
 process.env.DEMO_MODE = 'false';
 
 const test = require('node:test');
@@ -110,6 +111,31 @@ test('zalo bot platform', async (t) => {
     await post(update('1 cafe sua', { chatId: 'u5', from: 'u5', id: 'd1' }));
     await new Promise((r) => setTimeout(r, 80));
     assert.equal(sent.length, 1);
+  });
+
+  await t.test('"check nợ": balance with sendMessage, then the VietQR picture with sendPhoto (signed public URL)', async () => {
+    const customerModel = require('../src/models/customerModel');
+    const settingsModel = require('../src/models/settingsModel');
+    mock.method(customerModel, 'findByZaloUser', async (z) => (z === 'z-lan' ? { id: 5 } : null));
+    mock.method(customerModel, 'getById', async () => ({ id: 5, name: 'Chị Lan', balance: 366000 }));
+    const SETTINGS = { 'chatbot.bankBin': '970436', 'chatbot.bankAccount': '0123456789', 'chatbot.wifi': 'CoCoffee / 12345678' };
+    mock.method(settingsModel, 'getByPrefix', async (p) => Object.fromEntries(Object.entries(SETTINGS).filter(([k]) => k.startsWith(p))));
+
+    sent.length = 0;
+    await post(update('check nợ', { chatId: 'z-lan', from: 'z-lan', id: 'debt1' }));
+    await settle(2);
+    assert.deepEqual(sent.map((s) => s.method), ['sendMessage', 'sendPhoto']);
+    assert.match(sent[0].body.text, /366\.000đ[\s\S]*Vietcombank · 0123456789[\s\S]*NO KH5/);
+    assert.equal(sent[1].body.chat_id, 'z-lan');
+    assert.match(sent[1].body.photo, /^https:\/\/cafe\.example\.test\/api\/zalo\/qr\/[\w-]+\.[\w-]{22}\.png$/);
+    assert.match(sent[1].body.caption, /NO KH5/);
+
+    sent.length = 0;                                                  // the "@Bot" prefix is stripped, but still counts
+    await post(update('@CoCoffee pass wifi?', { chatType: 'GROUP', chatId: 'g9', from: 'u2', id: 'faq1' }));
+    await post(update('pass wifi?', { chatType: 'GROUP', chatId: 'g9', from: 'u3', id: 'faq2' }));
+    await new Promise((r) => setTimeout(r, 80));
+    assert.equal(sent.length, 1);
+    assert.match(sent[0].body.text, /CoCoffee \/ 12345678/);
   });
 
   await t.test('API errors never contain the bot token', async () => {

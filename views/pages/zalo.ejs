@@ -130,6 +130,51 @@
   <p class="mt-2 text-xs text-gray-500">Để xóa cấu hình, xóa Chat ID trong ô rồi bấm “Lưu nơi nhận”.</p>
 </section>
 
+<section id="tra-loi-tu-dong" class="mt-5 rounded-xl border border-milk-200 bg-white p-5" aria-labelledby="chatbot-title">
+  <div class="max-w-3xl">
+    <h2 id="chatbot-title" class="text-base font-semibold">Trả lời tự động &amp; chuyển khoản</h2>
+    <p class="mt-1 text-sm text-gray-600">Khách nhắn <code>check nợ</code> trong chat riêng: bot trả số dư của khách đã liên kết Zalo, kèm <strong>mã VietQR</strong> đúng số tiền và nội dung <code>NO KH&lt;mã khách&gt;</code> để quán đối chiếu. Khách hỏi địa chỉ, wifi, giờ mở cửa hay số tài khoản: bot trả lời bằng nội dung dưới đây (ô để trống thì bot không trả lời câu đó).</p>
+    <% if (!chatbot.bankAccount) { %>
+      <p class="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Chưa có tài khoản nhận chuyển khoản: "check nợ" chỉ báo số dư, không kèm mã QR.</p>
+    <% } %>
+  </div>
+  <form method="post" action="/admin/zalo/chatbot-info" class="mt-4 grid gap-4 sm:grid-cols-2" autocomplete="off">
+    <%- include('../partials/csrf') %>
+    <div>
+      <label for="cb-bank" class="<%= label %>">Ngân hàng</label>
+      <select id="cb-bank" name="bankBin" class="<%= input %>">
+        <option value="">— Chưa chọn —</option>
+        <% banks.forEach((b) => { %><option value="<%= b.bin %>" <%= chatbot.bankBin === b.bin ? 'selected' : '' %>><%= b.name %></option><% }) %>
+      </select>
+    </div>
+    <div>
+      <label for="cb-account" class="<%= label %>">Số tài khoản</label>
+      <input id="cb-account" name="bankAccount" value="<%= chatbot.bankAccount %>" maxlength="19" inputmode="numeric" spellcheck="false" class="<%= input %> font-mono" placeholder="VD: 0123456789">
+    </div>
+    <div class="sm:col-span-2">
+      <label for="cb-account-name" class="<%= label %>">Tên chủ tài khoản</label>
+      <input id="cb-account-name" name="bankAccountName" value="<%= chatbot.bankAccountName %>" maxlength="50" class="<%= input %> uppercase" placeholder="VD: NGUYEN VAN A">
+      <p class="mt-1 text-xs text-gray-500">Chỉ để khách đối chiếu; được lưu không dấu, chữ in hoa.</p>
+    </div>
+    <div class="sm:col-span-2">
+      <label for="cb-address" class="<%= label %>">Địa chỉ quán</label>
+      <input id="cb-address" name="address" value="<%= chatbot.address %>" maxlength="200" class="<%= input %>" placeholder="<%= chatbot.shopAddress || 'VD: 12 Lê Lợi, Quận 1' %>">
+      <p class="mt-1 text-xs text-gray-500">Để trống thì dùng địa chỉ in trên hóa đơn<%= chatbot.shopAddress ? ` (${chatbot.shopAddress})` : '' %>.</p>
+    </div>
+    <div>
+      <label for="cb-wifi" class="<%= label %>">Wifi</label>
+      <input id="cb-wifi" name="wifi" value="<%= chatbot.wifi %>" maxlength="200" class="<%= input %>" placeholder="VD: CoCoffee / mật khẩu 12345678">
+    </div>
+    <div>
+      <label for="cb-hours" class="<%= label %>">Giờ mở cửa</label>
+      <input id="cb-hours" name="hours" value="<%= chatbot.hours %>" maxlength="200" class="<%= input %>" placeholder="VD: 6h30 – 17h hằng ngày">
+    </div>
+    <div class="sm:col-span-2">
+      <button type="submit" class="<%= btnPrimary %>">Lưu nội dung trả lời</button>
+    </div>
+  </form>
+</section>
+
 <section class="mt-5 rounded border border-gray-200 max-lg:border-0" aria-labelledby="drafts-title">
   <h2 id="drafts-title" class="border-b border-gray-200 px-5 py-4 text-base font-semibold max-lg:border-b-0 max-lg:px-0">Đơn nháp chờ khách xác nhận (<%= drafts.length %>)</h2>
   <% if (!drafts.length) { %>

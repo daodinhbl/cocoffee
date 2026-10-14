@@ -16,7 +16,7 @@ function buildText(order, items) {
     `HÓA ĐƠN ${order.order_code}`,
     `Thời gian: ${when}`,
     '────────────────',
-    ...items.map((i) => `• ${i.quantity} x ${i.product_name} — ${formatVnd(i.line_total)}đ`),
+    ...items.map((i) => `• ${i.quantity} x ${i.product_name}${i.note ? ` (${i.note})` : ''} — ${formatVnd(i.line_total)}đ`),
     '────────────────',
   ];
   if (order.discount > 0) lines.push(`Tạm tính: ${formatVnd(order.subtotal)}đ`, `Giảm giá: -${formatVnd(order.discount)}đ`);
@@ -43,7 +43,7 @@ async function buildImage(order, items) {
     { t: env.business.shopName.toUpperCase(), size: 30, gap: 44, bold: true },
     { t: `HÓA ĐƠN ${order.order_code}`, size: 22, gap: 32 },
     { t: formatShopTime(order.completed_at || order.created_at), size: 20, gap: 36 },
-    ...items.map((i) => ({ l: `${i.quantity} x ${i.product_name}`, r: `${formatVnd(i.line_total)}đ`, size: 22, gap: 32 })),
+    ...items.map((i) => ({ l: `${i.quantity} x ${i.product_name}${i.note ? ` (${i.note})` : ''}`, r: `${formatVnd(i.line_total)}đ`, size: 22, gap: 32 })),
     { t: '', size: 10, gap: 12 },
     { l: 'TỔNG CỘNG', r: `${formatVnd(order.total)}đ`, size: 28, gap: 46, bold: true },
     { t: order.payment_status === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán', size: 20, gap: 30 },
