@@ -20,6 +20,7 @@ import '../features/orders/orders_screen.dart';
 import '../features/pos/pos_screen.dart';
 import '../features/reports/reports_screen.dart';
 import '../features/settings/settings_screen.dart';
+import '../features/sync/sync_screen.dart';
 import '../features/tables/tables_screen.dart';
 import 'session.dart';
 import 'widgets/app_shell.dart';
@@ -31,8 +32,8 @@ int _id(GoRouterState s) => int.tryParse(s.pathParameters['id'] ?? '') ?? 0;
 final _orderDetail = RegExp(r'^/orders/\d+$');
 
 /// What a cashier may open. The Web Admin gives a cashier only the POS screen (authPages.js, adminAuth.js); the app
-/// adds the order page (GET /api/orders/:id is open to any staff) and Cài đặt (own password, app info).
-bool cashierAllowed(String path) => path == '/pos' || path == '/settings' || _orderDetail.hasMatch(path);
+/// adds the order page (GET /api/orders/:id is open to any staff), Cài đặt (own password, app info) and the offline sync screen.
+bool cashierAllowed(String path) => path == '/pos' || path == '/settings' || path == '/sync' || _orderDetail.hasMatch(path);
 
 /// The router's guard as a pure function of the signed-in [user] and the requested [path] (no query string).
 /// Returns where to go instead, or null to stay.
@@ -113,6 +114,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(parentNavigatorKey: _rootKey, path: '/customers', builder: (_, _) => const CustomersScreen()),
       GoRoute(parentNavigatorKey: _rootKey, path: '/customers/:id', builder: (_, s) => CustomerDetailScreen(id: _id(s))),
       GoRoute(parentNavigatorKey: _rootKey, path: '/settings', builder: (_, _) => const SettingsScreen()),
+      GoRoute(parentNavigatorKey: _rootKey, path: '/sync', builder: (_, _) => const SyncScreen()),
     ],
   );
 });

@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/session.dart';
 
 /// Shown under "Ứng dụng"; keep in step with `version:` in pubspec.yaml.
-const kAppVersion = '1.0.0 (1)';
+const kAppVersion = '1.1.0 (2)';
 
 int _int(Object? v, int fallback) => v is num ? v.toInt() : int.tryParse('${v ?? ''}') ?? fallback;
 bool _bool(Object? v) => v == true || v == 1 || v == '1' || v == 'true';

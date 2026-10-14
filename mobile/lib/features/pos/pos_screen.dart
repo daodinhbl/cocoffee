@@ -8,7 +8,10 @@ import 'package:go_router/go_router.dart';
 import '../../core/format.dart';
 import '../../core/session.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/offline/connectivity.dart';
+import '../../core/offline/outbox.dart';
 import '../../core/widgets/common.dart';
+import '../../core/widgets/offline_banner.dart';
 import 'pos_models.dart';
 import 'pos_providers.dart';
 import 'widgets/pos_cart.dart';
@@ -109,6 +112,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   }
 
   Future<void> _reload() async {
+    if (!ref.read(netProvider).online) await ref.read(netProvider.notifier).probe();
     ref.invalidate(posBootstrapProvider);
     ref.invalidate(zaloDraftsProvider);
     try {
@@ -158,6 +162,25 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     final cart = ref.read(cartProvider);
     if (cart.busy) return;
     final unsaved = cart.dirty && cart.lines.isNotEmpty;
+    if (t != null && t.heldLocally) {
+      if (cart.localId == t.localHoldId) {
+        _go(_wide ? PosView.products : PosView.cart);
+        return;
+      }
+      final hold = ref.read(outboxProvider.notifier).byId(t.localHoldId!);
+      if (hold == null) return;
+      if (unsaved &&
+          !await confirmPos(context,
+              title: 'Bỏ giỏ hiện tại?',
+              message: 'Giỏ hiện tại chưa được lưu. Mở đơn của ${t.label} sẽ thay thế các món trong giỏ.',
+              action: 'Mở đơn')) {
+        return;
+      }
+      ref.read(cartProvider.notifier).openLocal(hold, data);
+      _go(_wide ? PosView.products : PosView.cart);
+      _toast('Đã mở đơn ${hold.code} của ${t.label} (đang chờ đồng bộ).');
+      return;
+    }
     if (t != null && t.busy && t.currentOrderId != null) {
       if (cart.orderId == t.currentOrderId) {
         _go(_wide ? PosView.products : PosView.cart);
@@ -173,7 +196,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       await _openOrder(t.currentOrderId!, data, t);
       return;
     }
-    if (cart.orderId != null && unsaved) {
+    if ((cart.orderId != null || cart.localId != null) && unsaved) {
       final ok = await confirmPos(context,
           title: 'Bỏ thay đổi chưa lưu?',
           message: 'Đơn ${cart.orderCode ?? ''} có thay đổi chưa lưu. Chọn ${t?.label ?? 'Mang đi'} sẽ đóng đơn này mà không lưu.',
@@ -209,17 +232,20 @@ class _PosScreenState extends ConsumerState<PosScreen> {
   Future<void> _hold() async {
     final cart = ref.read(cartProvider);
     if (cart.busy || cart.isEmpty) return;
-    if (cart.tableId == null && cart.orderId == null) {
+    if (cart.tableId == null && cart.orderId == null && cart.localId == null) {
       _go(PosView.tables);
       _toast('Chọn bàn để giữ đơn.', error: true);
       return;
     }
     try {
-      final order = await ref.read(cartProvider.notifier).hold();
+      final where = ref.read(posBootstrapProvider).value?.table(cart.tableId)?.label;
+      final order = await ref.read(cartProvider.notifier).hold(where: where);
       if (!mounted) return;
       ref.invalidate(posBootstrapProvider);
       _go(PosView.tables);
-      _toast('Đã lưu đơn ${order['order_code'] ?? ''} cho bàn.');
+      _toast(order['offline'] == true
+          ? 'Đã lưu đơn ${order['order_code'] ?? ''} cho bàn · sẽ gửi lên máy chủ khi có mạng.'
+          : 'Đã lưu đơn ${order['order_code'] ?? ''} cho bàn.');
     } catch (e) {
       _afterError(e);
     }
@@ -230,7 +256,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     final notifier = ref.read(cartProvider.notifier);
     final isAdmin = ref.read(currentUserProvider)?.isAdmin ?? false;
     if (cart.busy) return;
-    if (cart.orderId == null) {
+    if (cart.orderId == null && cart.localId == null) {
       final ok = await confirmPos(context, title: 'Xóa giỏ hàng?', message: 'Bỏ tất cả món trong giỏ hiện tại.', action: 'Xóa giỏ', danger: true);
       if (ok) notifier.reset(keepTable: true);
       return;
@@ -249,7 +275,9 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     }
     final ok = await confirmPos(context,
         title: 'Hủy đơn $code?',
-        message: 'Đơn sẽ bị hủy và bàn được trả về trạng thái trống. Không thể hoàn tác.',
+        message: cart.localId != null
+            ? 'Đơn này chưa được gửi lên máy chủ; hủy sẽ bỏ hẳn đơn và trả bàn về trạng thái trống. Không thể hoàn tác.'
+            : 'Đơn sẽ bị hủy và bàn được trả về trạng thái trống. Không thể hoàn tác.',
         action: 'Hủy đơn',
         danger: true);
     if (!ok) return;
@@ -277,7 +305,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       onConfirm: (req) async {
         notifier.setDiscount(req.discount);
         try {
-          return await notifier.checkout(req);
+          return await notifier.checkout(req, where: where);
         } catch (e) {
           if (isStale(e)) ref.invalidate(posBootstrapProvider);
           rethrow;
@@ -287,7 +315,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     if (out == null || !mounted) return;
     ref.invalidate(posBootstrapProvider);
     _go(out.tableId != null ? PosView.tables : PosView.products);
-    _toast('Đã thanh toán ${out.code}.${out.change > 0 ? ' Thối ${money(out.change)}.' : ''}');
+    final change = out.change > 0 ? ' Thối ${money(out.change)}.' : '';
+    _toast(out.offline ? 'Đã lưu thanh toán ${out.code} · sẽ gửi lên máy chủ khi có mạng.$change' : 'Đã thanh toán ${out.code}.$change');
   }
 
   void _openZalo() {
@@ -321,7 +350,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     final cart = ref.watch(cartProvider);
     final user = ref.watch(currentUserProvider);
     final isAdmin = user?.isAdmin ?? false;
-    final data = boot.value;
+    final queued = ref.watch(outboxProvider.select((b) => b.items));
+    final data = boot.value?.withLocalHolds(queued);
     final drafts = ref.watch(zaloDraftsProvider).value ?? data?.drafts ?? const <ZaloDraft>[];
     final wide = _wide;
 
@@ -340,12 +370,16 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       showZalo: !wide,
       onZalo: _openZalo,
       onReload: _reload,
+      queuedCount: queued.length,
     );
 
     if (data == null) {
       return Scaffold(
         appBar: appBar,
-        body: AsyncBody<PosData>(value: boot, onRetry: () => ref.invalidate(posBootstrapProvider), data: (_) => const SizedBox.shrink()),
+        body: Column(children: [
+          const OfflineBanner(),
+          Expanded(child: AsyncBody<PosData>(value: boot, onRetry: _reload, data: (_) => const SizedBox.shrink())),
+        ]),
       );
     }
 
@@ -394,7 +428,10 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       final railIndex = switch (view) { PosView.tables => 0, PosView.zalo => 2, _ => 1 };
       return Scaffold(
         appBar: appBar,
-        body: Row(children: [
+        body: Column(children: [
+          const OfflineBanner(),
+          Expanded(
+            child: Row(children: [
           NavigationRail(
             selectedIndex: railIndex,
             labelType: NavigationRailLabelType.all,
@@ -426,19 +463,26 @@ class _PosScreenState extends ConsumerState<PosScreen> {
           const VerticalDivider(width: 1),
           SizedBox(width: cartWidth, child: cartPanel),
         ]),
+          ),
+        ]),
       );
     }
 
     final tabIndex = switch (view) { PosView.tables => 0, PosView.products => 1, _ => 2 };
     return Scaffold(
       appBar: appBar,
-      body: switch (view) {
-        PosView.tables => tables,
-        PosView.products => products(
-            footer: cart.isEmpty ? null : _CartSummaryBar(cart: cart, onOpen: () => _go(PosView.cart)),
-          ),
-        _ => cartPanel,
-      },
+      body: Column(children: [
+        const OfflineBanner(),
+        Expanded(
+          child: switch (view) {
+            PosView.tables => tables,
+            PosView.products => products(
+                footer: cart.isEmpty ? null : _CartSummaryBar(cart: cart, onOpen: () => _go(PosView.cart)),
+              ),
+            _ => cartPanel,
+          },
+        ),
+      ]),
       bottomNavigationBar: NavigationBar(
         selectedIndex: tabIndex,
         onDestinationSelected: (i) => _go(const [PosView.tables, PosView.products, PosView.cart][i]),
@@ -503,6 +547,7 @@ class _PosAppBar extends ConsumerWidget implements PreferredSizeWidget {
     required this.showZalo,
     required this.onZalo,
     required this.onReload,
+    this.queuedCount = 0,
   });
 
   final AppUser? user;
@@ -514,6 +559,9 @@ class _PosAppBar extends ConsumerWidget implements PreferredSizeWidget {
   final bool showZalo;
   final VoidCallback onZalo;
   final Future<void> Function() onReload;
+
+  /// Writes waiting for the server (badge on the sync entry).
+  final int queuedCount;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -583,6 +631,11 @@ class _PosAppBar extends ConsumerWidget implements PreferredSizeWidget {
           ]),
         ),
         IconButton(tooltip: 'Tải lại dữ liệu', onPressed: onReload, icon: const Icon(Icons.refresh_rounded)),
+        IconButton(
+          tooltip: 'Đồng bộ ngoại tuyến',
+          onPressed: () => openSyncScreen(context),
+          icon: Badge(isLabelVisible: queuedCount > 0, backgroundColor: Palette.amber, textColor: Palette.ink900, label: Text('$queuedCount'), child: const Icon(Icons.cloud_sync_outlined)),
+        ),
         // a cashier has no sidebar: Cài đặt (own password) is reached from here
         if (!isAdmin) IconButton(tooltip: 'Cài đặt', onPressed: () => context.push('/settings'), icon: const Icon(Icons.tune_rounded)),
         IconButton(tooltip: 'Đăng xuất', onPressed: logout, icon: const Icon(Icons.logout_rounded)),
@@ -597,6 +650,8 @@ class _PosAppBar extends ConsumerWidget implements PreferredSizeWidget {
                 context.go('/dashboard');
               case 'reload':
                 onReload();
+              case 'sync':
+                openSyncScreen(context);
               case 'settings':
                 context.push('/settings');
               case 'logout':
@@ -615,6 +670,14 @@ class _PosAppBar extends ConsumerWidget implements PreferredSizeWidget {
             if (isAdmin)
               const PopupMenuItem(value: 'dashboard', child: ListTile(contentPadding: EdgeInsets.zero, leading: Icon(Icons.grid_view_rounded), title: Text('Quản lý'))),
             const PopupMenuItem(value: 'reload', child: ListTile(contentPadding: EdgeInsets.zero, leading: Icon(Icons.refresh_rounded), title: Text('Tải lại dữ liệu'))),
+            PopupMenuItem(
+              value: 'sync',
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.cloud_sync_outlined),
+                title: Text(queuedCount > 0 ? 'Đồng bộ ngoại tuyến ($queuedCount)' : 'Đồng bộ ngoại tuyến'),
+              ),
+            ),
             const PopupMenuItem(value: 'settings', child: ListTile(contentPadding: EdgeInsets.zero, leading: Icon(Icons.tune_rounded), title: Text('Cài đặt'))),
             const PopupMenuItem(value: 'logout', child: ListTile(contentPadding: EdgeInsets.zero, leading: Icon(Icons.logout_rounded), title: Text('Đăng xuất'))),
           ],

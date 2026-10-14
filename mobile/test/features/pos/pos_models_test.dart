@@ -1,8 +1,7 @@
 import 'package:cocoffee_mobile/core/api/api_client.dart';
-import 'package:cocoffee_mobile/core/session.dart';
+import 'package:cocoffee_mobile/core/offline/outbox.dart';
 import 'package:cocoffee_mobile/features/pos/pos_models.dart';
 import 'package:cocoffee_mobile/features/pos/pos_providers.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -40,9 +39,9 @@ void main() {
     expect(d.zaloLabel, 'Zalo bot OK');
   });
 
-  test('cart: plain lines merge, noted lines stay apart, 99 cap, discount clamp and VAT', () {
+  test('cart: plain lines merge, noted lines stay apart, 99 cap, discount clamp and VAT', () async {
     final api = MockApi();
-    final c = ProviderContainer(overrides: [apiProvider.overrideWithValue(api), currentUserProvider.overrideWithValue(cashierUser)]);
+    final c = await testContainer(api);
     addTearDown(c.dispose);
     final n = c.read(cartProvider.notifier);
     final d = PosData.fromJson(bootstrap());
@@ -74,23 +73,24 @@ void main() {
     expect(s.dirty, isTrue);
   });
 
-  test('checkout of a just-created order cancels it when the payment fails', () async {
+  test('checkout is ONE request (POST /pos/checkout with an Idempotency-Key); a refused sale keeps the cart', () async {
     final api = MockApi();
-    when(() => api.post('/orders', any())).thenAnswer((_) async => orderRes(9, 'open', 25000));
-    when(() => api.post('/orders/9/pay', any()))
+    when(() => api.post('/pos/checkout', any(), any()))
         .thenAnswer((_) async => throw ApiException(code: 'INSUFFICIENT_PAYMENT', status: 422, message: 'x'));
-    when(() => api.post('/orders/9/cancel', any())).thenAnswer((_) async => orderRes(9, 'cancelled', 25000));
-    final c = ProviderContainer(overrides: [apiProvider.overrideWithValue(api), currentUserProvider.overrideWithValue(cashierUser)]);
+    final c = await testContainer(api);
     addTearDown(c.dispose);
     final n = c.read(cartProvider.notifier);
     n.add(PosData.fromJson(bootstrap()).product(11)!);
 
     await expectLater(n.checkout(const PayRequest(method: 'cash', tendered: 1000)), throwsA(isA<ApiException>()));
-    verify(() => api.post('/orders/9/cancel', any())).called(1);
+    verifyNever(() => api.post('/orders', any()));
+    verifyNever(() => api.post('/orders/9/cancel', any())); // the server cancels a failed sale itself
     final s = c.read(cartProvider);
     expect(s.orderId, isNull);
     expect(s.busy, isFalse);
     expect(s.lines.length, 1);
+    expect(c.read(outboxProvider).items, isEmpty, reason: 'a business error is never queued');
     expect(posError(ApiException(code: 'INSUFFICIENT_PAYMENT', message: 'x')), 'Tiền khách đưa chưa đủ.');
   });
 }
+

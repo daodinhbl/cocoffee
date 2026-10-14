@@ -21,6 +21,7 @@ const DEFAULTS = { app_name: 'Tasotek FnB', package: 'com.tasotek.cocoffee_mobil
 // Android API level -> marketing version, for "Android 7.0 trở lên".
 const ANDROID = { 21: '5.0', 22: '5.1', 23: '6.0', 24: '7.0', 25: '7.1', 26: '8.0', 27: '8.1', 28: '9', 29: '10', 30: '11', 31: '12', 32: '12L', 33: '13', 34: '14', 35: '15', 36: '16' };
 
+let warnedManifest = 0;            // mtime of the broken manifest.json already reported (one log line per version of the file, not per request)
 let cache = null;                  // { key, release } for the current file + manifest mtimes
 const qrCache = new Map();         // url -> svg (bounded: the Host header is attacker-controlled when PUBLIC_BASE_URL is unset)
 const QR_CACHE_MAX = 8;
@@ -69,7 +70,10 @@ function readManifest() {
     const data = JSON.parse(fs.readFileSync(file, 'utf8'));
     return { stat, data: data && typeof data === 'object' && !Array.isArray(data) ? data : null };
   } catch (err) {
-    logger.warn(`${MANIFEST} in ${DIR} is not valid JSON; describing the APK from the file instead`, err);
+    if (warnedManifest !== stat.mtimeMs) {
+      warnedManifest = stat.mtimeMs;
+      logger.warn(`${MANIFEST} in ${DIR} is not valid JSON; describing the APK from the file instead`, err);
+    }
     return { stat, data: null };
   }
 }

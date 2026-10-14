@@ -1,4 +1,6 @@
 import 'package:cocoffee_mobile/core/api/api_client.dart';
+import 'package:cocoffee_mobile/core/offline/connectivity.dart';
+import 'package:cocoffee_mobile/core/offline/local_store.dart';
 import 'package:cocoffee_mobile/core/session.dart';
 import 'package:cocoffee_mobile/core/theme/app_theme.dart';
 import 'package:flutter/material.dart';
@@ -23,6 +25,7 @@ Future<Widget> testApp(Widget child, {required ApiClient api, AppUser user = adm
       sessionStoreProvider.overrideWithValue(store),
       apiProvider.overrideWithValue(api),
       currentUserProvider.overrideWithValue(user),
+      networkEventsProvider.overrideWithValue(() => const Stream<bool>.empty()),
     ],
     child: MaterialApp(
       theme: buildTheme(Brightness.light),
@@ -41,4 +44,18 @@ const tablet = Size(1280, 800);
 Future<void> setSurface(WidgetTester tester, Size size) async {
   tester.view.physicalSize = size * tester.view.devicePixelRatio;
   addTearDown(tester.view.resetPhysicalSize);
+}
+
+/// A ProviderContainer for logic tests (no widgets): signed-in [user], the API faked, no connectivity plugin, offline
+/// data kept in memory ([store] to inspect it).
+Future<ProviderContainer> testContainer(ApiClient api, {AppUser user = cashierUser, LocalStore? store}) async {
+  SharedPreferences.setMockInitialValues({});
+  final session = SessionStore(await SharedPreferences.getInstance());
+  return ProviderContainer(overrides: [
+    sessionStoreProvider.overrideWithValue(session),
+    apiProvider.overrideWithValue(api),
+    currentUserProvider.overrideWithValue(user),
+    networkEventsProvider.overrideWithValue(() => const Stream<bool>.empty()),
+    if (store != null) localStoreProvider.overrideWithValue(store),
+  ]);
 }

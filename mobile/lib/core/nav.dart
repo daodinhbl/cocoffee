@@ -40,6 +40,7 @@ const navGroups = <NavGroup>[
   ]),
   NavGroup('Hệ thống', [
     NavItem(key: 'settings', label: 'Cài đặt', icon: Icons.tune_rounded, route: '/settings'),
+    NavItem(key: 'sync', label: 'Đồng bộ ngoại tuyến', icon: Icons.cloud_sync_rounded, route: '/sync'),
   ]),
 ];
 

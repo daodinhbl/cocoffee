@@ -1,10 +1,14 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api/api_client.dart';
+import 'offline/connectivity.dart';
+import 'offline/local_store.dart';
+import 'offline/response_cache.dart';
 
 /// Production server; the login screen lets staff point the app at another one (e.g. http://10.0.2.2:3000
 /// for the Android emulator talking to `npm run dev` on the same PC).
@@ -109,14 +113,31 @@ class ServerUrlNotifier extends Notifier<String> {
   }
 }
 
+/// Where offline data lives (path_provider's application support directory, set in main()); null = memory only.
+final appDirProvider = Provider<Directory?>((_) => null);
+
+/// Durable storage for the response cache, the outbox and the saved cart (core/offline/).
+final localStoreProvider = Provider<LocalStore>((ref) {
+  final dir = ref.watch(appDirProvider);
+  return dir == null ? MemoryStore() : FileStore(Directory('${dir.path}${Platform.pathSeparator}offline'));
+});
+
 final apiProvider = Provider<ApiClient>((ref) {
   final store = ref.watch(sessionStoreProvider);
   final server = ref.watch(serverUrlProvider);
+  // Cached answers are per account (a cashier and an admin do not see the same screens); rebuilt on sign-in/out.
+  final userId = ref.watch(authProvider.select((a) => a is SignedIn ? a.user.id : null));
   return ApiClient(
     serverUrl: server,
     token: () => store.token,
     onUnauthorized: () => ref.read(authProvider.notifier).expired(),
     onMustChangePassword: () => ref.read(authProvider.notifier).requirePasswordChange(),
+    cache: ResponseCache(ref.watch(localStoreProvider), scope: '$server|${userId ?? 'anon'}'),
+    net: NetHooks(
+      isOffline: () => !ref.read(netProvider).online,
+      onOffline: () => ref.read(netProvider.notifier).markOffline(),
+      onOnline: () => ref.read(netProvider.notifier).markOnline(),
+    ),
   );
 });
 

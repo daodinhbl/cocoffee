@@ -1,5 +1,6 @@
 const express = require('express');
 const { adminSecurity } = require('../middlewares/adminSecurity');
+const rateLimit = require('../middlewares/rateLimit');
 const appRelease = require('../services/appRelease');
 const env = require('../config/env');
 const { formatShopTime } = require('../utils/text');
@@ -14,6 +15,9 @@ const { formatShopTime } = require('../utils/text');
  */
 const router = express.Router();
 const APK_PATH = '/download/cocoffee.apk';
+// Public and unauthenticated: the 60 MB file is the expensive one (a download manager resumes with a few Range requests).
+const pageLimit = rateLimit({ windowMs: 60 * 1000, max: 120 });
+const apkLimit = rateLimit({ windowMs: 10 * 60 * 1000, max: 30 });
 
 const describe = (req, r) => ({
   ...r,
@@ -24,7 +28,7 @@ const describe = (req, r) => ({
   builtAtLabel: formatShopTime(r.built_at),
 });
 
-router.get('/', adminSecurity, (req, res) => {
+router.get('/', pageLimit, adminSecurity, (req, res) => {
   const release = appRelease.current();
   const base = appRelease.baseUrl(req);
   res.render('download', {
@@ -35,7 +39,7 @@ router.get('/', adminSecurity, (req, res) => {
   });
 });
 
-router.get('/manifest.json', (req, res) => {
+router.get('/manifest.json', pageLimit, (req, res) => {
   const r = appRelease.current();
   if (!r) return res.status(404).json({ error: { code: 'NO_RELEASE', message: 'Chưa có bản cài đặt nào.' } });
   const base = appRelease.baseUrl(req);
@@ -55,7 +59,7 @@ router.get('/manifest.json', (req, res) => {
   });
 });
 
-router.get('/cocoffee.apk', (req, res, next) => {
+router.get('/cocoffee.apk', apkLimit, (req, res, next) => {
   const r = appRelease.current();
   if (!r) return res.status(404).type('text').send('Chưa có bản cài đặt nào.');
   res.set({ 'Cache-Control': 'no-cache', 'X-Checksum-SHA256': r.sha256, 'X-Content-Type-Options': 'nosniff' });
@@ -65,7 +69,7 @@ router.get('/cocoffee.apk', (req, res, next) => {
   });
 });
 
-router.get('/qr.svg', async (req, res, next) => {
+router.get('/qr.svg', pageLimit, async (req, res, next) => {
   try {
     const svg = await appRelease.qrSvg(`${appRelease.baseUrl(req)}/download`);
     res.set({

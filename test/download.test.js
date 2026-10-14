@@ -148,4 +148,15 @@ test('Android app download', async (t) => {
     assert.equal(appRelease.sizeLabel(4.2 * 1024 * 1024), '4,2 MB');
     assert.equal(appRelease.androidLabel(26), 'Android 8.0 trở lên');
   });
+
+  await t.test('the APK is rate limited per IP (30 requests / 10 min); the landing page and the QR keep working', async () => {
+    let limited = 0;
+    for (let i = 0; i < 40; i++) {
+      const r = await fetch(fx.base + '/download/cocoffee.apk', { method: 'HEAD' });
+      if (r.status === 429) limited++;
+    }
+    assert.ok(limited > 0, 'the limiter kicked in');
+    assert.equal((await get('/download')).status, 200);
+    assert.equal((await get('/download/qr.svg')).status, 200);
+  });
 });

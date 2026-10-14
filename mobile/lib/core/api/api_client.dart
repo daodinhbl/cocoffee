@@ -1,4 +1,9 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
+
+import '../offline/response_cache.dart';
 
 /// Error from the CoCoffee API: `{ error: { code, message, details } }` (src/middlewares/errorHandler.js).
 /// [message] is Vietnamese, ready to show; the server's English text is kept in [serverMessage].
@@ -13,6 +18,10 @@ class ApiException implements Exception {
 
   bool get isUnauthorized => status == 401;
   bool get isOffline => code == 'OFFLINE';
+
+  /// The server could not be reached or did not answer (no connection, timeout, or the host's 502-504 while the
+  /// app is being redeployed): the request may be served from the cache or queued, nothing was refused.
+  bool get isNetwork => isOffline || code == 'TIMEOUT' || (status != null && status! >= 502 && status! <= 504);
 
   @override
   String toString() => 'ApiException($code, $status): $message';
@@ -77,6 +86,8 @@ String vietnameseFor(String code, String? serverMessage, Object? details) {
       return 'Dữ liệu gửi lên quá lớn (ảnh quá nặng?).';
     case 'IDEMPOTENCY_IN_PROGRESS':
       return 'Yêu cầu trước vẫn đang được xử lý, vui lòng đợi rồi tải lại.';
+    case 'IDEMPOTENCY_MISMATCH':
+      return 'Yêu cầu này đã được gửi trước đó với nội dung khác.';
     case 'RATE_LIMITED':
       return 'Thao tác quá nhanh, vui lòng thử lại sau ít phút.';
     case 'OFFLINE':
@@ -126,12 +137,27 @@ String? _errorCode(DioException e) {
   return null;
 }
 
+/// How the client reports reachability and asks whether to try the network at all (core/offline/connectivity.dart).
+class NetHooks {
+  const NetHooks({this.isOffline, this.onOffline, this.onOnline});
+
+  /// true while the app already knows the server is unreachable: a GET then answers from the cache at once
+  /// instead of waiting for a timeout.
+  final bool Function()? isOffline;
+  final void Function()? onOffline;
+  final void Function()? onOnline;
+}
+
 /// Thin wrapper over Dio: base URL `<server>/api`, Bearer token, JSON in/out, errors as [ApiException].
 ///
 /// Session signals (src/middlewares/auth.js):
 ///  - 401 UNAUTHORIZED ends the session ([onUnauthorized]). 401 BAD_CREDENTIALS does not: it is the answer to a
 ///    wrong password (login, or the current password in POST /auth/change-password), and the user stays signed in.
 ///  - 403 MUST_CHANGE_PASSWORD: the token only reaches /auth/me and /auth/change-password ([onMustChangePassword]).
+///
+/// Offline (core/offline/): every successful GET is kept in [cache]; when a GET fails on the network (or the app
+/// already knows it is offline) the cached answer is returned instead, so screens keep showing their last data.
+/// Writes are never cached; the outbox replays the ones that matter with an Idempotency-Key header.
 class ApiClient {
   ApiClient({
     required String serverUrl,
@@ -139,9 +165,14 @@ class ApiClient {
     required void Function() onUnauthorized,
     void Function()? onMustChangePassword,
     Dio? dio,
-  }) : _dio = dio ?? Dio() {
+    this.cache,
+    NetHooks net = const NetHooks(),
+  })  : _dio = dio ?? Dio(),
+        _server = serverUrl.replaceAll(RegExp(r'/+$'), ''),
+        // ignore: prefer_initializing_formals
+        _net = net {
     _dio.options
-      ..baseUrl = '${serverUrl.replaceAll(RegExp(r'/+$'), '')}/api'
+      ..baseUrl = '$_server/api'
       ..connectTimeout = const Duration(seconds: 10)
       ..receiveTimeout = const Duration(seconds: 20)
       ..headers = {'Accept': 'application/json'};
@@ -163,10 +194,63 @@ class ApiClient {
   }
 
   final Dio _dio;
+  final String _server;
+  final NetHooks _net;
 
-  Future<Map<String, dynamic>> get(String path, {Map<String, dynamic>? query}) => _send(() => _dio.get<dynamic>(path, queryParameters: _clean(query)));
-  Future<Map<String, dynamic>> post(String path, [Object? body]) => _send(() => _dio.post<dynamic>(path, data: body ?? const {}));
-  Future<Map<String, dynamic>> put(String path, [Object? body]) => _send(() => _dio.put<dynamic>(path, data: body ?? const {}));
+  /// The offline cache behind [get] (null when the client was built without one).
+  final ResponseCache? cache;
+
+  /// GET, answered from the offline cache when the server cannot be reached ([useCache] false skips the cache).
+  Future<Map<String, dynamic>> get(String path, {Map<String, dynamic>? query, bool useCache = true}) async {
+    final q = _clean(query);
+    final store = useCache ? cache : null;
+    final key = store == null ? null : ResponseCache.keyFor(path, q);
+    if (key != null && (_net.isOffline?.call() ?? false)) {
+      final hit = await store!.read(key);
+      if (hit != null) return hit.data;
+    }
+    try {
+      final data = await _send(() => _dio.get<dynamic>(path, queryParameters: q));
+      if (key != null) unawaited(store!.write(key, data).catchError((Object _) {}));
+      return data;
+    } on ApiException catch (e) {
+      if (e.isNetwork && key != null) {
+        final hit = await store!.read(key);
+        if (hit != null) return hit.data;
+      }
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> post(String path, [Object? body, Map<String, String>? headers]) =>
+      _send(() => _dio.post<dynamic>(path, data: body ?? const {}, options: headers == null ? null : Options(headers: headers)));
+
+  Future<Map<String, dynamic>> put(String path, [Object? body, Map<String, String>? headers]) =>
+      _send(() => _dio.put<dynamic>(path, data: body ?? const {}, options: headers == null ? null : Options(headers: headers)));
+
+  /// Is the server reachable? GET `<server>/health` with a short timeout; any answer below 500 counts.
+  Future<bool> ping() async {
+    try {
+      final res = await _dio.get<dynamic>('$_server/health',
+          options: Options(receiveTimeout: const Duration(seconds: 6), validateStatus: (_) => true));
+      final ok = (res.statusCode ?? 599) < 500;
+      if (ok) _net.onOnline?.call();
+      return ok;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Raw bytes of a server file (product photos); null when it cannot be fetched.
+  Future<Uint8List?> bytes(String url) async {
+    try {
+      final res = await _dio.get<List<int>>(url, options: Options(responseType: ResponseType.bytes));
+      final data = res.data;
+      return data == null ? null : Uint8List.fromList(data);
+    } catch (_) {
+      return null;
+    }
+  }
 
   static Map<String, dynamic>? _clean(Map<String, dynamic>? q) =>
       q == null ? null : (Map.of(q)..removeWhere((_, v) => v == null || (v is String && v.isEmpty)));
@@ -174,12 +258,15 @@ class ApiClient {
   Future<Map<String, dynamic>> _send(Future<Response<dynamic>> Function() call) async {
     try {
       final res = await call();
+      _net.onOnline?.call();
       final data = res.data;
       if (data is Map<String, dynamic>) return data;
       if (data is List) return {'items': data};
       return {'data': data};
     } catch (e) {
-      throw toApiException(e);
+      final x = toApiException(e);
+      if (x.isNetwork) _net.onOffline?.call();
+      throw x;
     }
   }
 }

@@ -7,6 +7,7 @@ import '../nav.dart';
 import '../session.dart';
 import '../theme/app_theme.dart';
 import 'common.dart';
+import 'offline_banner.dart';
 
 /// Width from which the app shows the web's sidebar instead of the phone bottom bar.
 const kSidebarBreakpoint = 840.0;
@@ -46,12 +47,12 @@ class AppShell extends ConsumerWidget {
       return Scaffold(
         body: Row(children: [
           _Sidebar(shell: shell),
-          Expanded(child: shell),
+          Expanded(child: Column(children: [const OfflineBanner(), Expanded(child: shell)])),
         ]),
       );
     }
     return Scaffold(
-      body: shell,
+      body: Column(children: [const OfflineBanner(), Expanded(child: shell)]),
       bottomNavigationBar: NavigationBar(
         selectedIndex: shell.currentIndex,
         onDestinationSelected: (i) => shell.goBranch(i, initialLocation: i == shell.currentIndex),

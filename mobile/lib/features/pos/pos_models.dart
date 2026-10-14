@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import '../../core/api/api_client.dart';
+import '../../core/offline/outbox.dart';
 
 /// Data of the POS screen, read from GET /api/pos/bootstrap, GET /api/zalo/drafts and GET /api/orders/:id
 /// (snake_case keys, like src/controllers/admin/pos.js page()). The cart lives only in the app, like the web
@@ -45,7 +46,7 @@ class PosProduct {
 }
 
 class PosTable {
-  const PosTable({required this.id, required this.code, required this.name, required this.status, this.currentOrderId, this.currentOrderTotal});
+  const PosTable({required this.id, required this.code, required this.name, required this.status, this.currentOrderId, this.currentOrderTotal, this.localHoldId});
   factory PosTable.fromJson(Map<String, dynamic> j) => PosTable(
         id: toInt(j['id']),
         code: '${j['code'] ?? ''}',
@@ -61,7 +62,14 @@ class PosTable {
   final int? currentOrderId;
   final num? currentOrderTotal;
 
-  bool get busy => status == 'serving';
+  /// Set when the table holds an order saved while offline (a 'hold' waiting in the outbox).
+  final String? localHoldId;
+
+  bool get busy => status == 'serving' || localHoldId != null;
+  bool get heldLocally => localHoldId != null;
+
+  PosTable heldBy(OutboxItem hold) =>
+      PosTable(id: id, code: code, name: name, status: 'serving', currentOrderId: null, currentOrderTotal: hold.total, localHoldId: hold.id);
 
   /// "name || code" like the web.
   String get label => name.trim().isNotEmpty ? name : code;
@@ -157,6 +165,30 @@ class PosData {
   /// 'Tất cả' comes first in the UI; then each category that has at least one active product.
   List<PosCategory> get usedCategories =>
       [for (final c in categories) if (products.any((p) => p.categoryId == c.id)) c];
+
+  PosData copyWith({List<PosTable>? tables}) => PosData(
+        categories: categories,
+        products: products,
+        tables: tables ?? this.tables,
+        drafts: drafts,
+        zaloState: zaloState,
+        zaloLabel: zaloLabel,
+        autoPrint: autoPrint,
+        vatRate: vatRate,
+        paperMm: paperMm,
+      );
+
+  /// Free tables that hold an order saved while offline (a 'hold' still in the outbox) show as serving with that
+  /// order's total, until the server has it and the map is reloaded.
+  PosData withLocalHolds(Iterable<OutboxItem> items) {
+    final byTable = <int, OutboxItem>{};
+    for (final i in items) {
+      final t = i.tableId;
+      if (i.kind == 'hold' && t != null) byTable[t] = i;
+    }
+    if (byTable.isEmpty) return this;
+    return copyWith(tables: [for (final t in tables) if (!t.busy && byTable.containsKey(t.id)) t.heldBy(byTable[t.id]!) else t]);
+  }
 }
 
 /// One cart line. A product can sit on several lines when they carry different notes (ít đá / không đá).
@@ -208,6 +240,7 @@ class CartState {
     this.note = '',
     this.busy = false,
     this.dirty = false,
+    this.localId,
   });
 
   /// null = takeaway ("Mang đi").
@@ -216,6 +249,10 @@ class CartState {
   /// Set when an open order was loaded (a busy table): saving replaces its lines.
   final int? orderId;
   final String? orderCode;
+
+  /// Set when an order saved while offline (a 'hold' in the outbox) was opened: saving updates that queued item,
+  /// paying turns it into a queued checkout.
+  final String? localId;
   final List<CartLine> lines;
   final num discount;
   final String note;
@@ -249,6 +286,7 @@ class CartState {
     String? note,
     bool? busy,
     bool? dirty,
+    Object? localId = _keep,
   }) =>
       CartState(
         tableId: identical(tableId, _keep) ? this.tableId : tableId as int?,
@@ -259,6 +297,42 @@ class CartState {
         note: note ?? this.note,
         busy: busy ?? this.busy,
         dirty: dirty ?? this.dirty,
+        localId: identical(localId, _keep) ? this.localId : localId as String?,
+      );
+
+  /// Saved between app starts (never the busy flag).
+  Map<String, dynamic> toJson() => {
+        'table_id': tableId,
+        'order_id': orderId,
+        'order_code': orderCode,
+        'local_id': localId,
+        'discount': discount,
+        'note': note,
+        'dirty': dirty,
+        'lines': [
+          for (final l in lines) {'product_id': l.productId, 'name': l.name, 'price': l.price, 'qty': l.qty, 'note': l.note, 'image_url': l.imageUrl},
+        ],
+      };
+
+  static CartState fromJson(Map<String, dynamic> j) => CartState(
+        tableId: toIntOrNull(j['table_id']),
+        orderId: toIntOrNull(j['order_id']),
+        orderCode: strOrNull(j['order_code']),
+        localId: strOrNull(j['local_id']),
+        discount: toNum(j['discount']),
+        note: '${j['note'] ?? ''}',
+        dirty: j['dirty'] == true,
+        lines: [
+          for (final l in mapList(j['lines']))
+            CartLine(
+              productId: toInt(l['product_id']),
+              name: '${l['name'] ?? ''}',
+              price: toNum(l['price']),
+              qty: toInt(l['qty']).clamp(1, kMaxLineQty),
+              note: '${l['note'] ?? ''}',
+              imageUrl: strOrNull(l['image_url']),
+            ),
+        ],
       );
 }
 
@@ -269,6 +343,9 @@ class PayOutcome {
   final num change;
   final int? tableId;
   String get code => '${order['order_code'] ?? ''}';
+
+  /// The sale was saved on the device and waits for the server (code OFF-…).
+  bool get offline => order['offline'] == true;
 }
 
 /// What the cashier chose in the pay sheet.

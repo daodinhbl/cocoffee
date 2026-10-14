@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/api_client.dart';
 import '../format.dart';
+import '../offline/image_store.dart';
 import '../session.dart';
 import '../theme/app_theme.dart';
 
@@ -324,9 +327,23 @@ class Thumb extends ConsumerWidget {
     final u = url;
     if (u == null || u.isEmpty) return placeholder;
     final full = u.startsWith('http') ? u : '$server$u';
-    return ClipRRect(
-      borderRadius: radius,
-      child: Image.network(full, width: size, height: size, fit: BoxFit.cover, errorBuilder: (_, _, _) => placeholder),
+    final store = ref.watch(imageStoreProvider);
+    if (!store.enabled) {
+      return ClipRRect(
+        borderRadius: radius,
+        child: Image.network(full, width: size, height: size, fit: BoxFit.cover, errorBuilder: (_, _, _) => placeholder),
+      );
+    }
+    // Photos are kept on disk (offline POS); a photo already known to be there is shown without waiting.
+    Widget fromFile(File f) => ClipRRect(
+          borderRadius: radius,
+          child: Image.file(f, width: size, height: size, fit: BoxFit.cover, errorBuilder: (_, _, _) => placeholder),
+        );
+    final known = store.ready(full);
+    if (known != null) return fromFile(known);
+    return FutureBuilder<File?>(
+      future: store.file(full),
+      builder: (_, snap) => snap.data == null ? placeholder : fromFile(snap.data!),
     );
   }
 }

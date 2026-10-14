@@ -49,7 +49,8 @@ class CartPanel extends StatelessWidget {
     final empty = cart.isEmpty;
     final String thirdLabel;
     final IconData thirdIcon;
-    if (cart.orderId == null) {
+    final loaded = cart.orderId != null || cart.localId != null;
+    if (!loaded) {
       thirdLabel = 'Xóa giỏ';
       thirdIcon = Icons.remove_shopping_cart_outlined;
     } else if (isAdmin) {
@@ -59,7 +60,7 @@ class CartPanel extends StatelessWidget {
       thirdLabel = 'Đóng đơn';
       thirdIcon = Icons.logout_rounded;
     }
-    final thirdEnabled = !busy && (cart.orderId != null || !empty);
+    final thirdEnabled = !busy && (loaded || !empty);
 
     return Material(
       color: context.cs.surface,
@@ -106,7 +107,7 @@ class CartPanel extends StatelessWidget {
                 Expanded(
                   child: _ActionButton(
                     icon: Icons.bookmark_border_rounded,
-                    label: cart.orderId != null ? 'Lưu đơn' : 'Giữ đơn',
+                    label: loaded ? 'Lưu đơn' : 'Giữ đơn',
                     onTap: busy || empty ? null : onHold,
                   ),
                 ),
@@ -115,7 +116,7 @@ class CartPanel extends StatelessWidget {
                   child: _ActionButton(
                     icon: thirdIcon,
                     label: thirdLabel,
-                    danger: cart.orderId != null && isAdmin,
+                    danger: loaded && isAdmin,
                     onTap: thirdEnabled ? onClear : null,
                   ),
                 ),
@@ -164,6 +165,10 @@ class _TablePicker extends StatelessWidget {
       fg = context.co.warn;
       bg = context.co.warnTint;
       sub = cart.orderCode != null ? 'Đơn ${cart.orderCode}' : 'Khách mang đi · chạm để chọn bàn';
+    } else if (cart.localId != null || t.heldLocally) {
+      fg = context.co.warn;
+      bg = context.co.warnTint;
+      sub = 'Chờ đồng bộ${cart.orderCode != null ? ' · ${cart.orderCode}' : ''}';
     } else if (t.busy || cart.orderId != null) {
       fg = context.co.bad;
       bg = context.co.badTint;

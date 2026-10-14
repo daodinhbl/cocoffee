@@ -37,6 +37,7 @@ class TableMap extends StatelessWidget {
               Wrap(spacing: 16, runSpacing: 4, children: [
                 _Legend(color: context.co.good, label: 'Trống'),
                 _Legend(color: context.co.bad, label: 'Đang phục vụ (chạm để mở đơn)'),
+                if (data.tables.any((t) => t.heldLocally)) _Legend(color: context.co.warn, label: 'Giữ đơn khi mất mạng (chờ đồng bộ)'),
               ]),
             ]),
           ),
@@ -63,11 +64,11 @@ class TableMap extends StatelessWidget {
               for (final t in data.tables)
                 _TableTile(
                   name: t.label,
-                  sub: t.busy ? 'Đang phục vụ' : 'Trống',
+                  sub: t.heldLocally ? 'Chờ đồng bộ' : (t.busy ? 'Đang phục vụ' : 'Trống'),
                   amount: t.busy && t.currentOrderTotal != null ? money(t.currentOrderTotal) : null,
-                  icon: Icons.table_restaurant_rounded,
-                  fg: t.busy ? context.co.bad : context.co.good,
-                  bg: t.busy ? context.co.badTint : context.co.goodTint,
+                  icon: t.heldLocally ? Icons.cloud_upload_outlined : Icons.table_restaurant_rounded,
+                  fg: t.heldLocally ? context.co.warn : (t.busy ? context.co.bad : context.co.good),
+                  bg: t.heldLocally ? context.co.warnTint : (t.busy ? context.co.badTint : context.co.goodTint),
                   selected: selectedTableId == t.id,
                   onTap: () => onPick(t),
                 ),

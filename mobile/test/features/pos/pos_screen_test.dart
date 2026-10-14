@@ -13,8 +13,7 @@ void main() {
       await setSurface(tester, phone);
       final api = MockApi();
       stubPosReads(api);
-      when(() => api.post('/orders', any())).thenAnswer((_) async => orderRes(101, 'open', 50000));
-      when(() => api.post('/orders/101/pay', any()))
+      when(() => api.post('/pos/checkout', any(), any()))
           .thenAnswer((_) async => {...orderRes(101, 'completed', 50000), 'change': 50000});
 
       await tester.pumpWidget(await testApp(const PosScreen(), api: api, user: cashierUser));
@@ -71,15 +70,17 @@ void main() {
       await tester.tap(find.text('XÁC NHẬN THANH TOÁN'));
       await tester.pumpAndSettle();
 
-      final create = verify(() => api.post('/orders', captureAny())).captured.single;
-      expect(create, {
+      // one request saves the cart and takes the payment; the Idempotency-Key makes a retry safe
+      final call = verify(() => api.post('/pos/checkout', captureAny(), captureAny())).captured;
+      expect(call[0], {
         'items': [
           {'product_id': 11, 'quantity': 2},
         ],
+        'method': 'cash',
+        'tendered': 100000,
+        'discount': 0,
       });
-      final pay = verify(() => api.post('/orders/101/pay', captureAny())).captured.single;
-      expect(pay, {'method': 'cash', 'tendered': 100000, 'discount': 0});
-      verifyNever(() => api.post('/orders/101/cancel', any()));
+      expect((call[1] as Map)['Idempotency-Key'], startsWith('off-'));
       expect(find.text('Đã thanh toán CF261014-00101. Thối 50.000đ.'), findsOneWidget);
       expect(find.text('Thanh toán'), findsNothing); // sheet closed
       expect(find.text('2 món'), findsNothing); // cart emptied
@@ -90,7 +91,7 @@ void main() {
       final api = MockApi();
       stubPosReads(api);
       when(() => api.get('/orders/55', query: any(named: 'query'))).thenAnswer((_) async => order55());
-      when(() => api.put('/orders/55/items', any())).thenAnswer((_) async => orderRes(55, 'open', 108000));
+      when(() => api.post('/pos/hold', any(), any())).thenAnswer((_) async => orderRes(55, 'open', 108000));
 
       await tester.pumpWidget(await testApp(const PosScreen(), api: api));
       await tester.pumpAndSettle();
@@ -126,14 +127,14 @@ void main() {
 
       await tester.tap(find.text('Lưu đơn'));
       await tester.pumpAndSettle();
-      final put = verify(() => api.put('/orders/55/items', captureAny())).captured.single;
-      expect(put, {
+      final hold = verify(() => api.post('/pos/hold', captureAny(), any())).captured.single;
+      expect(hold, {
+        'order_id': 55,
         'items': [
           {'product_id': 11, 'quantity': 2, 'note': 'ít đá'},
           {'product_id': 12, 'quantity': 2},
         ],
       });
-      verifyNever(() => api.post('/orders', any()));
       expect(find.text('Đã lưu đơn CF261014-00055 cho bàn.'), findsOneWidget);
       expect(find.text('Chọn bàn'), findsOneWidget); // back on the table map
     });
@@ -256,7 +257,7 @@ void main() {
       await setSurface(tester, tablet);
       final api = MockApi();
       stubPosReads(api);
-      when(() => api.post('/orders', any())).thenAnswer((_) async => orderRes(102, 'open', 35000));
+      when(() => api.post('/pos/hold', any(), any())).thenAnswer((_) async => orderRes(102, 'open', 35000));
       when(() => api.get('/orders/42', query: any(named: 'query'))).thenAnswer((_) async => {
             'order': {
               'id': 42,
@@ -305,7 +306,7 @@ void main() {
 
       await tester.tap(find.text('Giữ đơn'));
       await tester.pumpAndSettle();
-      final create = verify(() => api.post('/orders', captureAny())).captured.single;
+      final create = verify(() => api.post('/pos/hold', captureAny(), any())).captured.single;
       expect(create, {
         'table_id': 1,
         'items': [
@@ -335,13 +336,11 @@ void main() {
       await setSurface(tester, tablet);
       final api = MockApi();
       stubPosReads(api);
-      when(() => api.post('/orders', any())).thenAnswer((_) async => orderRes(101, 'open', 29000));
-      when(() => api.post('/orders/101/pay', any())).thenAnswer((_) async => throw ApiException(
+      when(() => api.post('/pos/checkout', any(), any())).thenAnswer((_) async => throw ApiException(
             code: 'INSUFFICIENT_STOCK',
             status: 409,
             message: 'Không đủ tồn kho: Sữa đặc (cần 2, còn 1 hộp)',
           ));
-      when(() => api.post('/orders/101/cancel', any())).thenAnswer((_) async => orderRes(101, 'cancelled', 29000));
 
       await tester.pumpWidget(await testApp(const PosScreen(), api: api, user: cashierUser));
       await tester.pumpAndSettle();
@@ -360,9 +359,15 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Không đủ tồn kho: Sữa đặc (cần 2, còn 1 hộp)'), findsOneWidget);
-      final pay = verify(() => api.post('/orders/101/pay', captureAny())).captured.single;
-      expect(pay, {'method': 'transfer', 'discount': 0});
-      verify(() => api.post('/orders/101/cancel', any())).called(1);
+      final pay = verify(() => api.post('/pos/checkout', captureAny(), any())).captured.single;
+      expect(pay, {
+        'items': [
+          {'product_id': 12, 'quantity': 1},
+        ],
+        'method': 'transfer',
+        'discount': 0,
+      });
+      verifyNever(() => api.post('/orders/101/cancel', any())); // the server cancels a failed sale itself
       expect(find.text('XÁC NHẬN THANH TOÁN'), findsOneWidget); // sheet still open for another try
       expect(find.text('Đơn mới · 1 món'), findsOneWidget); // cart kept
     });
@@ -372,8 +377,7 @@ void main() {
       final api = MockApi();
       stubPosReads(api);
       when(() => api.get('/orders/55', query: any(named: 'query'))).thenAnswer((_) async => order55());
-      when(() => api.put('/orders/55/items', any())).thenAnswer((_) async => orderRes(55, 'open', 79000));
-      when(() => api.post('/orders/55/pay', any())).thenAnswer((_) async => {...orderRes(55, 'completed', 69000), 'change': 0});
+      when(() => api.post('/pos/checkout', any(), any())).thenAnswer((_) async => {...orderRes(55, 'completed', 69000), 'change': 0});
 
       await tester.pumpWidget(await testApp(const PosScreen(orderId: 55), api: api, user: cashierUser));
       await tester.pumpAndSettle();
@@ -397,10 +401,17 @@ void main() {
       await tester.tap(find.text('XÁC NHẬN THANH TOÁN'));
       await tester.pumpAndSettle();
 
-      verify(() => api.put('/orders/55/items', any())).called(1);
-      verifyNever(() => api.post('/orders', any()));
-      final pay = verify(() => api.post('/orders/55/pay', captureAny())).captured.single;
-      expect(pay, {'method': 'cash', 'tendered': 69000, 'discount': 10000});
+      final pay = verify(() => api.post('/pos/checkout', captureAny(), any())).captured.single;
+      expect(pay, {
+        'order_id': 55,
+        'items': [
+          {'product_id': 11, 'quantity': 2, 'note': 'ít đá'},
+          {'product_id': 12, 'quantity': 1},
+        ],
+        'method': 'cash',
+        'tendered': 69000,
+        'discount': 10000,
+      });
       expect(find.text('Đã thanh toán CF261014-00055.'), findsOneWidget);
       expect(find.text('Chọn bàn'), findsOneWidget); // table order paid: back to the table map
     });
