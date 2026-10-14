@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/format.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common.dart';
+import 'customer_detail_screen.dart' show AdjustSheet;
 import 'customer_form_screen.dart';
 import 'customer_models.dart';
 import 'customer_providers.dart';
@@ -65,6 +66,14 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
 
   Future<void> _edit(Customer c) async {
     await Navigator.of(context).push<Customer>(MaterialPageRoute(builder: (_) => CustomerFormScreen(customer: c)));
+  }
+
+  /// 'Ghi nợ' on a row: adds debt to the customer by hand (they are told on Zalo when linked), then the list reloads.
+  Future<void> _addDebt(Customer c) async {
+    final res = await showFormSheet<Map<String, dynamic>>(context, builder: (_) => AdjustSheet(customer: c, increaseOnly: true));
+    if (res == null || !mounted) return;
+    ref.invalidate(customersPageProvider);
+    showToast(context, adjustMessage(parseNum(res['balance']), res['notify']));
   }
 
   Future<void> _refresh() async {
@@ -146,11 +155,11 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
               else if (wide)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: _CustomerTable(customers: data.customers, onEdit: _edit),
+                  child: _CustomerTable(customers: data.customers, onEdit: _edit, onAddDebt: _addDebt),
                 )
               else
                 for (final c in data.customers)
-                  Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 10), child: _CustomerCard(customer: c, onEdit: () => _edit(c))),
+                  Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 10), child: _CustomerCard(customer: c, onEdit: () => _edit(c), onAddDebt: () => _addDebt(c))),
               PaginationBar(page: data.page, pages: data.pages, onPage: _goTo),
             ],
           ],
@@ -354,9 +363,10 @@ Widget _balanceText(BuildContext context, num balance, {double size = 15}) => Te
 
 /// Phone: the web's rtable card (title = name + note; rows Liên hệ, Đơn hàng, Số dư nợ, Cập nhật; actions).
 class _CustomerCard extends StatelessWidget {
-  const _CustomerCard({required this.customer, required this.onEdit});
+  const _CustomerCard({required this.customer, required this.onEdit, required this.onAddDebt});
   final Customer customer;
   final VoidCallback onEdit;
+  final VoidCallback onAddDebt;
 
   @override
   Widget build(BuildContext context) {
@@ -384,6 +394,12 @@ class _CustomerCard extends StatelessWidget {
             ),
             const Divider(height: 12),
             Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+              TextButton.icon(
+                key: ValueKey('add-debt-${c.id}'),
+                onPressed: onAddDebt,
+                icon: const Icon(Icons.add_card_rounded, size: 19),
+                label: const Text('Ghi nợ'),
+              ),
               IconButton(tooltip: 'Sửa khách hàng', onPressed: onEdit, icon: const Icon(Icons.edit_outlined, size: 20)),
               const SizedBox(width: 4),
               OutlinedButton(
@@ -401,9 +417,10 @@ class _CustomerCard extends StatelessWidget {
 
 /// Tablet: the web table (Tên khách hàng, Liên hệ / Zalo, Đơn hàng, Số dư nợ, Cập nhật, actions).
 class _CustomerTable extends StatelessWidget {
-  const _CustomerTable({required this.customers, required this.onEdit});
+  const _CustomerTable({required this.customers, required this.onEdit, required this.onAddDebt});
   final List<Customer> customers;
   final ValueChanged<Customer> onEdit;
+  final ValueChanged<Customer> onAddDebt;
 
   static const _flex = [30, 22, 10, 14, 16];
 
@@ -425,7 +442,7 @@ class _CustomerTable extends StatelessWidget {
             th('Số dư nợ', _flex[3], end: true),
             const SizedBox(width: 16),
             th('Cập nhật', _flex[4]),
-            const SizedBox(width: 120),
+            const SizedBox(width: 184),
           ]),
         ),
         const Divider(),
@@ -462,8 +479,9 @@ class _CustomerTable extends StatelessWidget {
             child: Text(shopTime(c.updatedAt), style: context.tt.bodySmall?.copyWith(fontSize: 13.5, fontFeatures: tabular)),
           ),
           SizedBox(
-            width: 120,
+            width: 184,
             child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+              IconButton(key: ValueKey('add-debt-${c.id}'), tooltip: 'Ghi nợ', onPressed: () => onAddDebt(c), icon: const Icon(Icons.add_card_rounded, size: 19)),
               IconButton(tooltip: 'Sửa khách hàng', onPressed: () => onEdit(c), icon: const Icon(Icons.edit_outlined, size: 19)),
               OutlinedButton(
                 style: OutlinedButton.styleFrom(minimumSize: const Size(52, 36), padding: const EdgeInsets.symmetric(horizontal: 12), foregroundColor: Palette.navy),

@@ -142,6 +142,21 @@ test('zalo bot platform', async (t) => {
     assert.match(sent[0].body.text, /CoCoffee \/ 12345678/);
   });
 
+  await t.test('a picture or sticker in a private chat gets ONE text-only hint, groups stay silent', async () => {
+    sent.length = 0;
+    const ev = (name, id, chatType = 'PRIVATE', chat = 'u-hint') => ({ ok: true, result: { event_name: name, message: { message_id: id, date: Date.now(), from: { id: chat, display_name: 'Lan', is_bot: false }, chat: { id: chat, chat_type: chatType } } } });
+    await post(ev('message.sticker.received', 'h1'));
+    await post(ev('message.image.received', 'h2'));
+    await post(ev('message.sticker.received', 'h3', 'GROUP', 'g-hint'));
+    await settle(1);
+    await new Promise((r) => setTimeout(r, 80));
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].method, 'sendMessage');
+    assert.equal(sent[0].body.chat_id, 'u-hint');
+    assert.match(sent[0].body.text, /chưa xem được ảnh/);
+    assert.doesNotMatch(sent[0].body.text, /^Mình chỉ đọc/, 'a payment-proof screenshot is not answered with an ordering prompt only');
+  });
+
   await t.test('API errors never contain the bot token', async () => {
     await assert.rejects(zaloBot.sendText('boom', 'x'), (err) => !String(err.message).includes('SECRET-TOKEN') && /chat not found/.test(err.message));
     assert.equal(zaloBot.chunks('a'.repeat(4500)).every((c) => c.length <= 2000), true);

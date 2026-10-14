@@ -210,3 +210,16 @@ Future<Widget> routerTestApp(GoRouter router, {required ApiClient api, AppUser u
 
 /// A stub page showing the location it was opened with.
 Widget stubPage(GoRouterState s) => Scaffold(body: Text('stub ${s.uri}'));
+
+/// A delivered Zalo order not paid yet and NOT on any customer's ledger (candidate for "Ghi công nợ").
+Map<String, dynamic> zaloUnlinkedResponse() {
+  final r = zaloUnpaidResponse();
+  final o = Map<String, dynamic>.from(r['order'] as Map)
+    ..['id'] = 78
+    ..['order_code'] = 'CF261014-00078'
+    ..['zalo_user_id'] = '8813'
+    ..['zalo_chat_type'] = 'user'
+    ..['customer_id'] = null
+    ..['customer_name'] = null;
+  return {'order': o, 'payments': <Map<String, dynamic>>[]};
+}

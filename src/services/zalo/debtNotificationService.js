@@ -68,4 +68,17 @@ async function notifyIncrease(details) {
   return results;
 }
 
-module.exports = { notifyIncrease };
+/** The sentence the admin sees after a debt notice (customer and owner parts). */
+function describe(sent) {
+  if (!sent) return '';
+  let m = '';
+  if (sent.customer === 'sent') m += ' Đã gửi Zalo cho khách.';
+  else if (sent.customer === 'not_linked') m += ' Khách chưa liên kết Zalo nên chưa nhận được tin.';
+  else if (sent.customer === 'failed') m += ' Gửi Zalo cho khách không thành công.';
+  else if (sent.customer === 'push_not_supported') m += ' Chế độ Zalo hiện tại không hỗ trợ gửi tin chủ động cho khách.';
+  if (sent.owner === 'sent') m += ' Đã báo chủ quán qua Zalo.';
+  else if (sent.owner === 'failed') m += ' Gửi Zalo cho chủ quán không thành công.';
+  return m;
+}
+
+module.exports = { notifyIncrease, describe };

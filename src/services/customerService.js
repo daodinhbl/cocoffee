@@ -85,4 +85,71 @@ async function adjust(customerId, { amount, note, userId }) {
   });
 }
 
-module.exports = { collect, adjust, settleOrders, METHODS };
+/**
+ * "Ghi công nợ" for a Zalo order that is not on any customer's ledger (the customer was not in the list when they
+ * confirmed it, or was never linked): puts the order on a customer's debt.
+ *   - the customer is an existing one (customerId) or a new one (newCustomer { name, phone? }); a new customer takes the
+ *     order's Zalo id, so their next Zalo orders go to the ledger on their own;
+ *   - linkZalo (default true): an existing customer without a Zalo id gets the order's Zalo id, unless another customer
+ *     already owns it;
+ *   - one transaction under the order lock: the order is linked, ONE 'debt' ledger row of the order total is written
+ *     (the (order, 'debt') pair is unique, so a double click cannot count it twice). The order stays completed + unpaid:
+ *     it is paid later with "Thu tiền" / "Thu nợ" like any debt order.
+ * @returns {Promise<{ order: object, customer: object, amount: number, balance: number, note: string, linkedZalo: boolean, createdCustomer: boolean }>}
+ */
+async function recordOrderDebt(orderId, { customerId, newCustomer, linkZalo = true, userId } = {}) {
+  if (!customerId && !(newCustomer && String(newCustomer.name || '').trim())) {
+    throw new AppError(400, 'VALIDATION', 'Chọn khách hàng có sẵn hoặc nhập tên khách mới.');
+  }
+  return withTransaction(async (conn) => {
+    const order = await orderModel.getById(orderId, conn, { forUpdate: true });
+    if (!order) throw new AppError(404, 'NOT_FOUND', 'Không tìm thấy đơn hàng.');
+    if (order.source !== 'zalo' || order.status !== 'completed') throw new AppError(409, 'NOT_APPLICABLE', 'Chỉ đơn Zalo đã hoàn tất mới ghi công nợ được.');
+    if (order.payment_status !== 'unpaid') throw new AppError(409, 'ORDER_NOT_PAYABLE', 'Đơn đã thanh toán, không ghi công nợ được.');
+    if (order.customer_id) throw new AppError(409, 'ALREADY_ON_LEDGER', 'Đơn này đã được ghi công nợ cho một khách hàng.');
+    const total = Math.round(Number(order.total));
+    if (!(total > 0)) throw new AppError(409, 'VALIDATION', 'Đơn 0đ không có công nợ để ghi.');
+
+    let id = customerId ? Number(customerId) : null;
+    let createdCustomer = false;
+    let linkedZalo = false;
+    if (!id) {
+      const owner = order.zalo_user_id ? await customerModel.findByZaloUser(order.zalo_user_id, conn) : null;
+      if (owner) {
+        id = owner.id;                                          // the Zalo account already belongs to a customer: use them
+      } else {
+        id = await customerModel.create({
+          name: String(newCustomer.name).trim().slice(0, 120),
+          phone: String(newCustomer.phone || '').trim().slice(0, 20) || null,
+          zalo_user_id: order.zalo_user_id || null,
+          note: `Tạo khi ghi nợ đơn ${order.order_code}`,
+        }, conn);
+        createdCustomer = true;
+        linkedZalo = Boolean(order.zalo_user_id);
+      }
+    }
+    const customer = await lockCustomer(conn, id);
+    if (linkZalo && !createdCustomer && !customer.zalo_user_id && order.zalo_user_id) {
+      const owner = await customerModel.findByZaloUser(order.zalo_user_id, conn);
+      if (!owner) {
+        await customerModel.update(id, { zalo_user_id: order.zalo_user_id }, conn);
+        customer.zalo_user_id = order.zalo_user_id;
+        linkedZalo = true;
+      }
+    }
+    const note = `Nợ đơn ${order.order_code}`;
+    await customerModel.linkOrder(orderId, id, conn);
+    await customerModel.addEntry({ customerId: id, orderId, type: 'debt', amount: total, note, userId }, conn);
+    return {
+      order: { ...order, customer_id: id },
+      customer: { id, name: customer.name, zalo_user_id: customer.zalo_user_id || null },
+      amount: total,
+      balance: await balanceOf(conn, id),
+      note,
+      linkedZalo,
+      createdCustomer,
+    };
+  });
+}
+
+module.exports = { collect, adjust, recordOrderDebt, settleOrders, METHODS };

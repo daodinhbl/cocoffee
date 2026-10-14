@@ -5,6 +5,7 @@ const env = require('../config/env');
 const logger = require('../utils/logger');
 const orderModel = require('../models/orderModel');
 const zaloApi = require('./zalo/zaloApiService');
+const billDelivery = require('./zalo/billDelivery');
 const { formatVnd, formatShopTime } = require('../utils/text');
 
 const RECEIPT_DIR = path.join(env.rootDir, 'public', 'receipts');
@@ -76,47 +77,83 @@ async function buildImage(order, items) {
 }
 
 /**
- * Send the bill back to the Zalo chat that placed the order. Called AFTER the DB commit and never
- * throws: a failed delivery must not undo a finalized sale; it is recorded on the order instead
- * (orders.receipt_error) and can be retried via POST /api/orders/:id/resend-receipt.
- * @returns {Promise<{sent:boolean,error?:string}>}
+ * How to push messages and pictures into the Zalo chat of an order, or null when the channel cannot push (Bot Client mode).
+ * { reply(text), image({ url, caption }), textBill() } as billDelivery.deliver expects; pictures go by public URL.
  */
-async function sendReceipt(orderId) {
-  const { mode } = await require('./zalo/zaloConfig').get();
+function channelFor(order, mode, text = '') {
+  const noUrl = () => { throw new Error('PUBLIC_BASE_URL chưa đặt: Zalo không có địa chỉ công khai để lấy ảnh.'); };
   if (mode === 'platform') {
-    try {
-      const order = await orderModel.getById(orderId);
-      if (!order || order.source !== 'zalo' || !order.zalo_chat_id) return { sent: false, error: 'not a Zalo order' };
-      await require('./zalo/zaloBotPlatform').sendText(order.zalo_chat_id, buildText(order, await orderModel.getItems(orderId)));
-      await orderModel.markReceipt(orderId, null);
-      return { sent: true };
-    } catch (err) {
-      logger.error(`Receipt delivery failed for order ${orderId}`, err);
-      await orderModel.markReceipt(orderId, err.message).catch(() => {});
-      return { sent: false, error: err.message };
-    }
+    const bot = require('./zalo/zaloBotPlatform');
+    const chatId = order.zalo_chat_id;
+    return {
+      reply: (t) => bot.sendText(chatId, t),
+      image: async ({ url, caption }) => { if (!url) noUrl(); await bot.sendPhoto(chatId, url, caption); },
+      textBill: () => bot.sendText(chatId, text),
+    };
   }
+  if (mode === 'oa') {
+    const target = { chatType: order.zalo_chat_type, chatId: order.zalo_chat_id };
+    return {
+      reply: (t) => zaloApi.sendText(target, t),
+      image: async ({ url, caption }) => { if (!url) noUrl(); await zaloApi.sendImageWithText(target, caption || '', url); },
+      textBill: () => zaloApi.sendText(target, text),
+    };
+  }
+  return null;
+}
+
+/**
+ * Send the bill back to the Zalo chat that placed the order (the admin's "Gửi lại bill"): the 80 mm PNG receipt, then the
+ * bank account and VietQR for an unpaid order, exactly as the chatbot does after "ok" (services/zalo/billDelivery.js);
+ * the text bill when the picture cannot be sent. Called AFTER the DB commit and never throws: a failed delivery must
+ * not undo a finalized sale; it is recorded on the order (orders.receipt_error) and can be retried.
+ * @returns {Promise<{sent:boolean, error?:string, bill?:string, paymentInfo?:boolean, qr?:boolean, pictureError?:string|null}>}
+ */
+const inflight = new Set();       // orders whose bill is being sent right now: a double click must not send the whole set twice
+
+/** Plain text bill only (no picture, no payment info): what the OA channel's "ok" reply uses as the text fallback. */
+async function sendTextBill(orderId) {
+  const { mode } = await require('./zalo/zaloConfig').get();
+  const order = await orderModel.getById(orderId);
+  if (!order || order.source !== 'zalo' || !order.zalo_chat_id) throw new Error('not a Zalo order');
+  const io = channelFor(order, mode, buildText(order, await orderModel.getItems(orderId)));
+  if (!io) throw new Error('this Zalo mode cannot push messages');
+  try {
+    await io.textBill();
+    await orderModel.markReceipt(orderId, null);
+  } catch (err) {
+    await orderModel.markReceipt(orderId, err.message).catch(() => {});
+    throw err;
+  }
+}
+
+async function sendReceipt(orderId) {
+  const key = Number(orderId);
+  if (inflight.has(key)) return { sent: false, error: 'Đang gửi bill cho đơn này, vui lòng đợi vài giây rồi thử lại.' };
+  inflight.add(key);
+  try {
+    return await sendReceiptNow(orderId);
+  } finally {
+    inflight.delete(key);
+  }
+}
+
+async function sendReceiptNow(orderId) {
+  const { mode } = await require('./zalo/zaloConfig').get();
   // Bot Client mode: the server cannot push into Zalo; bills travel in the webhook response when the customer confirms.
-  if (mode !== 'oa') return { sent: false, error: 'Chế độ Zalo bot: bill được gửi vào nhóm khi khách chốt đơn. Hãy in hóa đơn hoặc gửi tay.' };
+  if (mode !== 'platform' && mode !== 'oa') return { sent: false, error: 'Chế độ Zalo bot: bill được gửi vào nhóm khi khách chốt đơn. Hãy in hóa đơn hoặc gửi tay.' };
   try {
     const order = await orderModel.getById(orderId);
     if (!order || order.source !== 'zalo' || !order.zalo_chat_id) return { sent: false, error: 'not a Zalo order' };
     const items = await orderModel.getItems(orderId);
-    const target = { chatType: order.zalo_chat_type, chatId: order.zalo_chat_id };
     const text = buildText(order, items);
-
-    let imageUrl = null;
-    try { imageUrl = await buildImage(order, items); } catch (err) { logger.warn('Receipt image failed, falling back to text', err); }
-
-    try {
-      if (imageUrl) await zaloApi.sendImageWithText(target, text, imageUrl);
-      else await zaloApi.sendText(target, text);
-    } catch (err) {
-      if (!imageUrl) throw err;
-      await zaloApi.sendText(target, text); // image rejected by Zalo -> still deliver the bill
-    }
-    await orderModel.markReceipt(orderId, null);
-    return { sent: true };
+    const io = channelFor(order, mode, text);
+    const r = await billDelivery.deliver(io, orderId);
+    if (r.bill === 'none') throw new Error(r.error || r.pictureError || 'Không gửi được bill.');
+    // what the owner sees on the order: the bill went as text because of the picture, or the payment info was not delivered
+    const problem = r.bill === 'text' && r.pictureError ? `Đã gửi bill chữ: ${r.pictureError}` : (r.error ? `Đã gửi bill, chưa gửi được thông tin thanh toán: ${r.error}` : null);
+    await orderModel.markReceipt(orderId, problem);
+    return { sent: true, ...r };
   } catch (err) {
     logger.error(`Receipt delivery failed for order ${orderId}`, err);
     await orderModel.markReceipt(orderId, err.message).catch(() => {});
@@ -124,4 +161,4 @@ async function sendReceipt(orderId) {
   }
 }
 
-module.exports = { buildText, buildImage, sendReceipt };
+module.exports = { buildText, buildImage, sendReceipt, sendTextBill, channelFor };

@@ -7,6 +7,7 @@ const orders = require('./orders');
 const { AppError } = require('../../utils/httpError');
 const zaloBot = require('../../services/zalo/zaloBotPlatform');
 const zaloConfig = require('../../services/zalo/zaloConfig');
+const webhookGuard = require('../../services/zalo/webhookGuard');
 const chatbotInfo = require('../../services/zalo/chatbotInfo');
 const { BANKS } = require('../../services/vietQr');
 
@@ -80,6 +81,7 @@ async function registerWebhook() {
     throw new AppError(502, 'ZALO_BOT_API', `Zalo từ chối: ${err.message.replace(/^Zalo Bot \w+ failed: /, '')}`);
   }
   const v = result.verification || {};
+  if (v.ok !== false) await webhookGuard.remember(url, secret);
   const name = me.account_name || me.display_name || me.name || 'bot';
   return {
     message: v.ok === false

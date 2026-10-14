@@ -1,6 +1,10 @@
 const orderModel = require('../../models/orderModel');
 const orderService = require('../../services/orderService');
 const receiptService = require('../../services/receiptService');
+const paymentNotification = require('../../services/zalo/paymentNotificationService');
+const customerService = require('../../services/customerService');
+const customerModel = require('../../models/customerModel');
+const debtNotifications = require('../../services/zalo/debtNotificationService');
 const orderQuery = require('../../services/orderQueryService');
 const { AppError } = require('../../utils/httpError');
 const v = require('../../utils/validate');
@@ -64,10 +68,12 @@ async function detail(req, res) {
   const id = v.id(req.params.id);
   const order = await orderService.getWithItems(id);
   const payments = await orderModel.getPayments(id);
+  const canRecordDebt = req.user.role === 'admin' && order.source === 'zalo' && order.status === 'completed' && order.payment_status === 'unpaid' && !order.customer_id;
+  const debtCustomers = canRecordDebt ? await customerModel.list({ limit: 500 }).catch(() => []) : [];
   await render(res, 'order_detail', {
     title: order.order_code || `Đơn #${id}`, activeMenu: 'orders',
     breadcrumbs: [{ label: 'Đơn hàng', href: '/admin/orders' }, { label: order.order_code || `#${id}` }],
-  }, { order, payments });
+  }, { order, payments, canRecordDebt, debtCustomers });
 }
 
 async function cancel(req) {
@@ -84,7 +90,28 @@ async function pay(req) {
     userId: req.user.id,
     allowDebtSettlement: true,                         // admin-only page: may settle a customer's debt order
   });
-  return { message: `Đã ghi nhận thanh toán đơn ${result.order.order_code}.` };
+  const notified = result.order.source === 'zalo' ? await paymentNotification.notifyOrderPaidSoon(id) : null;
+  return { message: `Đã ghi nhận thanh toán đơn ${result.order.order_code}.${paymentNotification.describe(notified)}` };
+}
+
+/** POST /admin/orders/:id/record-debt { customer_id | new_name [+ new_phone], link_zalo } — "Ghi công nợ" for a Zalo order. */
+async function recordDebt(req) {
+  const id = v.id(req.params.id);
+  const b = req.body;
+  const customerId = optional(b.customer_id) ? v.id(b.customer_id, 'Khách hàng') : null;
+  const newName = v.str(optional(b.new_name), 'Tên khách mới', { max: 120, required: false });
+  const r = await customerService.recordOrderDebt(id, {
+    customerId,
+    newCustomer: !customerId && newName ? { name: newName, phone: v.str(optional(b.new_phone), 'Số điện thoại', { max: 20, required: false }) } : undefined,
+    linkZalo: b.link_zalo !== '0',
+    userId: req.user.id,
+  });
+  const sent = await debtNotifications.notifyIncrease({ customer: r.customer, amount: r.amount, balance: r.balance, note: r.note });
+  const money = (n) => Number(n).toLocaleString('vi-VN');
+  let message = `Đã ghi công nợ ${money(r.amount)}đ (đơn ${r.order.order_code}) cho ${r.customer.name}${r.createdCustomer ? ' (khách mới)' : ''}. Số dư nợ ${money(r.balance)}đ.`;
+  if (r.linkedZalo) message += ' Đã liên kết Zalo của đơn với khách.';
+  message += debtNotifications.describe(sent);
+  return { message, to: `/admin/orders/${id}` };
 }
 
 async function resendReceipt(req) {
@@ -94,7 +121,10 @@ async function resendReceipt(req) {
   if (order.source !== 'zalo' || order.status !== 'completed') throw new AppError(409, 'NOT_APPLICABLE', 'Chỉ đơn Zalo đã hoàn tất mới có bill Zalo.');
   const r = await receiptService.sendReceipt(id);
   if (!r.sent) throw new AppError(502, 'ZALO_FAILED', `Gửi bill thất bại: ${r.error}`);
-  return { message: `Đã gửi lại bill ${order.order_code} qua Zalo.` };
+  const parts = [r.bill === 'picture' ? 'ảnh hóa đơn' : 'bill dạng chữ'];
+  if (r.paymentInfo) parts.push(r.qr ? 'số tài khoản + mã QR' : 'số tài khoản');
+  const why = r.bill === 'text' && r.pictureError ? ` Không gửi được ảnh: ${r.pictureError}` : '';
+  return { message: `Đã gửi lại ${order.order_code} qua Zalo: ${parts.join(', ')}.${why}` };
 }
 
-module.exports = { list, detail, cancel, pay, resendReceipt, readFilters, PAGE_SIZE };
+module.exports = { list, detail, cancel, pay, recordDebt, resendReceipt, readFilters, PAGE_SIZE };

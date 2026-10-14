@@ -118,6 +118,8 @@
           <td data-label="Cập nhật" class="px-4 py-3 text-sm text-milk-500 tnum"><%= fmtTime(c.updated_at) %></td>
           <td data-label="" class="rt-actions px-4 py-3 text-right">
             <div class="inline-flex items-center gap-1">
+              <button type="button" data-modal-open="#debt-add-dialog" data-action="/admin/customers/<%= c.id %>/adjust" data-title="Ghi nợ · <%= c.name %>"
+                class="<%= ui.btnGhost %>" title="Ghi nợ cho khách" aria-label="Ghi nợ cho <%= c.name %>"><%- icon('receipt','h-4 w-4') %></button>
               <button type="button" data-modal-open="#zalo-dialog" data-action="/admin/customers/<%= c.id %>/zalo" data-title="Gán Zalo · <%= c.name %>" data-fill="<%= safeJson({ zalo_user_id: c.zalo_user_id || '' }) %>"
                 class="<%= ui.btnGhost %>" title="<%= c.zalo_user_id ? 'Đổi / gỡ Zalo ID' : 'Gán Zalo ID' %>" aria-label="Gán Zalo cho <%= c.name %>"><%- icon('chat','h-4 w-4') %></button>
               <a href="/admin/customers/<%= c.id %>/edit" class="<%= ui.btnGhost %>" title="Sửa khách hàng" aria-label="Sửa <%= c.name %>"><%- icon('pencil','h-4 w-4') %></a>
@@ -181,6 +183,35 @@
     <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-4 py-3 max-sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
       <button type="button" data-modal-close class="<%= btnSecondary %> max-sm:flex-1">Hủy</button>
       <button type="submit" class="<%= btnPrimary %> max-sm:flex-[2]">Lưu</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Ghi nợ: add debt to a customer by hand (the customer is told on Zalo when linked) -->
+<dialog id="debt-add-dialog" aria-labelledby="debt-add-title" class="max-w-md <%= sheet %>">
+  <form method="post" action="/admin/customers" class="flex flex-col">
+    <%- include('../partials/csrf') %>
+    <%- grabber %>
+    <input type="hidden" name="direction" value="increase">
+    <input type="hidden" name="stay" value="1">
+    <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4">
+      <h2 id="debt-add-title" data-dialog-title class="text-lg font-semibold">Ghi nợ</h2>
+      <button type="button" data-modal-close aria-label="Đóng" class="<%= btnGhost %>"><%- icon('x', 'h-5 w-5') %></button>
+    </div>
+    <div class="space-y-4 px-4 py-4 sm:px-6 sm:py-5">
+      <div>
+        <label for="da-amount" class="<%= label %>">Số tiền ghi nợ (đ)</label>
+        <input id="da-amount" name="amount" type="number" min="1" step="1000" required inputmode="numeric" class="<%= input %> text-right font-mono text-lg">
+      </div>
+      <div>
+        <label for="da-note" class="<%= label %>">Lý do (bắt buộc)</label>
+        <input id="da-note" name="note" maxlength="255" required class="<%= input %>" autocomplete="off" placeholder="VD: khách lấy hàng chưa trả tiền, nợ sổ tay">
+        <p class="mt-1.5 text-xs text-milk-500">Khách đã liên kết Zalo sẽ nhận thông báo công nợ. Thu nợ ở trang chi tiết khách.</p>
+      </div>
+    </div>
+    <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-4 py-3 max-sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
+      <button type="button" data-modal-close class="<%= btnSecondary %> max-sm:flex-1">Hủy</button>
+      <button type="submit" class="<%= btnPrimary %> max-sm:flex-[2]">Ghi nợ</button>
     </div>
   </form>
 </dialog>

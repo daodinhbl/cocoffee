@@ -25,6 +25,7 @@ router.put('/customers/:id', customers.update);
 router.get('/customers/:id/statement', customers.statement);
 router.post('/customers/:id/collect', customers.collect);
 router.post('/customers/:id/adjust', customers.adjust);
+router.post('/orders/:id/record-debt', customers.recordOrderDebt);          // "Ghi công nợ" for a Zalo order
 
 router.get('/menu', menu.menu);
 router.get('/bom', menu.bom);

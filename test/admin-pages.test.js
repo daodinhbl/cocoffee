@@ -184,6 +184,15 @@ test('admin pages', async (t) => {
     assert.equal(opts.userId, 1);
     assert.equal(opts.discount, undefined);
 
+    // "Thu tiền" on a Zalo order tells the customer on Zalo and says so to the owner
+    reset();
+    const paymentNotification = require('../src/services/zalo/paymentNotificationService');
+    const confirm = require('node:test').mock.method(paymentNotification, 'notifyOrderPaidSoon', async () => 'sent');
+    await admin.post('/admin/orders/42/pay', { _csrf: token, _back: '/admin/orders/42', method: 'cash' });
+    assert.deepEqual(confirm.mock.calls[0].arguments, [42]);
+    assert.match(await (await admin.get('/admin/orders/42')).text(), /Đã gửi xác nhận thanh toán cho khách qua Zalo/);
+    confirm.mock.restore();
+
     reset();
     await admin.post('/admin/orders/42/pay', { _csrf: token, _back: '/admin/orders/42', method: 'bitcoin' });
     assert.equal(called('order.pay').length, 0, 'unknown payment method is rejected');

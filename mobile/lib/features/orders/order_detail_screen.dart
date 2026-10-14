@@ -7,10 +7,13 @@ import '../../core/format.dart';
 import '../../core/session.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common.dart';
+import '../customers/customer_providers.dart' show customersPageProvider;
+import '../menu/form_sheet.dart' show showFormSheet;
 import 'order_widgets.dart';
 import 'orders_models.dart';
 import 'orders_providers.dart';
 import 'pay_sheet.dart';
+import 'record_debt_sheet.dart';
 
 /// Content width from which items and the info column sit side by side (the web's lg 8/4 grid).
 const _kTwoColumns = 900.0;
@@ -51,6 +54,15 @@ class _DetailBody extends ConsumerWidget {
     if (r == null || !context.mounted) return;
     _reload(ref);
     showToast(context, 'Đã ghi nhận thanh toán đơn ${r.orderCode}.${r.change > 0 ? ' Thối ${money(r.change)}.' : ''}');
+  }
+
+  /// "Ghi công nợ": puts this Zalo order on a customer's debt (existing or new), then the customer is told on Zalo.
+  Future<void> _recordDebt(BuildContext context, WidgetRef ref) async {
+    final res = await showFormSheet<Map<String, dynamic>>(context, builder: (_) => RecordDebtSheet(order: order));
+    if (res == null || !context.mounted) return;
+    _reload(ref);
+    ref.invalidate(customersPageProvider);
+    showToast(context, recordDebtMessage(res, order.orderCode));
   }
 
   Future<void> _cancel(BuildContext context, WidgetRef ref) async {
@@ -124,6 +136,28 @@ class _DetailBody extends ConsumerWidget {
                 onPressed: () => _pay(context, ref, isAdmin),
                 icon: const Icon(Icons.check_rounded),
                 label: Text(o.isOpen ? 'Thu tiền & hoàn tất đơn' : 'Thu ${money(o.total)}'),
+              ),
+            ]),
+          ),
+        ),
+      ],
+      if (isAdmin && o.canRecordDebt) ...[
+        const SizedBox(height: 16),
+        PanelCard(
+          key: const Key('debt-card'),
+          title: 'Công nợ',
+          icon: Icons.account_balance_wallet_outlined,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Text('Đơn Zalo này chưa nằm trong sổ nợ của khách nào. Ghi nợ sẽ gắn đơn vào khách, tăng số dư nợ và báo khách qua Zalo.',
+                  style: context.tt.bodySmall),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                key: const Key('open-record-debt'),
+                onPressed: () => _recordDebt(context, ref),
+                icon: const Icon(Icons.receipt_long_rounded),
+                label: const Text('Ghi công nợ cho khách'),
               ),
             ]),
           ),

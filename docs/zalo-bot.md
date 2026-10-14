@@ -112,7 +112,7 @@ Với Zalo Bot Platform, server tự gửi ảnh bằng `sendPhoto` với link c
 | `draft` | Tin nhắn có món: đã tạo hoặc cập nhật đơn nháp. Nhắn lại món để thay đơn, nhắn `thêm ...` để bổ sung. Tùy chọn `ít/nhiều/không đường`, `ít/nhiều/không đá`, `đá riêng`, `size S/M/L` (hoặc `ly lớn/nhỏ`) được ghi vào ghi chú của dòng món. |
 | `debt` | `check nợ`, `xem công nợ`, `mình còn nợ bao nhiêu`...: chỉ trả lời trong chat riêng, cho khách đã liên kết Zalo; kèm ảnh VietQR khi quán đã nhập tài khoản. |
 | `faq` | Hỏi địa chỉ, wifi, giờ mở cửa, số tài khoản (không có món nào trong tin). Trong nhóm chỉ trả lời khi bot được @nhắc tên. Nội dung sửa ở **Admin → Zalo → Trả lời tự động & chuyển khoản**. |
-| `confirmed` | `ok` / `oke`: đã chốt đơn, `replies` chứa bill. |
+| `confirmed` | `ok` / `oke` / `chốt đơn` / `đúng rồi`...: đã chốt đơn. `replies` gồm ảnh hóa đơn PNG 80mm (`type: image`; bill chữ nếu không vẽ được ảnh), rồi, khi quán đã nhập tài khoản ngân hàng, tin chữ số tài khoản + số tiền + nội dung chuyển khoản và ảnh VietQR đúng số tiền của đơn. |
 | `cancelled` | `huy`: đã hủy đơn nháp. |
 | `expired` | Đơn nháp quá `ZALO_DRAFT_TTL_MINUTES` phút: đã hủy, khách cần đặt lại. |
 | `menu` | `menu`: trả về thực đơn. |
@@ -123,6 +123,26 @@ Với Zalo Bot Platform, server tự gửi ảnh bằng `sendPhoto` với link c
 Mã lỗi HTTP: `401` sai hoặc thiếu Bearer, `400` thiếu `senderId`/`message`, `503` server chưa đặt `BOT_WEBHOOK_SECRET`, `429` gửi quá 120 tin/phút, `500` lỗi xử lý (`replies` rỗng, bot có thể thử lại với **cùng** `messageId`).
 
 `GET /api/zalo/webhook` trả về `{"ok":true,"mode":"bot"}`, dùng để bot kiểm tra kết nối.
+
+## Sau khi chốt đơn: hóa đơn PNG, số tài khoản, mã QR
+
+Khách nhắn `ok` thì server (`services/zalo/billDelivery.js`) gửi theo thứ tự:
+
+1. **Ảnh hóa đơn PNG khổ 80mm** (576px, vẽ bằng `pureimage` + font DejaVu, chạy được trên Hostinger). Không vẽ được hoặc Zalo từ chối ảnh thì gửi bill chữ thay thế.
+2. Nếu đơn chưa thanh toán và Admin → Zalo → "Trả lời tự động & chuyển khoản" đã có tài khoản: tin chữ gồm ngân hàng, số tài khoản, tên chủ tài khoản, số tiền, nội dung chuyển khoản (mã đơn).
+3. **Mã VietQR** của tài khoản đó, đúng số tiền của đơn.
+
+Mỗi hóa đơn còn được lưu một bản tại `public/uploads/receipts/<khách hàng>/<yyyy>/<mm>/<dd>/` (`KH<mã>-<tên>`, `zalo-<id>` hoặc `khach-le`); mỗi lần deploy thư mục này bị thay.
+
+Ảnh gửi bằng đường dẫn công khai có chữ ký, hết hạn sau 7 ngày: `/api/zalo/receipt/<token>.png` và `/api/zalo/pay-qr/<token>.png` (cần `PUBLIC_BASE_URL`). Bot Client nhận ảnh trực tiếp (`base64`) trong `replies`.
+
+**Nút "Gửi lại bill"** (Admin → đơn hàng, POS) gửi đúng bộ này (ảnh, số tài khoản, QR) và báo cho chủ quán đã gửi gì, hoặc vì sao chỉ gửi được bill chữ.
+
+**Chủ quán bấm "Thu tiền"** thì khách nhận tin "✅ ĐÃ NHẬN THANH TOÁN" (đơn, số tiền, hình thức, giờ) kèm lại ảnh hóa đơn đã đóng dấu ĐÃ THANH TOÁN. Thu nợ ở trang khách hàng thì khách nhận số tiền đã thu, các đơn đã tất toán và công nợ còn lại. Chỉ gửi được khi Zalo ở chế độ Bot Platform (hoặc OA) và khách đã liên kết Zalo; việc gửi chỉ là xác nhận thêm, không bao giờ làm hỏng việc thu tiền.
+
+## Webhook: tự kiểm tra khi khởi động
+
+Zalo chỉ gọi webhook đã đăng ký bằng `setWebhook` với đúng địa chỉ **và** khóa bí mật. Đổi `BOT_WEBHOOK_SECRET`, token hoặc tên miền trong hPanel mà không đăng ký lại thì mọi tin đến bị trả 401: bot nhận không được nhưng vẫn gửi đi được (trả lời, "Gửi lại bill"). Khi khởi động ở chế độ Bot Platform, server so dấu vân tay (địa chỉ + khóa) với lần đăng ký trước và với `getWebhookInfo` của Zalo, rồi tự đăng ký lại nếu khác. Log Hostinger ghi: `Zalo webhook info: …`, `Zalo webhook: registering … (lý do)`, từng sự kiện `Zalo event … -> action`, và `Zalo webhook REFUSED` (tối đa 1 dòng/phút) khi Zalo gọi sai khóa.
 
 ## Đảm bảo khi khách "chốt đơn"
 

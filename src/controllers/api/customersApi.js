@@ -3,6 +3,7 @@ const customerService = require('../../services/customerService');
 const customerQuery = require('../../services/customerQueryService');
 const printerSettings = require('../../services/printerSettings');
 const debtNotifications = require('../../services/zalo/debtNotificationService');
+const paymentNotification = require('../../services/zalo/paymentNotificationService');
 const { AppError } = require('../../utils/httpError');
 const v = require('../../utils/validate');
 
@@ -87,7 +88,7 @@ async function update(req, res) {
   res.json({ customer: await customerModel.getById(id) });
 }
 
-/** POST /api/admin/customers/:id/collect { amount, method, note? } -> { amount, balance, settled: [order_code] } */
+/** POST /api/admin/customers/:id/collect { amount, method, note? } -> { amount, balance, settled: [order_code], zalo_notify } (the customer is told on Zalo) */
 async function collect(req, res) {
   const id = v.id(req.params.id);
   const r = await customerService.collect(id, {
@@ -96,7 +97,9 @@ async function collect(req, res) {
     note: v.str(req.body.note, 'note', { max: 255, required: false }),
     userId: req.user.id,
   });
-  res.json({ amount: r.amount, balance: r.balance, settled: r.settled });
+  const customer = await customerModel.getById(id).catch(() => null);
+  const zaloNotify = await paymentNotification.notifyDebtCollected({ customer, amount: r.amount, balance: r.balance, settled: r.settled, method: req.body.method });
+  res.json({ amount: r.amount, balance: r.balance, settled: r.settled, zalo_notify: zaloNotify });
 }
 
 /**
@@ -113,6 +116,27 @@ async function adjust(req, res) {
   });
   const notify = r.amount > 0 ? await debtNotifications.notifyIncrease(r) : null;
   res.json({ balance: r.balance, amount: r.amount, note: r.note, notify });
+}
+
+/**
+ * POST /api/admin/orders/:id/record-debt { customer_id } | { new_customer: { name, phone? } } [, link_zalo = true ]
+ * "Ghi công nợ" for a Zalo order that is not on a customer's ledger -> { order_id, customer: { id, name, zalo_user_id },
+ * amount, balance, note, linked_zalo, created_customer, notify }. The customer (and the owner) are told on Zalo.
+ */
+async function recordOrderDebt(req, res) {
+  const b = req.body || {};
+  const nc = b.new_customer && typeof b.new_customer === 'object' ? b.new_customer : null;
+  const r = await customerService.recordOrderDebt(v.id(req.params.id), {
+    customerId: b.customer_id ? v.id(b.customer_id, 'customer_id') : null,
+    newCustomer: nc ? { name: v.str(nc.name, 'new_customer.name', { max: 120, required: false }), phone: v.str(nc.phone, 'new_customer.phone', { max: 20, required: false }) } : undefined,
+    linkZalo: b.link_zalo !== false,
+    userId: req.user.id,
+  }).catch((err) => { throw duplicateError(err); });
+  const notify = await debtNotifications.notifyIncrease({ customer: r.customer, amount: r.amount, balance: r.balance, note: r.note });
+  res.status(201).json({
+    order_id: r.order.id, customer: r.customer, amount: r.amount, balance: r.balance, note: r.note,
+    linked_zalo: r.linkedZalo, created_customer: r.createdCustomer, notify,
+  });
 }
 
 /** GET /api/admin/customers/reconciliation?from=&to=&q= (default: this month so far; a reversed range is swapped) */
@@ -133,4 +157,4 @@ async function statement(req, res) {
   });
 }
 
-module.exports = { list, detail, create, update, collect, adjust, reconciliation, statement, duplicateError };
+module.exports = { list, detail, create, update, collect, adjust, recordOrderDebt, reconciliation, statement, duplicateError };

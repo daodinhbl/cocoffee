@@ -78,9 +78,13 @@ async function handle(req, res) {
         if (!url) throw new Error('PUBLIC_BASE_URL is not set: no public URL for the picture');
         await zaloApi.sendImageWithText({ chatType, chatId: String(chatId) }, caption || '', url);
       },
-      onConfirmed: async (orderId) => {
-        const result = await receiptService.sendReceipt(orderId);
-        if (!result.sent) logger.warn(`Order ${orderId} completed but receipt not delivered: ${result.error}`);
+      onConfirmed: async (orderId) => {                  // the text bill only: the picture and the payment info are sent by billDelivery
+        try {
+          await receiptService.sendTextBill(orderId);
+        } catch (err) {
+          logger.warn(`Order ${orderId} completed but the text bill was not delivered: ${err.message}`);
+          throw err;
+        }
       },
     }))
     .then(() => eventModel.mark(key, 'processed'))

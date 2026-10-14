@@ -226,6 +226,7 @@ class OrderDetail {
     this.tableName,
     this.tableCode,
     this.zaloChatType,
+    this.zaloUserId,
     this.createdAt,
     this.completedAt,
     this.paidAt,
@@ -254,6 +255,7 @@ class OrderDetail {
       tableName: _s(o['table_name']),
       tableCode: _s(o['table_code']),
       zaloChatType: _s(o['zalo_chat_type']),
+      zaloUserId: _s(o['zalo_user_id']),
       createdAt: _s(o['created_at']),
       completedAt: _s(o['completed_at']),
       paidAt: _s(o['paid_at']),
@@ -282,6 +284,7 @@ class OrderDetail {
   final String? tableName;
   final String? tableCode;
   final String? zaloChatType;
+  final String? zaloUserId;
   final String? createdAt;
   final String? completedAt;
   final String? paidAt;
@@ -296,6 +299,9 @@ class OrderDetail {
   bool get canCancel => status == 'draft' || status == 'open';
   bool get canPay => status == 'open' || (status == 'completed' && paymentStatus == 'unpaid');
   bool get canResend => source == 'zalo' && status == 'completed';
+
+  /// "Ghi công nợ" (admin): a delivered, unpaid Zalo order that is not on any customer's ledger.
+  bool get canRecordDebt => source == 'zalo' && status == 'completed' && paymentStatus == 'unpaid' && customerId == null;
   bool get printable => status == 'open' || status == 'completed';
   num get profit => total - (cogsTotal ?? 0);
   num get margin => total > 0 ? profit / total * 100 : 0;

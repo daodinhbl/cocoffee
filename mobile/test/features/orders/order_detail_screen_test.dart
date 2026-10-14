@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:mocktail/mocktail.dart';
 
 import '../../helpers/test_app.dart';
+import '../customers/customer_fixtures.dart';
 import 'orders_fixtures.dart';
 
 void main() {
@@ -292,5 +293,136 @@ void main() {
     await tester.tap(find.text('Chị Lan').first);
     await tester.pumpAndSettle();
     expect(find.text('stub /customers/5'), findsOneWidget);
+  });
+
+  group('Ghi công nợ (Zalo order not on a ledger)', () {
+    setUp(() {
+      when(() => api.get('/orders/78', query: any(named: 'query'))).thenAnswer((_) async => zaloUnlinkedResponse());
+      when(() => api.get('/admin/customers', query: any(named: 'query'))).thenAnswer((_) async => customersPage());
+    });
+
+    testWidgets('admin picks an existing customer, the Zalo account is linked, one POST, the toast says what happened', (tester) async {
+      await setSurface(tester, phone);
+      when(() => api.post('/admin/orders/78/record-debt', any())).thenAnswer((_) async => {
+            'order_id': 78,
+            'customer': {'id': 7, 'name': 'Nguyễn Văn An', 'zalo_user_id': '8813'},
+            'amount': 120000,
+            'balance': 270000,
+            'note': 'Nợ đơn CF261014-00078',
+            'linked_zalo': true,
+            'created_customer': false,
+            'notify': {'customer': 'sent', 'owner': 'not_configured'},
+          });
+      await tester.pumpWidget(await testApp(const OrderDetailScreen(id: 78), api: api));
+      await tester.pumpAndSettle();
+
+      await scrollTo(tester, find.byKey(const Key('open-record-debt')));
+      await tester.ensureVisible(find.byKey(const Key('open-record-debt')));
+      await tester.pumpAndSettle();
+      expect(find.text('CÔNG NỢ'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('open-record-debt')));
+      await tester.pumpAndSettle();
+      expect(find.text('Ghi công nợ · CF261014-00078'), findsOneWidget);
+      expect(find.textContaining('Số tiền ghi nợ: 120.000đ'), findsOneWidget);
+      expect(find.text('Nguyễn Văn An'), findsOneWidget);
+      expect(find.byKey(const ValueKey('debt-link-zalo')), findsOneWidget);
+
+      // nothing chosen yet
+      await tester.tap(find.byKey(const ValueKey('debt-submit')));
+      await tester.pumpAndSettle();
+      expect(find.text('Chọn một khách hàng trong danh sách, hoặc tạo khách mới.'), findsOneWidget);
+
+      await tester.tap(find.byKey(const ValueKey('debt-customer-7')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('debt-submit')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Ghi công nợ 120.000đ (đơn CF261014-00078) cho Nguyễn Văn An?'), findsOneWidget);
+      await tester.tap(find.text('Đồng ý'));
+      await tester.pumpAndSettle();
+
+      final body = verify(() => api.post('/admin/orders/78/record-debt', captureAny())).captured.single;
+      expect(body, {'customer_id': 7, 'link_zalo': true});
+      expect(find.textContaining('Đã ghi công nợ 120.000đ (đơn CF261014-00078) cho Nguyễn Văn An. Số dư nợ 270.000đ.'), findsOneWidget);
+      expect(find.textContaining('Đã liên kết Zalo của đơn với khách. Đã gửi Zalo cho khách.'), findsOneWidget);
+      expect(find.text('Ghi công nợ · CF261014-00078'), findsNothing, reason: 'the sheet closed');
+    });
+
+    testWidgets('a new customer: name is required, phone optional, Zalo linking can be switched off', (tester) async {
+      await setSurface(tester, phone);
+      when(() => api.post('/admin/orders/78/record-debt', any())).thenAnswer((_) async => {
+            'order_id': 78,
+            'customer': {'id': 51, 'name': 'Chị Mai', 'zalo_user_id': null},
+            'amount': 120000,
+            'balance': 120000,
+            'linked_zalo': false,
+            'created_customer': true,
+            'notify': {'customer': 'not_linked', 'owner': 'not_configured'},
+          });
+      await tester.pumpWidget(await testApp(const OrderDetailScreen(id: 78), api: api));
+      await tester.pumpAndSettle();
+      await scrollTo(tester, find.byKey(const Key('open-record-debt')));
+      await tester.ensureVisible(find.byKey(const Key('open-record-debt')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('open-record-debt')));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Khách mới'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('debt-submit')));
+      await tester.pumpAndSettle();
+      expect(find.text('Nhập tên khách mới.'), findsOneWidget);
+
+      await tester.enterText(find.byKey(const ValueKey('debt-new-name')), 'Chị Mai');
+      await tester.enterText(find.byKey(const ValueKey('debt-new-phone')), '0909111222');
+      await tester.tap(find.byKey(const ValueKey('debt-link-zalo')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('debt-submit')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Đồng ý'));
+      await tester.pumpAndSettle();
+
+      final body = verify(() => api.post('/admin/orders/78/record-debt', captureAny())).captured.single;
+      expect(body, {
+        'new_customer': {'name': 'Chị Mai', 'phone': '0909111222'},
+        'link_zalo': false,
+      });
+      expect(find.textContaining('cho Chị Mai (khách mới). Số dư nợ 120.000đ.'), findsOneWidget);
+      expect(find.textContaining('Khách chưa liên kết Zalo nên chưa nhận được tin.'), findsOneWidget);
+    });
+
+    testWidgets('a server refusal stays inside the sheet', (tester) async {
+      await setSurface(tester, phone);
+      when(() => api.post('/admin/orders/78/record-debt', any())).thenAnswer((_) async => throw ApiException(
+            code: 'ALREADY_ON_LEDGER', status: 409, message: 'Đơn này đã được ghi công nợ cho một khách hàng.'));
+      await tester.pumpWidget(await testApp(const OrderDetailScreen(id: 78), api: api));
+      await tester.pumpAndSettle();
+      await scrollTo(tester, find.byKey(const Key('open-record-debt')));
+      await tester.ensureVisible(find.byKey(const Key('open-record-debt')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('open-record-debt')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('debt-customer-7')));
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('debt-submit')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Đồng ý'));
+      await tester.pumpAndSettle();
+      expect(find.text('Đơn này đã được ghi công nợ cho một khách hàng.'), findsOneWidget);
+      expect(find.text('Ghi công nợ · CF261014-00078'), findsOneWidget, reason: 'the sheet stays open for another try');
+    });
+
+    testWidgets('no button for a cashier, for an order already on a ledger, or for a POS / paid order', (tester) async {
+      await setSurface(tester, phone);
+      await tester.pumpWidget(await testApp(const OrderDetailScreen(id: 78), api: api, user: cashierUser));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('open-record-debt')), findsNothing);
+
+      for (final id in [77, 42, 9]) {
+        await tester.pumpWidget(const SizedBox());
+        await tester.pumpWidget(await testApp(OrderDetailScreen(id: id), api: api));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('open-record-debt')), findsNothing, reason: 'order $id');
+      }
+    });
   });
 }

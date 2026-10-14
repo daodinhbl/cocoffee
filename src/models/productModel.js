@@ -139,6 +139,15 @@ async function setAliases(productId, name, aliases, conn) {
     const norm = normalize(a);
     if (norm && !unique.has(norm)) unique.set(norm, String(a).trim());
   }
+  // a keyword can belong to one product only: say which one holds it, before anything is deleted
+  const [taken] = await db(conn).query(
+    `SELECT a.alias, p.name FROM product_aliases a JOIN products p ON p.id = a.product_id WHERE a.alias_norm IN (?) AND a.product_id <> ? LIMIT 1`,
+    [[...unique.keys()], productId]
+  );
+  if (taken && taken[0]) {
+    const { AppError } = require('../utils/httpError');
+    throw new AppError(409, 'DUPLICATE', `Từ khóa "${taken[0].alias}" đang thuộc món "${taken[0].name}". Bỏ từ khóa đó ở món kia trước, hoặc dùng từ khóa khác.`);
+  }
   await db(conn).query('DELETE FROM product_aliases WHERE product_id = ?', [productId]);
   await db(conn).query(
     'INSERT INTO product_aliases (product_id, alias, alias_norm) VALUES ?',

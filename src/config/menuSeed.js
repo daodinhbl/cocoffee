@@ -256,4 +256,94 @@ async function ensureMenuSeed() {
   }
 }
 
-module.exports = { CATEGORIES, MENU, applyMenu, runMenuSeed, ensureMenuSeed, slugify };
+// ---------------------------------------------------------------------------------------------- extra aliases
+/**
+ * How customers really order, found by running chat messages against the printed menu ("1 đen đá", "cf muối",
+ * "ép cam", "coca"...). Added once per database to the products that carry these names; an alias that already
+ * exists (on any product) or equals a product's own name is left alone, so the owner's edits always win.
+ */
+const EXTRA_ALIASES = {
+  'Cà Phê Đen': ['đen đá', 'đen nóng', 'cà phê đen nóng', 'cf đen đá', 'cafe đen đá'],
+  'Cà Phê Sữa': ['cf nâu', 'cà phê nâu'],
+  'Cà Phê Muối Kem Tươi': ['cà phê muối', 'cf muối', 'cafe muối'],
+  'Cacao Đá Xay': ['socola đá xay', 'sô cô la đá xay', 'chocolate đá xay', 'cacao xay'],
+  'Nước Ép Cam': ['ép cam', 'cam ép'],
+  'Nước Ép Cam Cà Rốt': ['ép cam cà rốt', 'cam cà rốt'],
+  'Nước Ép Cà Rốt': ['ép cà rốt'],
+  'Nước Ép Táo': ['ép táo'],
+  'Nước Ép Thơm': ['ép thơm'],
+  'Nước Ép Cóc': ['ép cóc'],
+  'Nước Ép Mix': ['ép mix'],
+  'Yaourt Đá': ['yaourt đánh đá'],
+  'Nước Ngọt Các Loại': ['coca', 'coca cola', 'pepsi', 'sting', '7up', 'fanta'],
+  'Trà Lipton': ['lipton'],
+};
+// Deliberately NOT aliases: bare "đen", "nâu", "milo", "nước ngọt", "sữa đá", "chanh đá", "nước suối", "sữa chua đá".
+// A bare common word turns ordinary chat into an order, and an alias that is a prefix/part of other products' names
+// ("sữa đá" in "cacao sữa đá") wins the matcher over the right product. Ambiguous names are asked about, with suggestions.
+const ALIAS_KEY = 'seed.aliases_v2';
+const ALIAS_LOCK = 'cocoffee_menu_aliases';
+
+/** @returns {Promise<number>} aliases inserted */
+async function applyExtraAliases(conn) {
+  const [products] = await conn.query('SELECT id, name FROM products WHERE is_active = 1');
+  const byName = new Map(products.map((p) => [normalize(p.name), p.id]));
+  const [existing] = await conn.query('SELECT alias_norm FROM product_aliases');
+  const taken = new Set(existing.map((r) => r.alias_norm));
+  let added = 0;
+  for (const [name, aliases] of Object.entries(EXTRA_ALIASES)) {
+    const id = byName.get(normalize(name));
+    if (!id) continue;
+    for (const alias of aliases) {
+      const n = normalize(alias);
+      if (!n || taken.has(n) || byName.has(n)) continue;
+      await conn.query('INSERT INTO product_aliases (product_id, alias, alias_norm) VALUES (?, ?, ?)', [id, alias, n]);
+      taken.add(n);
+      added += 1;
+    }
+  }
+  return added;
+}
+
+/**
+ * One-shot at boot, after ensureMenuSeed: adds EXTRA_ALIASES to a database that got the printed menu, once. Skipped on
+ * a database that started empty (it belongs to the owner). Never throws.
+ */
+async function ensureMenuAliases() {
+  const { pool } = require('./db');
+  let conn;
+  let locked = false;
+  try {
+    conn = await pool.getConnection();
+    const [[lock]] = await conn.query('SELECT GET_LOCK(?, 30) AS ok', [ALIAS_LOCK]);
+    if (Number(lock.ok) !== 1) return 'lock-timeout';
+    locked = true;
+    const [rows] = await conn.query('SELECT setting_key, setting_value FROM app_settings WHERE setting_key IN (?, ?)', [ALIAS_KEY, SETTING_KEY]);
+    const done = rows.find((r) => r.setting_key === ALIAS_KEY);
+    const menu = rows.find((r) => r.setting_key === SETTING_KEY);
+    if (done) return 'done-before';
+    if (!menu || /skipped-empty/.test(String(menu.setting_value))) return 'no-printed-menu';
+    await conn.beginTransaction();
+    try {
+      const added = await applyExtraAliases(conn);
+      await conn.query('INSERT INTO app_settings (setting_key, setting_value) VALUES (?, ?)', [ALIAS_KEY, JSON.stringify({ added })]);
+      await conn.commit();
+      require('../models/productModel').invalidateCatalog();
+      logger.info(`Menu aliases applied: ${added} added`);
+      return 'applied';
+    } catch (err) {
+      await conn.rollback().catch(() => {});
+      throw err;
+    }
+  } catch (err) {
+    logger.error('Menu aliases failed', err);
+    return 'failed';
+  } finally {
+    if (conn) {
+      if (locked) await conn.query('SELECT RELEASE_LOCK(?)', [ALIAS_LOCK]).catch(() => {});
+      conn.release();
+    }
+  }
+}
+
+module.exports = { CATEGORIES, MENU, EXTRA_ALIASES, applyMenu, applyExtraAliases, runMenuSeed, ensureMenuSeed, ensureMenuAliases, slugify };

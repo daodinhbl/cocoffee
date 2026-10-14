@@ -250,7 +250,7 @@ test('API endpoints for the app', async (t) => {
     reset();
     let r = await api('POST', '/api/admin/customers/5/collect', { token: admin, json: { amount: 50000, method: 'transfer', note: 'CK' } });
     assert.equal(r.status, 200);
-    assert.deepEqual(r.body, { amount: 50000, balance: 70000, settled: [fx.ORDER.order_code] });
+    assert.deepEqual(r.body, { amount: 50000, balance: 70000, settled: [fx.ORDER.order_code], zalo_notify: 'push_not_supported' });   // bot mode cannot push: the customer is not messaged
     assert.deepEqual(called('customer.collect')[0].args, [5, { amount: 50000, method: 'transfer', note: 'CK', userId: 1 }]);
     assert.equal((await api('POST', '/api/admin/customers/5/collect', { token: admin, json: { amount: 50000, method: 'bitcoin' } })).status, 400);
     assert.equal((await api('POST', '/api/admin/customers/5/collect', { token: admin, json: { amount: 0, method: 'cash' } })).status, 400);

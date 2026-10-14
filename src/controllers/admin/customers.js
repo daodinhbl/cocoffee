@@ -6,6 +6,7 @@ const { render, optional, describeError } = require('./common');
 const env = require('../../config/env');
 const printerSettings = require('../../services/printerSettings');
 const debtNotifications = require('../../services/zalo/debtNotificationService');
+const paymentNotification = require('../../services/zalo/paymentNotificationService');
 
 const customerQuery = require('../../services/customerQueryService');
 
@@ -204,8 +205,10 @@ async function collect(req) {
     note: v.str(optional(req.body.note), 'Ghi chú', { max: 255, required: false }),
     userId: req.user.id,
   });
+  const customer = await customerModel.getById(id).catch(() => null);
+  const notified = await paymentNotification.notifyDebtCollected({ customer, amount: r.amount, balance: r.balance, settled: r.settled, method: req.body.method });
   const settled = r.settled.length ? ` Đã tất toán ${r.settled.length} đơn: ${r.settled.join(', ')}.` : '';
-  return { message: `Đã thu ${r.amount.toLocaleString('vi-VN')}đ. Còn nợ ${r.balance.toLocaleString('vi-VN')}đ.${settled}`, to: `/admin/customers/${id}` };
+  return { message: `Đã thu ${r.amount.toLocaleString('vi-VN')}đ. Còn nợ ${r.balance.toLocaleString('vi-VN')}đ.${settled}${paymentNotification.describe(notified)}`, to: `/admin/customers/${id}` };
 }
 
 async function adjust(req) {
@@ -228,7 +231,8 @@ async function adjust(req) {
     else if (sent.owner === 'failed') message += ' Gửi Zalo cho chủ quán không thành công.';
     else if (sent.owner === 'push_not_supported') message += ' Chế độ Zalo hiện tại không hỗ trợ gửi tin chủ động cho chủ quán.';
   }
-  return { message, to: '/admin/customers/' + id };
+  // from the list's "Ghi nợ" dialog (stay=1) the owner stays on the list
+  return { message, to: req.body.stay === '1' ? undefined : '/admin/customers/' + id };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

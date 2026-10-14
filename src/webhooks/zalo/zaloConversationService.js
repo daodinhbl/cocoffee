@@ -9,7 +9,7 @@ const orderService = require('../../services/orderService');
 const customerModel = require('../../models/customerModel');
 const chatbotInfo = require('../../services/zalo/chatbotInfo');
 const debtQr = require('../../services/zalo/debtQr');
-const billMedia = require('../../services/zalo/billMedia');
+const billDelivery = require('../../services/zalo/billDelivery');
 const parser = require('./zaloOrderParser');
 
 /**
@@ -43,7 +43,7 @@ const TXT = {
   expired: (min) => `Đơn tạm đã hết hạn (quá ${min} phút). Bạn nhắn lại món giúp mình nhé!`,
   cancelled: 'Đã hủy đơn tạm. Cần đặt món khác cứ nhắn nhé!',
   busy: 'Xin lỗi, hệ thống đang bận. Bạn vui lòng thử lại sau ít phút nhé!',
-  notFound: (list) => `Mình chưa tìm thấy món: ${list.map((s) => `"${s}"`).join(', ')}. Nhắn "menu" để xem thực đơn nhé!`,
+  notFound: (list, suggestions = []) => `Mình chưa tìm thấy món: ${list.map((s, i) => `"${s}"${suggestions[i] && suggestions[i].length ? ` (có phải: ${suggestions[i].join(', ')}?)` : ''}`).join('; ')}. Nhắn "menu" để xem thực đơn nhé!`,
   outOfStock: (names) => `Rất tiếc hiện đã hết hàng/nguyên liệu cho: ${names.join(', ')}. Bạn chọn món khác hoặc nhắn "huy" để hủy đơn nhé!`,
 };
 
@@ -57,13 +57,13 @@ async function say(ctx, text, action) {
   return action;
 }
 
-function draftSummary(order, unmatched) {
+function draftSummary(order, unmatched, suggestions = []) {
   const lines = [
     '🧾 ĐƠN TẠM (chưa xác nhận)',
     ...order.items.map((i) => `• ${i.quantity} x ${i.product_name}${i.note ? ` (${i.note})` : ''} — ${formatVnd(i.line_total)}đ`),
     `TỔNG: ${formatVnd(order.total)}đ`,
   ];
-  if (unmatched.length) lines.push(`⚠️ Chưa tìm thấy: ${unmatched.map((s) => `"${s}"`).join(', ')}`);
+  if (unmatched.length) lines.push(`⚠️ Chưa tìm thấy: ${unmatched.map((s, i) => `"${s}"${suggestions[i] && suggestions[i].length ? ` (có phải: ${suggestions[i].join(', ')}?)` : ''}`).join('; ')}`);
   lines.push('👉 Nhắn "ok" để xác nhận, "huy" để hủy. Nhắn lại món để sửa đơn, hoặc "thêm ..." để bổ sung.');
   return lines.join('\n');
 }
@@ -135,7 +135,10 @@ async function handleText({ chatType, chatId, userId, text, msgId, mentioned = f
   }
   if (command === 'confirm') return confirm(ctx);
   if (command === 'cancel') return cancel(ctx);
-  if (command === 'menu') return say(ctx, await menuText(), 'menu');
+  if (command === 'menu') {
+    if (isGroup && !mentioned && !parser.isMentioned(text) && !parser.isStrictMenu(text)) return 'ignored';   // group chatter ("quán có gì") is not for the bot
+    return say(ctx, await menuText(), 'menu');
+  }
   if (command === 'debt') return debt(ctx);
 
   const parsed = parser.parseOrder(text, await productModel.listForMatching());
@@ -146,7 +149,7 @@ async function handleText({ chatType, chatId, userId, text, msgId, mentioned = f
       if (answer) return say(ctx, answer, 'faq');
     }
     if (isGroup) return 'ignored';                                   // ignore group chatter
-    return say(ctx, parsed.unmatched.length ? TXT.notFound(parsed.unmatched) : TXT.help, 'help');
+    return say(ctx, parsed.unmatched.length ? TXT.notFound(parsed.unmatched, parsed.suggestions) : TXT.help, 'help');
   }
 
   try {
@@ -158,7 +161,7 @@ async function handleText({ chatType, chatId, userId, text, msgId, mentioned = f
       await sessionModel.setDraft(conn, session.id, orderId, msgId, env.zalo.draftTtlMinutes);
       return orderService.getWithItems(orderId, conn);
     });
-    return say(ctx, draftSummary(order, parsed.unmatched), 'draft');
+    return say(ctx, draftSummary(order, parsed.unmatched, parsed.suggestions), 'draft');
   } catch (err) {
     logger.error('Draft creation failed', err);
     return say(ctx, TXT.busy, 'error');
@@ -167,46 +170,19 @@ async function handleText({ chatType, chatId, userId, text, msgId, mentioned = f
 
 // --------------------------------------------------------------------------- bill + payment info
 /**
- * After COMMIT. 1) the receipt as a PNG for 80 mm paper, built by the web server; the plain-text bill is the fallback
- * when the picture cannot be drawn or the channel refuses it. 2) the shop's bank account with a VietQR code for this
- * order. Nothing here can undo the sale: every failure is logged and the next step still runs.
+ * After COMMIT: the 80 mm PNG receipt (text bill as the fallback), then the bank account and a VietQR code for this
+ * order (services/zalo/billDelivery.js). Nothing here can undo the sale. A delivery problem is recorded on the order
+ * so the admin sees it and can resend.
  */
 async function deliverBill(ctx, orderId) {
-  let billSent = false;
-  if (ctx.io.image) {
-    try {
-      const picture = await billMedia.receipt(orderId);
-      if (picture) {
-        await ctx.io.image({ ...picture, caption: '🧾 Hóa đơn của bạn' });
-        await orderModel.markReceipt(orderId, null).catch(() => {});
-        billSent = true;
-      }
-    } catch (err) {
-      logger.warn(`Receipt picture of order ${orderId} not delivered, sending the text bill`, err);
-    }
-  }
-  if (!billSent) {
-    try {
-      await ctx.io.onConfirmed(orderId);
-    } catch (err) {
-      logger.warn(`Order ${orderId} completed but the bill was not delivered`, err);
-    }
-  }
-  await sendPaymentInfo(ctx, orderId);
-}
-
-/** Bank account + VietQR for an order that is still to be paid. Silent when no bank account is set. */
-async function sendPaymentInfo(ctx, orderId) {
-  try {
-    const [order, info] = await Promise.all([orderModel.getById(orderId), chatbotInfo.get()]);
-    if (!order || order.payment_status === 'paid' || !chatbotInfo.bankReady(info)) return;
-    await ctx.io.reply(billMedia.paymentText(order, info));
-    if (!ctx.io.image) return;
-    const qr = await billMedia.payQr(orderId, info);
-    if (qr) await ctx.io.image({ ...qr, caption: `Quét mã để chuyển ${formatVnd(order.total)}đ (nội dung ${billMedia.transferNote(order)})` });
-  } catch (err) {
-    logger.warn(`Payment info of order ${orderId} not delivered`, err);   // the bill above already went out
-  }
+  const result = await billDelivery.deliver({
+    reply: (text) => ctx.io.reply(text),
+    image: ctx.io.image ? (picture) => ctx.io.image(picture) : undefined,
+    textBill: () => ctx.io.onConfirmed(orderId),
+  }, orderId);
+  if (result.bill === 'picture') await orderModel.markReceipt(orderId, null).catch(() => {});
+  if (result.bill === 'none') logger.warn(`Order ${orderId} completed but no bill could be delivered`);
+  return result;
 }
 
 // --------------------------------------------------------------------------- confirm

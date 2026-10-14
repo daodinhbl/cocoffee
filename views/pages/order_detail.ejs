@@ -1,5 +1,5 @@
 <%
-  const { input, label, btnPrimary, btnSecondary, btnDanger } = ui;
+  const { input, label, btnPrimary, btnSecondary, btnDanger, sheet, grabber, btnGhost } = ui;
   const canCancel  = ['draft', 'open'].includes(order.status);
   const canPay     = order.status === 'open' || (order.status === 'completed' && order.payment_status === 'unpaid');
   const canResend  = order.source === 'zalo' && order.status === 'completed';
@@ -298,11 +298,17 @@
     <% } %>
 
     <!-- Other actions -->
-    <% if (canResend || canCancel) { %>
+    <% if (canResend || canCancel || canRecordDebt) { %>
     <section class="overflow-hidden rounded-xl border border-milk-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,.04)]"
              aria-labelledby="act-title">
       <h2 id="act-title" class="border-b border-milk-200 px-5 py-3.5 text-sm font-semibold uppercase tracking-wide text-milk-500">Thao tác khác</h2>
       <div class="space-y-3 px-5 py-4">
+        <% if (canRecordDebt) { %>
+          <button type="button" data-modal-open="#debt-dialog" class="<%= btnPrimary %> w-full">
+            <%- icon('receipt', 'h-4 w-4') %> Ghi công nợ cho khách
+          </button>
+          <p class="text-xs text-milk-500">Đơn Zalo này chưa nằm trong sổ nợ của khách nào. Ghi nợ sẽ gắn đơn vào khách, tăng số dư nợ và báo khách qua Zalo.</p>
+        <% } %>
         <% if (canResend) { %>
           <form method="post" action="/admin/orders/<%= order.id %>/resend-receipt">
             <%- include('../partials/csrf') %>
@@ -326,3 +332,51 @@
 
   </div><!-- /right col -->
 </div><!-- /grid -->
+
+<% if (canRecordDebt) { %>
+<!-- Ghi công nợ: an existing customer, or a new one that takes this order's Zalo account -->
+<dialog id="debt-dialog" aria-labelledby="debt-title" class="max-w-md <%= sheet %>">
+  <form method="post" action="/admin/orders/<%= order.id %>/record-debt" class="flex flex-col">
+    <%- include('../partials/csrf') %>
+    <%- grabber %>
+    <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4">
+      <h2 id="debt-title" class="text-lg font-semibold">Ghi công nợ · <%= order.order_code %></h2>
+      <button type="button" data-modal-close aria-label="Đóng" class="<%= btnGhost %>"><%- icon('x', 'h-5 w-5') %></button>
+    </div>
+    <div class="space-y-4 px-4 py-4 sm:px-6 sm:py-5">
+      <p class="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">Số tiền ghi nợ: <b class="font-mono"><%= money(order.total) %></b>. Đơn vẫn "chờ thu tiền" cho tới khi bạn thu nợ.</p>
+      <div>
+        <label for="debt-customer" class="<%= label %>">Khách hàng có sẵn</label>
+        <select id="debt-customer" name="customer_id" class="<%= input %>">
+          <option value="">— Chọn khách —</option>
+          <% debtCustomers.forEach((c) => { %>
+            <option value="<%= c.id %>"><%= c.name %><%= c.phone ? ' · ' + c.phone : '' %><%= Number(c.balance) > 0 ? ' · nợ ' + money(c.balance) : '' %><%= c.zalo_user_id ? ' · đã có Zalo' : '' %></option>
+          <% }) %>
+        </select>
+      </div>
+      <p class="text-center text-xs uppercase tracking-wide text-milk-500">hoặc tạo khách mới</p>
+      <div class="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label for="debt-new-name" class="<%= label %>">Tên khách mới</label>
+          <input id="debt-new-name" name="new_name" maxlength="120" class="<%= input %>" autocomplete="off" placeholder="VD: Chị Lan">
+        </div>
+        <div>
+          <label for="debt-new-phone" class="<%= label %>">Số điện thoại</label>
+          <input id="debt-new-phone" name="new_phone" maxlength="20" inputmode="tel" class="<%= input %> font-mono" autocomplete="off">
+        </div>
+      </div>
+      <% if (order.zalo_user_id) { %>
+        <label class="flex items-start gap-2 text-sm text-gray-700">
+          <input type="hidden" name="link_zalo" value="0">
+          <input type="checkbox" name="link_zalo" value="1" checked class="mt-1 h-4 w-4 rounded border-gray-300">
+          <span>Liên kết tài khoản Zalo của đơn (<code class="font-mono text-xs"><%= order.zalo_user_id %></code>) với khách này, để đơn Zalo sau tự vào sổ nợ và khách nhận thông báo.</span>
+        </label>
+      <% } %>
+    </div>
+    <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-4 py-3 max-sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
+      <button type="button" data-modal-close class="<%= btnSecondary %> max-sm:flex-1">Hủy</button>
+      <button type="submit" class="<%= btnPrimary %> max-sm:flex-[2]">Ghi công nợ</button>
+    </div>
+  </form>
+</dialog>
+<% } %>

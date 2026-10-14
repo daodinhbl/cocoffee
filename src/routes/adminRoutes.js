@@ -51,6 +51,7 @@ router.get('/orders', orders.list);
 router.get('/orders/:id', orders.detail);
 router.post('/orders/:id/cancel', act(orders.cancel));
 router.post('/orders/:id/pay', act(orders.pay));
+router.post('/orders/:id/record-debt', act(orders.recordDebt));
 router.post('/orders/:id/resend-receipt', act(orders.resendReceipt));
 
 router.get('/customers', customers.list);

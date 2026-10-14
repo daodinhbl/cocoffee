@@ -43,7 +43,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
   }
 
   Future<void> _adjust(Customer c) async {
-    final res = await showFormSheet<Map<String, dynamic>>(context, builder: (_) => _AdjustSheet(customer: c));
+    final res = await showFormSheet<Map<String, dynamic>>(context, builder: (_) => AdjustSheet(customer: c));
     if (res == null || !mounted) return;
     setState(() => _flash = _Flash(adjustMessage(parseNum(res['balance']), res['notify'])));
     invalidateCustomerData(ref, id: widget.id);
@@ -527,15 +527,17 @@ class _CollectSheetState extends ConsumerState<_CollectSheet> {
 }
 
 /// 'Điều chỉnh công nợ thủ công': Tăng nợ (+) / Giảm nợ (−), amount, required reason. POST adjust.
-class _AdjustSheet extends ConsumerStatefulWidget {
-  const _AdjustSheet({required this.customer});
+/// [increaseOnly]: the list's 'Ghi nợ' button (the web's debt-add-dialog): only adds debt, no direction choice.
+class AdjustSheet extends ConsumerStatefulWidget {
+  const AdjustSheet({super.key, required this.customer, this.increaseOnly = false});
   final Customer customer;
+  final bool increaseOnly;
 
   @override
-  ConsumerState<_AdjustSheet> createState() => _AdjustSheetState();
+  ConsumerState<AdjustSheet> createState() => _AdjustSheetState();
 }
 
-class _AdjustSheetState extends ConsumerState<_AdjustSheet> {
+class _AdjustSheetState extends ConsumerState<AdjustSheet> {
   final _form = GlobalKey<FormState>();
   final _amount = TextEditingController();
   final _note = TextEditingController();
@@ -553,7 +555,8 @@ class _AdjustSheetState extends ConsumerState<_AdjustSheet> {
   Future<void> _submit() async {
     if (!(_form.currentState?.validate() ?? false)) return;
     final c = widget.customer;
-    if (!await confirmAction(context, 'Điều chỉnh công nợ của ${c.name}?') || !mounted) return;
+    final ask = widget.increaseOnly ? 'Ghi nợ ${money(num.parse(_amount.text.trim()))} cho ${c.name}?' : 'Điều chỉnh công nợ của ${c.name}?';
+    if (!await confirmAction(context, ask) || !mounted) return;
     setState(() {
       _busy = true;
       _error = null;
@@ -578,24 +581,26 @@ class _AdjustSheetState extends ConsumerState<_AdjustSheet> {
     return Form(
       key: _form,
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Text('Điều chỉnh công nợ thủ công', style: context.tt.titleLarge),
+        Text(widget.increaseOnly ? 'Ghi nợ cho khách' : 'Điều chỉnh công nợ thủ công', style: context.tt.titleLarge),
         const SizedBox(height: 2),
         Text('${c.name} · Số dư ${money(c.balance)}', style: context.tt.bodySmall?.copyWith(fontSize: 13.5)),
         const SizedBox(height: 16),
         if (_error != null) ...[InlineError(_error!), const SizedBox(height: 12)],
-        FieldLabel(
-          'Loại',
-          child: SegmentedButton<String>(
-            showSelectedIcon: false,
-            segments: const [
-              ButtonSegment(value: 'increase', label: Text('Tăng nợ (+)')),
-              ButtonSegment(value: 'decrease', label: Text('Giảm nợ (−)')),
-            ],
-            selected: {_direction},
-            onSelectionChanged: (s) => setState(() => _direction = s.first),
+        if (!widget.increaseOnly) ...[
+          FieldLabel(
+            'Loại',
+            child: SegmentedButton<String>(
+              showSelectedIcon: false,
+              segments: const [
+                ButtonSegment(value: 'increase', label: Text('Tăng nợ (+)')),
+                ButtonSegment(value: 'decrease', label: Text('Giảm nợ (−)')),
+              ],
+              selected: {_direction},
+              onSelectionChanged: (s) => setState(() => _direction = s.first),
+            ),
           ),
-        ),
-        const SizedBox(height: 14),
+          const SizedBox(height: 14),
+        ],
         FieldLabel(
           'Số tiền (đ)',
           child: TextFormField(
@@ -629,7 +634,7 @@ class _AdjustSheetState extends ConsumerState<_AdjustSheet> {
           onPressed: _busy ? null : _submit,
           child: _busy
               ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5))
-              : const Text('Lưu điều chỉnh'),
+              : Text(widget.increaseOnly ? 'Ghi nợ' : 'Lưu điều chỉnh'),
         ),
       ]),
     );

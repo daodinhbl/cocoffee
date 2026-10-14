@@ -156,4 +156,55 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Tổng cộng (2 khách)'), findsOneWidget);
   });
+
+  testWidgets('phone: "Ghi nợ" on a card adds debt only (no direction choice), one POST, the list reloads', (tester) async {
+    await setSurface(tester, phone);
+    when(() => api.post('/admin/customers/7/adjust', any())).thenAnswer((_) async => {
+          'balance': 270000,
+          'amount': 120000,
+          'note': 'lấy hàng chưa trả',
+          'notify': {'customer': 'sent', 'owner': 'not_configured'},
+        });
+    await tester.pumpWidget(await testApp(const CustomersScreen(), api: api));
+    await tester.pumpAndSettle();
+    final before = queries.length;
+
+    await tester.ensureVisible(find.byKey(const ValueKey('add-debt-7')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('add-debt-7')));
+    await tester.pumpAndSettle();
+    expect(find.text('Ghi nợ cho khách'), findsOneWidget);
+    expect(find.text('Nguyễn Văn An · Số dư 150.000đ'), findsOneWidget);
+    expect(find.text('Loại'), findsNothing, reason: 'increase only');
+    expect(find.text('Tăng nợ (+)'), findsNothing);
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Ghi nợ'));
+    await tester.pumpAndSettle();
+    expect(find.text('Số tiền điều chỉnh phải khác 0.'), findsOneWidget);
+    expect(find.text('Ghi rõ lý do điều chỉnh.'), findsOneWidget);
+
+    await tester.enterText(find.byKey(const ValueKey('adjust-amount')), '120000');
+    await tester.enterText(find.byKey(const ValueKey('adjust-note')), 'lấy hàng chưa trả');
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Ghi nợ'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ghi nợ 120.000đ cho Nguyễn Văn An?'), findsOneWidget);
+    await tester.tap(find.text('Đồng ý'));
+    await tester.pumpAndSettle();
+
+    final body = verify(() => api.post('/admin/customers/7/adjust', captureAny())).captured.single;
+    expect(body, {'amount': 120000, 'direction': 'increase', 'note': 'lấy hàng chưa trả'});
+    expect(find.textContaining('Đã điều chỉnh công nợ. Số dư mới 270.000đ. Đã gửi Zalo cho khách.'), findsOneWidget);
+    expect(queries.length, greaterThan(before), reason: 'the list was reloaded');
+  });
+
+  testWidgets('tablet: every row has a "Ghi nợ" button', (tester) async {
+    await setSurface(tester, tablet);
+    await tester.pumpWidget(await testApp(const CustomersScreen(), api: api));
+    await tester.pumpAndSettle();
+    for (final id in [7, 8, 9]) {
+      expect(find.byKey(ValueKey('add-debt-$id')), findsOneWidget);
+    }
+    expect(find.byTooltip('Ghi nợ'), findsNWidgets(3));
+    expect(tester.takeException(), isNull);
+  });
 }

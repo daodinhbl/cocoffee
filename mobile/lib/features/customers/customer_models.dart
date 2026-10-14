@@ -312,6 +312,30 @@ const methodLabels = <String, String>{'cash': 'Tiền mặt', 'transfer': 'Chuy�
 /// "2026-10-01" -> "01/10/2026" (fmtDay in debt_reconciliation.ejs).
 String fmtDay(String isoDay) => isoDay.isEmpty ? '—' : isoDay.split('-').reversed.join('/');
 
+/// The "đã gửi Zalo cho khách..." part of a debt flash (adjust and record-debt answers carry `notify`).
+String notifyText(Object? notify) {
+  final b = StringBuffer();
+  if (notify is Map) {
+    switch (notify['customer']) {
+      case 'sent':
+        b.write(' Đã gửi Zalo cho khách.');
+      case 'not_linked':
+        b.write(' Khách chưa liên kết Zalo nên chưa nhận được tin.');
+      case 'failed':
+        b.write(' Gửi Zalo cho khách không thành công.');
+      case 'push_not_supported':
+        b.write(' Chế độ Zalo hiện tại không hỗ trợ gửi tin chủ động cho khách.');
+    }
+    switch (notify['owner']) {
+      case 'sent':
+        b.write(' Đã báo chủ quán qua Zalo.');
+      case 'failed':
+        b.write(' Gửi Zalo cho chủ quán không thành công.');
+    }
+  }
+  return b.toString();
+}
+
 /// Flash text of the adjust result, word for word from src/controllers/admin/customers.js adjust().
 String adjustMessage(num balance, Object? notify) {
   final b = StringBuffer('Đã điều chỉnh công nợ. Số dư mới ${money(balance)}.');

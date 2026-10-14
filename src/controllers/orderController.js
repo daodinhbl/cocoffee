@@ -108,6 +108,7 @@ async function replaceItems(req, res) {
  * customer's debt order (completed + customer_id) is admin-only, checked by payOrder after locking the order.
  */
 async function pay(req, res) {
+  const paymentNotification = require('../services/zalo/paymentNotificationService');
   const isAdmin = req.user.role === 'admin';
   const result = await orderService.payOrder(v.id(req.params.id), {
     method: v.oneOf(req.body.method, 'method', isAdmin ? METHODS : CASHIER_METHODS),
@@ -117,6 +118,11 @@ async function pay(req, res) {
     userId: req.user.id,
     allowDebtSettlement: isAdmin,
   });
+  // a paid Zalo order: the customer gets a confirmation on Zalo (waited for at most 4 s; `zalo_notify` says how it went)
+  if (result.order && result.order.source === 'zalo') {
+    res.json({ ...result, zalo_notify: await paymentNotification.notifyOrderPaidSoon(result.order.id) });
+    return;
+  }
   res.json(result);
 }
 
