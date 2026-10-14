@@ -1,44 +1,17 @@
 const env = require('../../config/env');
-const { tokenModel } = require('../../models/zaloModel');
-const inventoryModel = require('../../models/inventoryModel');
-const adminModel = require('../../models/adminModel');
+const { zaloStatus } = require('../../services/zalo/zaloStatus');
+const notificationService = require('../../services/notificationService');
 const { AppError } = require('../../utils/httpError');
 const { safeBack } = require('../../middlewares/adminAuth');
 const { ago } = require('../../utils/shopTime');
 const logger = require('../../utils/logger');
 
-/**
- * Header indicator. Honest by construction: green only when the OA is configured AND an OAuth
- * token pair is stored; anything else says why it is not green.
- * @returns {Promise<{state:'ok'|'warn'|'off'|'unknown', label:string}>}
- */
-async function zaloStatus() {
-  const zcfg = await require('../../services/zalo/zaloConfig').get();
-  if (zcfg.mode !== 'oa') {
-    if (!zcfg.botWebhookSecret || (zcfg.mode === 'platform' && !zcfg.botToken)) return { state: 'off', label: 'Zalo bot: chưa cấu hình' };
-    try {
-      const { lastEventAt } = await adminModel.zaloEventStats(24);
-      const fresh = lastEventAt && Date.now() - new Date(lastEventAt).getTime() < 24 * 3600 * 1000;
-      return fresh ? { state: 'ok', label: 'Zalo bot OK' } : { state: 'warn', label: 'Zalo bot: chưa nhận tin' };
-    } catch (err) {
-      logger.warn('Admin header: could not read Zalo bot state', err);
-      return { state: 'unknown', label: 'Zalo bot: không rõ' };
-    }
-  }
-  if (!env.zalo.appId || !env.zalo.oaSecretKey) return { state: 'off', label: 'Zalo: chưa cấu hình' };
-  try {
-    const row = await tokenModel.get(null);
-    return row ? { state: 'ok', label: 'Zalo OK' } : { state: 'warn', label: 'Zalo: chưa cấp quyền' };
-  } catch (err) {
-    logger.warn('Admin header: could not read Zalo token state', err);
-    return { state: 'unknown', label: 'Zalo: không rõ' };
-  }
-}
+// Header indicator: see services/zalo/zaloStatus.js (re-exported for the admin controllers).
 
 /** Real alerts for the bell: low stock, bills waiting to be collected, Zalo receipts that failed to send. */
 async function notifications() {
   try {
-    const [low, counts, failed] = await Promise.all([inventoryModel.list({ lowStockOnly: true }), adminModel.queueCounts(), adminModel.receiptErrors(3)]);
+    const { low_stock: low, counts, receipt_errors: failed } = await notificationService.load({ receiptErrors: 3 });
     const out = [];
     for (const e of failed) out.push({ text: `Bill Zalo gửi lỗi — ${e.order_code}`, time: ago(e.completed_at), tone: 'bad', href: `/admin/orders/${e.id}` });
     if (counts.drafts > 0) out.push({ text: `${counts.drafts} đơn Zalo chờ khách xác nhận`, time: '', tone: 'info', href: '/admin/orders?status=draft' });

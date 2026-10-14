@@ -1,13 +1,13 @@
 const orderModel = require('../../models/orderModel');
 const orderService = require('../../services/orderService');
 const receiptService = require('../../services/receiptService');
+const orderQuery = require('../../services/orderQueryService');
 const { AppError } = require('../../utils/httpError');
 const v = require('../../utils/validate');
 const { parseDay, dayBounds, shopDay } = require('../../utils/shopTime');
 const { render, optional } = require('./common');
 
-const PAGE_SIZE = 25;
-const STATUSES = ['draft', 'open', 'completed', 'cancelled'];
+const { PAGE_SIZE, STATUSES } = orderQuery;
 const METHODS = ['cash', 'transfer', 'card', 'other'];
 
 const pick = (value, allowed) => (allowed.includes(value) ? value : undefined);
@@ -28,16 +28,10 @@ function readFilters(query) {
 async function list(req, res) {
   const f = readFilters(req.query);
   const bounds = f.from || f.to ? dayBounds(f.from || f.to, f.to || f.from) : {};
-  const where = {
-    status: f.status, source: f.source, paymentStatus: f.payment, q: f.q || undefined,
-    // "Chưa thu" means money still to collect: cancelled orders and unconfirmed Zalo drafts never will be.
-    excludeStatuses: f.payment === 'unpaid' && !f.status ? ['cancelled', 'draft'] : undefined,
-    from: bounds.from, to: bounds.to,
-  };
-  const [total, counts] = await Promise.all([orderModel.count(where), orderModel.breakdown(where)]);
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const page = Math.min(f.page, pages);
-  const orders = await orderModel.list({ ...where, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE });
+  const { orders, total, page, pages, counts } = await orderQuery.page(
+    { status: f.status, source: f.source, payment: f.payment, q: f.q, from: bounds.from, to: bounds.to },
+    { page: f.page, pageSize: PAGE_SIZE }
+  );
 
   const params = new URLSearchParams();
   for (const k of ['status', 'source', 'payment', 'from', 'to', 'q']) if (f[k]) params.set(k, f[k]);
@@ -88,6 +82,7 @@ async function pay(req) {
     reference: v.str(optional(req.body.reference), 'Mã tham chiếu', { max: 100, required: false }),
     discount: v.num(optional(req.body.discount), 'Giảm giá', { required: false }),
     userId: req.user.id,
+    allowDebtSettlement: true,                         // admin-only page: may settle a customer's debt order
   });
   return { message: `Đã ghi nhận thanh toán đơn ${result.order.order_code}.` };
 }

@@ -8,13 +8,13 @@ const { render, formFlag, optional } = require('./common');
 const imageStore = require('../../services/imageStore');
 
 async function page(req, res) {
-  const items = await inventoryModel.listAll();
+  const { items, stockValue } = await inventoryService.listWithValue();
   await render(res, 'inventory', {
     title: 'Nguyên liệu', activeMenu: 'inventory', breadcrumbs: [{ label: 'Kho & Định mức', href: '#' }, { label: 'Nguyên liệu' }],
   }, {
     items,
     onlyLow: req.query.low === '1',
-    stockValue: items.filter((i) => i.is_active).reduce((s, i) => s + Number(i.stock_value || 0), 0),
+    stockValue,
   });
 }
 

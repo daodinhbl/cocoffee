@@ -63,7 +63,8 @@ npm test                        # unit + admin/UI tests (no DB needed); add RUN_
 
 ## Security checklist
 
-- **Default login is `admin` / `admin`** (from `seed.sql`). The Web Admin forces a new password at first sign-in; for the POS API use `POST /api/auth/change-password`.
+- **Default login is `admin` / `admin`** (from `seed.sql`). The Web Admin forces a new password at first sign-in. The JSON API does the same: an admin whose password is shorter than 10 characters gets `must_change_password: true` at login, and every call except `GET /api/auth/me` and `POST /api/auth/change-password` answers `403 MUST_CHANGE_PASSWORD` until the password is changed (change-password answers a fresh token).
+- API bearer tokens carry audience `pos-api` / issuer `cocoffee` (the admin cookie JWT is refused as a bearer token and vice versa) and a password stamp: changing or resetting a password revokes every older token. `/api/admin/*` is admin-only; a cashier can pay open POS orders and walk-in Zalo bills, but settling a customer's debt order is admin-only.
 - Web Admin sessions are an HttpOnly, SameSite=Strict cookie (Secure when `NODE_ENV=production` or the request arrived over HTTPS); every form carries a per-session CSRF token. Only active `admin` accounts can sign in, and API bearer tokens are not accepted as admin sessions. Login is rate-limited to 20 tries / 15 min per IP. Changing or resetting a password ends every older session of that account.
 - Keep `.env` out of git and out of `public_html`. `ZALO_VERIFY_SIGNATURE` must stay `true` in production.
 - `JWT_SECRET` is derived from `DB_PASSWORD` when unset; set it explicitly to rotate tokens independently.

@@ -6,28 +6,27 @@ const { AppError } = require('../../utils/httpError');
 const v = require('../../utils/validate');
 const { render, formFlag, optional } = require('./common');
 const imageStore = require('../../services/imageStore');
+const menuRules = require('../../services/menuRules');
 
-/** Textarea "a, b\nc" -> ['a','b','c'] (the model de-duplicates by normalized form). */
-function parseAliases(raw) {
-  if (typeof raw !== 'string') return [];
-  const list = raw.split(/[\n,;]+/).map((s) => s.trim()).filter(Boolean);
-  if (list.length > 30 || list.some((a) => a.length > 100)) throw new AppError(400, 'VALIDATION', 'Tối đa 30 từ khóa, mỗi từ khóa tối đa 100 ký tự.');
-  return list;
-}
+const { parseAliases } = menuRules;
 
-async function page(_req, res) {
+/** Menu screen data, shared with GET /api/admin/menu: whole menu, every category, the active stock items. */
+async function pageData() {
   const [products, categories, items] = await Promise.all([
     productModel.listForAdmin(), categoryModel.list({ activeOnly: false }), inventoryModel.listAll(),
   ]);
+  return { products, categories, items: items.filter((i) => i.is_active) };
+}
+
+async function page(_req, res) {
   await render(res, 'menu', {
     title: 'Thực đơn', activeMenu: 'menu', breadcrumbs: [{ label: 'Vận hành', href: '#' }, { label: 'Thực đơn' }],
-  }, { products, categories, items: items.filter((i) => i.is_active) });
+  }, await pageData());
 }
 
 // ---------------------------------------------------------------- categories
 async function createCategory(req) {
-  const code = v.str(req.body.code, 'Mã nhóm', { max: 30 }).toLowerCase();
-  if (!/^[a-z0-9_]+$/.test(code)) throw new AppError(400, 'VALIDATION', 'Mã nhóm chỉ gồm chữ thường, số và dấu gạch dưới.');
+  const code = menuRules.categoryCode(req.body.code);
   await categoryModel.create({
     code,
     name: v.str(req.body.name, 'Tên nhóm', { max: 100 }),
@@ -97,4 +96,4 @@ async function updateProduct(req) {
   return { message: `Đã cập nhật ${name}.` };
 }
 
-module.exports = { page, createCategory, updateCategory, createProduct, updateProduct, parseAliases };
+module.exports = { page, pageData, createCategory, updateCategory, createProduct, updateProduct, parseAliases };

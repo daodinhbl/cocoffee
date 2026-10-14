@@ -105,12 +105,7 @@ async function saveBotToken(req) {
 }
 
 async function saveDebtRecipient(req) {
-  const chatId = typeof req.body.chatId === 'string' ? req.body.chatId.trim() : '';
-  const chatType = req.body.chatType === 'group' ? 'group' : req.body.chatType === 'user' ? 'user' : '';
-  if (chatId && !/^[A-Za-z0-9._:-]{1,100}$/.test(chatId)) {
-    throw new AppError(400, 'VALIDATION', 'Chat ID không hợp lệ. Hãy sao chép nguyên mã bot trả về.');
-  }
-  if (!chatType) throw new AppError(400, 'VALIDATION', 'Chọn loại chat nhận thông báo.');
+  const { chatId, chatType } = zaloConfig.readDebtRecipient(req.body);
   await zaloConfig.saveDebtRecipient(chatId, chatType, req.user.id);
   return {
     message: chatId ? 'Đã lưu nơi nhận thông báo công nợ qua Zalo.' : 'Đã xóa nơi nhận thông báo công nợ qua Zalo.',

@@ -21,7 +21,8 @@ const oneOf = (v, name, allowed, { required = true } = {}) => {
   return v;
 };
 
-const flag = (v) => (v === undefined || v === null ? undefined : (v ? 1 : 0));
+// JSON booleans or 0/1; the strings '0' and 'false' mean 0 (plain truthiness would turn them into 1).
+const flag = (v) => (v === undefined || v === null ? undefined : (v === '0' || v === 'false' ? 0 : (v ? 1 : 0)));
 
 const id = (v, name = 'id') => num(v, name, { min: 1, integer: true });
 

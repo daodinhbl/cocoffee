@@ -68,4 +68,4 @@ async function changeOwnPassword(req, res) {
   return { message: 'Đã đổi mật khẩu.', to: '/admin/settings' };
 }
 
-module.exports = { loginForm, login, logout, changeOwnPassword, checkNewPassword, isDemoAccount, MIN_PASSWORD };
+module.exports = { loginForm, login, logout, changeOwnPassword, checkNewPassword, isDemoAccount, MIN_PASSWORD, DUMMY_HASH };

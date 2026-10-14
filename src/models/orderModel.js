@@ -28,8 +28,9 @@ async function getById(id, conn, { forUpdate = false } = {}) {
     return locked[0] || null;
   }
   const [rows] = await db(conn).query(
-    `SELECT o.*, t.code AS table_code, t.name AS table_name
+    `SELECT o.*, t.code AS table_code, t.name AS table_name, c.name AS customer_name
        FROM orders o LEFT JOIN dining_tables t ON t.id = o.table_id
+                     LEFT JOIN customers c ON c.id = o.customer_id
       WHERE o.id = ? LIMIT 1`,
     [id]
   );
@@ -106,7 +107,7 @@ async function markReceipt(orderId, error, conn) {
 }
 
 /** WHERE clause shared by list() and count(). `q` matches the order code (LIKE wildcards escaped). */
-function buildFilter({ status, excludeStatuses, source, paymentStatus, tableId, from, to, q } = {}) {
+function buildFilter({ status, excludeStatuses, source, paymentStatus, tableId, from, to, q, updatedAfter } = {}) {
   const where = [];
   const params = [];
   if (status) { where.push('o.status = ?'); params.push(status); }
@@ -117,6 +118,7 @@ function buildFilter({ status, excludeStatuses, source, paymentStatus, tableId, 
   if (from) { where.push('o.created_at >= ?'); params.push(from); }
   if (to) { where.push('o.created_at < ?'); params.push(to); }
   if (q) { where.push("o.order_code LIKE ? ESCAPE '\\\\'"); params.push(`%${String(q).replace(/[\\%_]/g, '\\$&')}%`); }
+  if (updatedAfter) { where.push('o.updated_at >= ?'); params.push(updatedAfter); }
   return { where, params };
 }
 
@@ -159,8 +161,8 @@ async function list({ limit = 50, offset = 0, ...filter } = {}, conn) {
  * Counts and amounts per status for the list's tabs and summary cards. Uses every filter EXCEPT the
  * status/payment ones, so each tab shows what clicking it would give.
  */
-async function breakdown({ source, tableId, from, to, q } = {}, conn) {
-  const { where, params } = buildFilter({ source, tableId, from, to, q });
+async function breakdown({ source, tableId, from, to, q, updatedAfter } = {}, conn) {
+  const { where, params } = buildFilter({ source, tableId, from, to, q, updatedAfter });
   const [rows] = await db(conn).query(
     `SELECT o.status, o.payment_status, COUNT(*) AS n, COALESCE(SUM(o.total), 0) AS amount
        FROM orders o ${where.length ? `WHERE ${where.join(' AND ')}` : ''}

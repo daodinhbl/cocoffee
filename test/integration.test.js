@@ -121,13 +121,20 @@ suite('integration', async (t) => {
     assert.equal((await fetch(`${base}/not-an-api-route`)).status, 404);
   });
 
-  await t.test('login with the seeded admin/admin account', async () => {
+  await t.test('login with the seeded admin/admin account: the factory password must be replaced first', async () => {
     assert.equal((await api('POST', '/auth/login', { username: 'admin', password: 'wrong' })).status, 401);
     const ok = await api('POST', '/auth/login', { username: 'admin', password: 'admin' });
     assert.equal(ok.status, 200);
     assert.equal(ok.body.user.role, 'admin');
-    token = ok.body.token;
+    assert.equal(ok.body.must_change_password, true);
+    const blocked = await api('GET', '/tables', null, ok.body.token);
+    assert.equal(blocked.status, 403);
+    assert.equal(blocked.body.error.code, 'MUST_CHANGE_PASSWORD');
+    const changed = await api('POST', '/auth/change-password', { current_password: 'admin', new_password: 'a-long-new-password' }, ok.body.token);
+    assert.equal(changed.status, 200);
+    token = changed.body.token;
     assert.equal((await api('GET', '/tables', null, token)).body.tables.length, 10);
+    assert.equal((await api('GET', '/tables', null, ok.body.token)).status, 401, 'the flagged token died with the factory password');
   });
 
   await t.test('webhook rejects bad / missing signature and wrong app', async () => {
@@ -379,23 +386,26 @@ suite('integration', async (t) => {
     await post(textEvent('1 matcha', { user: 'U6' })); await waitFor(() => /Matcha đá xay/.test(lastText() || ''));
 
     await pool.query("INSERT INTO users (username, password_hash, full_name, role) SELECT 'cashier1', password_hash, 'C', 'cashier' FROM users WHERE username = 'admin'");
-    const cashier = (await api('POST', '/auth/login', { username: 'cashier1', password: 'admin' })).body.token;
+    const cashier = (await api('POST', '/auth/login', { username: 'cashier1', password: 'a-long-new-password' })).body.token;
     assert.equal((await api('POST', '/products', { category_id: 1 }, cashier)).status, 403);
     assert.equal((await api('GET', '/products', null, cashier)).status, 200);
   });
 
-  await t.test('REST: change-password replaces admin/admin', async () => {
-    assert.equal((await api('POST', '/auth/change-password', { current_password: 'admin', new_password: 'short' }, token)).status, 400);
-    assert.equal((await api('POST', '/auth/change-password', { current_password: 'nope', new_password: 'a-long-new-password' }, token)).status, 401);
-    assert.equal((await api('POST', '/auth/change-password', { current_password: 'admin', new_password: 'a-long-new-password' }, token)).status, 200);
-    assert.equal((await api('POST', '/auth/login', { username: 'admin', password: 'admin' })).status, 401);
-    assert.equal((await api('POST', '/auth/login', { username: 'admin', password: 'a-long-new-password' })).status, 200);
+  await t.test('REST: change-password replaces the password and revokes older tokens', async () => {
+    assert.equal((await api('POST', '/auth/change-password', { current_password: 'a-long-new-password', new_password: 'short' }, token)).status, 400);
+    assert.equal((await api('POST', '/auth/change-password', { current_password: 'nope', new_password: 'another-long-password' }, token)).status, 401);
+    const changed = await api('POST', '/auth/change-password', { current_password: 'a-long-new-password', new_password: 'another-long-password' }, token);
+    assert.equal(changed.status, 200);
+    assert.equal((await api('GET', '/tables', null, token)).status, 401, 'older token revoked by the stamp check');
+    assert.equal((await api('GET', '/tables', null, changed.body.token)).status, 200);
+    assert.equal((await api('POST', '/auth/login', { username: 'admin', password: 'a-long-new-password' })).status, 401);
+    assert.equal((await api('POST', '/auth/login', { username: 'admin', password: 'another-long-password' })).status, 200);
   });
 
   await t.test('resend-receipt works for completed Zalo orders only', async () => {
     const zo = await one("SELECT id FROM orders WHERE zalo_user_id = 'U1' AND status = 'completed'");
     const n = sends().length;
-    const r = await api('POST', `/orders/${zo.id}/resend-receipt`, null, (await api('POST', '/auth/login', { username: 'admin', password: 'a-long-new-password' })).body.token);
+    const r = await api('POST', `/orders/${zo.id}/resend-receipt`, null, (await api('POST', '/auth/login', { username: 'admin', password: 'another-long-password' })).body.token);
     assert.deepEqual(r.body, { sent: true });
     assert.equal(sends().length, n + 1);
   });

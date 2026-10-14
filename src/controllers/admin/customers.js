@@ -5,24 +5,17 @@ const v = require('../../utils/validate');
 const { render, optional, describeError } = require('./common');
 const env = require('../../config/env');
 const printerSettings = require('../../services/printerSettings');
-const { shopDay, parseDay, dayBounds } = require('../../utils/shopTime');
 const debtNotifications = require('../../services/zalo/debtNotificationService');
 
-const PAGE_SIZE = 25;
+const customerQuery = require('../../services/customerQueryService');
+
+const { PAGE_SIZE } = customerQuery;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Parse and sanitise query-string filter params. */
-function readFilters(query) {
-  return {
-    q:        typeof query.q === 'string' ? query.q.trim().slice(0, 60) : '',
-    debtOnly: query.debt === '1',
-    zaloOnly: query.zalo === '1',
-    page:     Math.max(1, Math.min(10000, parseInt(query.page, 10) || 1)),
-  };
-}
+const { readFilters, readPeriod } = customerQuery;
 
 /**
  * Override describeError to give a Vietnamese message for duplicate phone/zalo.
@@ -48,16 +41,7 @@ function friendlyDbError(err) {
 
 async function list(req, res) {
   const f = readFilters(req.query);
-  const filterOpts = { q: f.q || undefined, debtOnly: f.debtOnly, zaloOnly: f.zaloOnly };
-
-  const [total, stats] = await Promise.all([
-    customerModel.count(filterOpts),
-    customerModel.summary(),
-  ]);
-
-  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const page  = Math.min(f.page, pages);
-  const customers = await customerModel.list({ ...filterOpts, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE });
+  const { customers, stats, total, page, pages } = await customerQuery.listPage(f);
 
   // Build a page URL helper that keeps active filters.
   const params = new URLSearchParams();
@@ -230,39 +214,13 @@ async function adjust(req) {
 // Debt reconciliation (đối chiếu công nợ)
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** ?from=&to= (YYYY-MM-DD, shop days, inclusive). Default: this month so far. */
-function readPeriod(query) {
-  const today = shopDay();
-  let from = parseDay(query.from) || `${today.slice(0, 8)}01`;
-  let to = parseDay(query.to) || today;
-  if (from > to) [from, to] = [to, from];
-  return { from, to, bounds: dayBounds(from, to) };
-}
-
-function presets() {
-  const today = shopDay();
-  const monthStart = `${today.slice(0, 8)}01`;
-  const lastMonthEnd = shopDay(new Date(`${monthStart}T12:00:00Z`), -1);
-  const lastMonthStart = `${lastMonthEnd.slice(0, 8)}01`;
-  const yearStart = `${today.slice(0, 4)}-01-01`;
-  return [
-    { key: 'month', label: 'Tháng này', from: monthStart, to: today },
-    { key: 'last_month', label: 'Tháng trước', from: lastMonthStart, to: lastMonthEnd },
-    { key: 'year', label: 'Năm nay', from: yearStart, to: today },
-  ];
-}
-
 /** GET /admin/customers/reconciliation */
 async function reconciliation(req, res) {
-  const p = readPeriod(req.query);
-  const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 60) : '';
-  const rows = await customerModel.reconciliation(p.bounds.from, p.bounds.to, { q: q || undefined });
-  const totals = rows.reduce((t, r) => ({ opening: t.opening + r.opening, increase: t.increase + r.increase, decrease: t.decrease + r.decrease, closing: t.closing + r.closing }),
-    { opening: 0, increase: 0, decrease: 0, closing: 0 });
+  const r = await customerQuery.reconciliation(req.query);
   await render(res, 'debt_reconciliation', {
     title: 'Đối chiếu công nợ', activeMenu: 'customers',
     breadcrumbs: [{ label: 'Khách hàng', href: '/admin/customers' }, { label: 'Đối chiếu công nợ' }],
-  }, { rows, totals, period: p, q, presets: presets() });
+  }, { rows: r.rows, totals: r.totals, period: r.period, q: r.q, presets: r.presets });
 }
 
 /** GET /admin/customers/:id/statement — printable A4 reconciliation sheet for one customer */

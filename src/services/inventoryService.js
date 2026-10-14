@@ -112,4 +112,13 @@ async function adjust(conn, itemId, newQuantity, { type = 'adjustment', userId =
   return { quantity_on_hand: newQuantity, delta };
 }
 
-module.exports = { consumeForOrder, receive, adjust };
+/**
+ * Admin stock list (Web Admin > Nguyên liệu and GET /api/inventory?all=1): every item, inactive included, and the
+ * total value of the ACTIVE items at moving-average cost.
+ */
+async function listWithValue() {
+  const items = await inventoryModel.listAll();
+  return { items, stockValue: items.filter((i) => i.is_active).reduce((sum, i) => sum + Number(i.stock_value || 0), 0) };
+}
+
+module.exports = { consumeForOrder, receive, adjust, listWithValue };

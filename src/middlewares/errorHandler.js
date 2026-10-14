@@ -11,6 +11,9 @@ function errorHandler(err, req, res, _next) {
   if (err.type === 'entity.parse.failed') {
     return res.status(400).json({ error: { code: 'BAD_JSON', message: 'Malformed JSON body' } });
   }
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({ error: { code: 'PAYLOAD_TOO_LARGE', message: 'Request body is larger than 1 MB' } });
+  }
   if (err.errno === 1062) { // ER_DUP_ENTRY
     return res.status(409).json({ error: { code: 'DUPLICATE', message: 'A record with the same unique value already exists' } });
   }

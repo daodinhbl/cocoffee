@@ -1,11 +1,7 @@
 const env = require('../../config/env');
-const categoryModel = require('../../models/categoryModel');
-const productModel = require('../../models/productModel');
-const tableModel = require('../../models/tableModel');
-const adminModel = require('../../models/adminModel');
-const orderModel = require('../../models/orderModel');
 const printerSettings = require('../../services/printerSettings');
 const orderService = require('../../services/orderService');
+const posService = require('../../services/posService');
 const { AppError } = require('../../utils/httpError');
 const v = require('../../utils/validate');
 const logger = require('../../utils/logger');
@@ -17,12 +13,8 @@ const { versionOf } = require('../../middlewares/adminSecurity');
  * is sent once, at checkout. Pricing, stock deduction (BOM) and COGS stay in orderService — the client's
  * prices are display-only.
  */
-const METHODS = ['cash', 'transfer', 'card'];
-
 async function page(req, res) {
-  const [categories, products, tables, drafts, zalo, printer] = await Promise.all([
-    categoryModel.list(), productModel.list(), tableModel.list(), adminModel.zaloPendingDrafts(20), zaloStatus(), printerSettings.get(),
-  ]);
+  const [{ categories, products, tables, drafts, printer }, zalo] = await Promise.all([posService.bootstrap(), zaloStatus()]);
   res.render('pos', {
     shopName: env.business.shopName,
     user: req.user,
@@ -53,52 +45,24 @@ async function openOrder(req, res) {
   }
 }
 
-/** body: { table_id?, order_id?, items:[{product_id, quantity}], note?, discount?, method, tendered? } */
-function readCart(body) {
-  const items = Array.isArray(body.items) ? body.items : [];
-  if (!items.length) throw new AppError(400, 'VALIDATION', 'Đơn chưa có món nào.');
-  if (items.length > 100) throw new AppError(400, 'VALIDATION', 'Đơn quá nhiều dòng.');
-  return {
-    tableId: body.table_id ? v.id(body.table_id, 'Bàn') : null,
-    orderId: body.order_id ? v.id(body.order_id, 'Đơn') : null,
-    items: items.map((i) => ({ product_id: v.id(i?.product_id, 'Món'), quantity: i?.quantity })),
-    note: v.str(typeof body.note === 'string' && body.note.trim() ? body.note : undefined, 'Ghi chú', { max: 255, required: false }),
-  };
-}
-
-/** Create the order (or update the table's open one) without taking payment. */
-async function saveOpen(cart, userId) {
-  if (cart.orderId) return { order: await orderService.replaceOpenOrderItems(cart.orderId, cart.items), created: false };
-  return { order: await orderService.createPosOrder({ table_id: cart.tableId, items: cart.items, note: cart.note, userId }), created: true };
-}
+const { readCart } = posService;
 
 /** Keep the order on its table (pay later). Needs a table. */
 async function hold(req) {
-  const cart = readCart(req.body);
-  if (!cart.tableId && !cart.orderId) throw new AppError(400, 'VALIDATION', 'Chọn bàn để giữ đơn.');
-  const { order } = await saveOpen(cart, req.user.id);
+  const { order } = await posService.hold(readCart(req.body), req.user.id);
   return { message: `Đã lưu đơn ${order.order_code} cho bàn.`, order: { id: order.id, code: order.order_code, total: Number(order.total) } };
 }
 
 /** Save + pay in one step. A just-created order whose payment fails is cancelled, so nothing is left half-done. */
 async function checkout(req) {
   const cart = readCart(req.body);
-  const method = v.oneOf(req.body.method, 'Hình thức thanh toán', METHODS);
-  const discount = v.num(req.body.discount === '' || req.body.discount == null ? undefined : req.body.discount, 'Giảm giá', { min: 0, required: false });
-  const tendered = v.num(req.body.tendered === '' || req.body.tendered == null ? undefined : req.body.tendered, 'Tiền khách đưa', { min: 0, required: false });
-
-  const { order, created } = await saveOpen(cart, req.user.id);
-  try {
-    const result = await orderService.payOrder(order.id, { method, tendered, discount, userId: req.user.id });
-    return {
-      message: `Đã thanh toán ${result.order.order_code}.`,
-      order: { id: result.order.id, code: result.order.order_code, total: Number(result.order.total) },
-      change: Number(result.change) || 0,
-    };
-  } catch (err) {
-    if (created) await orderService.cancelOrder(order.id).catch((e) => logger.warn('POS: could not cancel unpaid order', e));
-    throw err;
-  }
+  const payment = posService.readPayment(req.body);
+  const result = await posService.checkout(cart, payment, req.user.id);
+  return {
+    message: `Đã thanh toán ${result.order.order_code}.`,
+    order: { id: result.order.id, code: result.order.order_code, total: Number(result.order.total) },
+    change: result.change,
+  };
 }
 
 const METHOD_LABEL = { cash: 'Tiền mặt', transfer: 'Chuyển khoản', card: 'Thẻ', other: 'Khác' };
@@ -120,7 +84,7 @@ function renderReceipt(req, res, { order, payments, printer, sample = false }) {
     paper: printer.paperMm,
     order,
     payments: payments.map((p) => ({ ...p, label: METHOD_LABEL[p.method] || p.method })),
-    vat: printer.showVat && printer.vatRate > 0 ? total - total / (1 + printer.vatRate / 100) : null,
+    vat: posService.vatOf(total, printer),
     cash: Number.isFinite(given) && given >= total ? { given, change: given - total } : null,
     autoPrint: req.query.print === '1',
     printedBy: req.user.full_name || req.user.username,
@@ -129,9 +93,7 @@ function renderReceipt(req, res, { order, payments, printer, sample = false }) {
 }
 
 async function receipt(req, res) {
-  const order = await orderService.getWithItems(v.id(req.params.id));
-  if (order.status === 'cancelled' || order.status === 'draft') throw new AppError(409, 'NOT_PRINTABLE', 'Đơn này chưa hoàn tất nên không in hóa đơn.');
-  const [payments, printer] = await Promise.all([orderModel.getPayments(order.id), printerSettings.get()]);
+  const { order, payments, printer } = await posService.receipt(v.id(req.params.id));
   renderReceipt(req, res, { order, payments, printer });
 }
 

@@ -15,17 +15,25 @@ async function getWithItems(orderId, conn) {
   return { ...order, items: await orderModel.getItems(orderId, conn) };
 }
 
+/** Optional line note ("ít đá"): a string up to 255 characters (the column size), '' / null = none. */
+function lineNote(note) {
+  if (note === undefined || note === null || note === '') return null;
+  if (typeof note !== 'string' || note.trim().length > 255) throw new AppError(400, 'VALIDATION', 'note must be a string up to 255 chars');
+  return note.trim() || null;
+}
+
 /** Validate [{product_id, quantity, note}] against live product rows and snapshot name/price. */
 async function priceLines(conn, items) {
   if (!Array.isArray(items)) throw new AppError(400, 'VALIDATION', 'items must be an array');
-  const ids = [...new Set(items.map((i) => Number(i.product_id)))];
+  const ids = [...new Set(items.map((i) => Number(i?.product_id)))];
   const products = new Map((await productModel.getManyByIds(ids, conn)).map((p) => [p.id, p]));
   return items.map((i) => {
+    if (!i || typeof i !== 'object') throw new AppError(400, 'VALIDATION', 'items must be objects');
     const qty = Number(i.quantity);
     const product = products.get(Number(i.product_id));
     if (!product || !product.is_active) throw new AppError(422, 'PRODUCT_UNAVAILABLE', `Product ${i.product_id} is not available`);
     if (!Number.isInteger(qty) || qty < 1 || qty > MAX_QTY) throw new AppError(400, 'VALIDATION', `quantity must be 1..${MAX_QTY}`);
-    return { product_id: product.id, product_name: product.name, unit_price: product.price, quantity: qty, note: i.note };
+    return { product_id: product.id, product_name: product.name, unit_price: product.price, quantity: qty, note: lineNote(i.note) };
   });
 }
 
@@ -75,11 +83,16 @@ async function replaceOpenOrderItems(orderId, items) {
  * Take payment. Two legal entry states:
  *  - open      (POS)  -> finalize (deduct stock, COGS) + record payment
  *  - completed & unpaid (Zalo order, stock already deducted at confirmation) -> record payment only
+ * A completed order linked to a customer is on that customer's debt ledger: paying it settles debt, which only an
+ * admin may do (allowDebtSettlement). Checked after the row lock, so the order cannot change in between.
  */
-async function payOrder(orderId, { method, tendered, reference, discount, userId }) {
+async function payOrder(orderId, { method, tendered, reference, discount, userId, allowDebtSettlement = false }) {
   return withTransaction(async (conn) => {
     let order = await orderModel.getById(orderId, conn, { forUpdate: true });
     if (!order) throw new AppError(404, 'NOT_FOUND', 'Order not found');
+    if (order.status === 'completed' && order.customer_id && !allowDebtSettlement) {
+      throw new AppError(403, 'FORBIDDEN', 'Only an admin can settle a customer debt');
+    }
 
     if (order.status === 'open') {
       if (discount !== undefined && discount !== null) {

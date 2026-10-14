@@ -6,24 +6,37 @@ const { AppError } = require('../../utils/httpError');
 const v = require('../../utils/validate');
 const { render } = require('./common');
 const imageStore = require('../../services/imageStore');
+const menuRules = require('../../services/menuRules');
 
-async function page(_req, res) {
+/** BOM screen data, shared with GET /api/admin/bom. */
+async function pageData() {
   const [products, categories, items] = await Promise.all([
     productModel.listWithCost(), categoryModel.list(), inventoryModel.listAll(),
   ]);
-  const drinks = products.filter((p) => p.stock_mode === 'bom');
-  const retail = products.filter((p) => p.stock_mode === 'direct');
-  const avgMargin = products.length ? products.reduce((s, p) => s + p.margin, 0) / products.length : 0;
+  return {
+    drinks: products.filter((p) => p.stock_mode === 'bom'),
+    retail: products.filter((p) => p.stock_mode === 'direct'),
+    categories,
+    stats: {
+      total: products.length,
+      missing: products.filter((p) => !p.ingredients.length).length,
+      avgMargin: products.length ? products.reduce((s, p) => s + p.margin, 0) / products.length : 0,
+    },
+    // what the dialog offers: raw materials with their current moving-average cost per base unit. Inactive
+    // items are included so an existing recipe line that uses one still shows (and survives a save).
+    catalog: items.map((i) => ({ id: i.id, name: i.name, unit: i.unit, unitCost: i.avg_cost, active: Boolean(i.is_active) })),
+  };
+}
+
+async function page(_req, res) {
+  const { drinks, retail, categories, stats, catalog } = await pageData();
 
   await render(res, 'bom_recipes', {
     title: 'Quản lý định mức (BOM)', activeMenu: 'bom',
     breadcrumbs: [{ label: 'Kho & Định mức', href: '#' }, { label: 'Công thức (BOM)' }],
   }, {
-    drinks, retail, categories,
-    stats: { total: products.length, missing: products.filter((p) => !p.ingredients.length).length, avgMargin },
-    // what the dialog offers: raw materials with their current moving-average cost per base unit. Inactive
-    // items are included so an existing recipe line that uses one still shows (and survives a save).
-    catalog: { drink: items.map((i) => ({ id: i.id, name: i.name, unit: i.unit, unitCost: i.avg_cost, active: Boolean(i.is_active) })) },
+    drinks, retail, categories, stats,
+    catalog: { drink: catalog },
   });
 }
 
@@ -31,15 +44,7 @@ async function page(_req, res) {
 function readRecipe(raw) {
   let parsed;
   try { parsed = JSON.parse(raw); } catch (_) { parsed = null; }
-  if (!Array.isArray(parsed) || !parsed.length) throw new AppError(400, 'VALIDATION', 'Công thức cần ít nhất một nguyên liệu.');
-  if (parsed.length > 50) throw new AppError(400, 'VALIDATION', 'Công thức tối đa 50 dòng.');
-  const merged = new Map();
-  for (const l of parsed) {
-    const id = v.id(l?.inventory_item_id, 'Nguyên liệu');
-    const qty = v.num(l?.quantity, 'Định lượng', { min: 0.0001, max: 1e7 });
-    merged.set(id, (merged.get(id) || 0) + qty);
-  }
-  return [...merged].map(([inventory_item_id, quantity]) => ({ inventory_item_id, quantity: Math.round(quantity * 1e4) / 1e4 }));
+  return menuRules.mergeRecipe(parsed);
 }
 
 async function create(req) {
@@ -101,4 +106,4 @@ async function remove(req) {
   return { message: `Đã ngừng bán ${current.name}. Bật lại ở trang Thực đơn.` };
 }
 
-module.exports = { page, create, update, remove, readRecipe };
+module.exports = { page, pageData, create, update, remove, readRecipe };

@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const env = require('../../config/env');
 const settingsModel = require('../../models/settingsModel');
 const logger = require('../../utils/logger');
+const { AppError } = require('../../utils/httpError');
 
 /**
  * Effective Zalo chatbot configuration. The Zalo Bot Platform token and webhook secret can come from the
@@ -54,6 +55,17 @@ async function saveBotToken(token, userId) {
   return get();
 }
 
+/** Validate the "debt notices go to" form/JSON: { chatId ('' clears it), chatType: user|group }. */
+function readDebtRecipient(body = {}) {
+  const chatId = typeof body.chatId === 'string' ? body.chatId.trim() : '';
+  const chatType = body.chatType === 'group' ? 'group' : body.chatType === 'user' ? 'user' : '';
+  if (chatId && !/^[A-Za-z0-9._:-]{1,100}$/.test(chatId)) {
+    throw new AppError(400, 'VALIDATION', 'Chat ID không hợp lệ. Hãy sao chép nguyên mã bot trả về.');
+  }
+  if (!chatType) throw new AppError(400, 'VALIDATION', 'Chọn loại chat nhận thông báo.');
+  return { chatId, chatType };
+}
+
 async function saveDebtRecipient(chatId, chatType, userId) {
   await settingsModel.setMany({
     [PREFIX + 'debtOwnerChatId']: chatId,
@@ -63,4 +75,4 @@ async function saveDebtRecipient(chatId, chatType, userId) {
   return get();
 }
 
-module.exports = { get, invalidate, saveBotToken, saveDebtRecipient };
+module.exports = { get, invalidate, saveBotToken, saveDebtRecipient, readDebtRecipient };

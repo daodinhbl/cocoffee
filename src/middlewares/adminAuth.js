@@ -21,7 +21,7 @@ const AUDIENCE = 'admin-web';
 const COOKIE_BASE = { httpOnly: true, sameSite: 'strict', path: '/admin', secure: env.nodeEnv === 'production' };
 // Also Secure whenever the request itself came over HTTPS (trust proxy is on), even if NODE_ENV was left unset.
 const cookieOpts = (res) => ({ ...COOKIE_BASE, secure: COOKIE_BASE.secure || Boolean(res.req && res.req.secure) });
-const pwStamp = (passwordHash) => crypto.createHash('sha256').update(String(passwordHash)).digest('hex').slice(0, 16);
+const { pwStamp } = require('../utils/passwordStamp');
 
 function readCookies(req) {
   const out = {};

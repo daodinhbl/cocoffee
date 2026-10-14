@@ -78,14 +78,15 @@ async function addMovement(
   );
 }
 
-async function movements(itemId, limit = 100, conn) {
+/** Ledger of one item, newest first. `type` optionally keeps one movement_type (purchase, sale, ...). */
+async function movements(itemId, limit = 100, conn, { type } = {}) {
   const [rows] = await db(conn).query(
     `SELECT m.id, m.movement_type, m.quantity_change, m.unit_cost, m.balance_after, m.order_id, m.note, m.created_at,
             u.full_name AS created_by_name
        FROM inventory_movements m
        LEFT JOIN users u ON u.id = m.created_by
-      WHERE m.inventory_item_id = ? ORDER BY m.id DESC LIMIT ?`,
-    [itemId, Math.min(Number(limit) || 100, 500)]
+      WHERE m.inventory_item_id = ? ${type ? 'AND m.movement_type = ? ' : ''}ORDER BY m.id DESC LIMIT ?`,
+    [itemId, ...(type ? [type] : []), Math.min(Number(limit) || 100, 500)]
   );
   return rows;
 }

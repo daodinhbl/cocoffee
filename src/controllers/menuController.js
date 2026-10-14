@@ -3,18 +3,21 @@ const categoryModel = require('../models/categoryModel');
 const productModel = require('../models/productModel');
 const { AppError } = require('../utils/httpError');
 const v = require('../utils/validate');
+const menuRules = require('../services/menuRules');
 
 // ------------------------------------------------------------------ categories
 async function listCategories(req, res) {
   res.json({ categories: await categoryModel.list({ activeOnly: req.query.all !== '1' }) });
 }
 
+/** Same rules as the Web Admin: the code is lowercased (a-z, 0-9, _), and the chatbot catalog is refreshed. */
 async function createCategory(req, res) {
   const id = await categoryModel.create({
-    code: v.str(req.body.code, 'code', { max: 30 }),
+    code: menuRules.categoryCode(req.body.code, 'code'),
     name: v.str(req.body.name, 'name', { max: 100 }),
     sort_order: v.num(req.body.sort_order, 'sort_order', { min: -1000, max: 1000, integer: true, required: false }),
   });
+  productModel.invalidateCatalog();
   res.status(201).json({ id });
 }
 
@@ -24,6 +27,7 @@ async function updateCategory(req, res) {
     sort_order: v.num(req.body.sort_order, 'sort_order', { min: -1000, max: 1000, integer: true, required: false }),
     is_active: v.flag(req.body.is_active),
   });
+  productModel.invalidateCatalog();
   res.json({ ok: true });
 }
 
@@ -52,10 +56,8 @@ function readStockConfig(body, { stock_mode, inventory_item_id }) {
     itemId = v.id(body.inventory_item_id ?? inventory_item_id, 'inventory_item_id');
   } else if (body.recipe !== undefined) {
     if (!Array.isArray(body.recipe) || !body.recipe.length) v.fail('recipe must be a non-empty array for stock_mode=bom');
-    recipe = body.recipe.map((l) => ({
-      inventory_item_id: v.id(l.inventory_item_id, 'recipe.inventory_item_id'),
-      quantity: v.num(l.quantity, 'recipe.quantity', { min: 0.0001, max: 1e7 }),
-    }));
+    // like the BOM page: duplicate lines of one ingredient merged, 4 decimals, at most 50 lines
+    recipe = menuRules.mergeRecipe(body.recipe, { item: 'recipe.inventory_item_id', qty: 'recipe.quantity' });
   }
   return { mode, itemId, recipe };
 }
@@ -65,6 +67,7 @@ async function createProduct(req, res) {
   const { mode, itemId, recipe } = readStockConfig(b, {});
   if (mode === 'bom' && !recipe) v.fail('recipe is required for stock_mode=bom');
   const name = v.str(b.name, 'name', { max: 150 });
+  const aliases = b.aliases === undefined || b.aliases === null ? [] : menuRules.checkAliases(b.aliases);
 
   const id = await withTransaction(async (conn) => {
     const productId = await productModel.create({
@@ -76,7 +79,7 @@ async function createProduct(req, res) {
       inventory_item_id: itemId,
     }, conn);
     if (recipe) await productModel.setRecipe(productId, recipe, conn);
-    await productModel.setAliases(productId, name, b.aliases, conn);
+    await productModel.setAliases(productId, name, aliases, conn);
     return productId;
   });
   res.status(201).json({ product: await productModel.getById(id) });
@@ -89,6 +92,7 @@ async function updateProduct(req, res) {
   if (!current) throw new AppError(404, 'NOT_FOUND', 'Product not found');
   const { mode, itemId, recipe } = readStockConfig(b, current);
   if (mode === 'bom' && current.stock_mode === 'direct' && !recipe) v.fail('recipe is required when switching to stock_mode=bom');
+  const aliases = b.aliases === undefined || b.aliases === null ? undefined : menuRules.checkAliases(b.aliases);
 
   await withTransaction(async (conn) => {
     await productModel.update(id, {
@@ -101,8 +105,8 @@ async function updateProduct(req, res) {
     }, conn);
     if (mode === 'direct') await productModel.setRecipe(id, [], conn);
     else if (recipe) await productModel.setRecipe(id, recipe, conn);
-    if (b.aliases !== undefined || b.name !== undefined) {
-      await productModel.setAliases(id, b.name ?? current.name, b.aliases ?? current.aliases, conn);
+    if (aliases !== undefined || b.name !== undefined) {
+      await productModel.setAliases(id, b.name ?? current.name, aliases ?? current.aliases, conn);
     }
   });
   res.json({ product: await productModel.getById(id) });
