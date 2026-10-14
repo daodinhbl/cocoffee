@@ -89,6 +89,7 @@ async function menuText() {
  * transfer content "NO KH<id>" so the payment can be matched. Never in a group, never for anyone else.
  */
 async function debt(ctx) {
+  if (await isOwnerChat(ctx)) return ownerStatement(ctx, statementService.periodFromText(''));   // the owner asking "công nợ" wants everyone's table
   if (ctx.isGroup) return say(ctx, TXT.debtPrivate, 'debt');
   const linked = await customerModel.findByZaloUser(ctx.userId);
   const customer = linked ? await customerModel.getById(linked.id) : null;
@@ -105,6 +106,8 @@ async function debt(ctx) {
     lines.push('Bạn vui lòng thanh toán tại quầy nhé.');
   }
   await say(ctx, lines.join('\n'), 'debt');
+  // the debt table (last 3 months) with the answer: what makes up the balance
+  await sendTable(ctx, () => billMedia.statementPicture({ customerId: customer.id, ...statementService.periodFromText('gan day') }), '');
 
   if (chatbotInfo.bankReady(info) && ctx.io.image) {
     try {
@@ -124,11 +127,15 @@ async function debt(ctx) {
  *   - a customer in a private chat: their own statement, then the account + VietQR when something is still owed.
  * A text summary first, then the table as a picture (the table as text when the picture cannot be sent).
  */
+/** The chat the owner set as "nhận thông báo công nợ" (Admin > Zalo): it may ask for the debts of ALL customers. */
+async function isOwnerChat(ctx) {
+  const cfg = await zaloConfig.get();
+  return Boolean(cfg.debtOwnerChatId) && String(cfg.debtOwnerChatId) === String(ctx.chatId) && cfg.debtOwnerChatType === ctx.chatType;
+}
+
 async function statement(ctx, text) {
   const period = statementService.periodFromText(parser.statementPeriodText(text));
-  const cfg = await zaloConfig.get();
-  const isOwner = Boolean(cfg.debtOwnerChatId) && String(cfg.debtOwnerChatId) === String(ctx.chatId) && cfg.debtOwnerChatType === ctx.chatType;
-  if (isOwner) return ownerStatement(ctx, period);
+  if (await isOwnerChat(ctx)) return ownerStatement(ctx, period);
   if (ctx.isGroup) return say(ctx, TXT.debtPrivate, 'statement');
   const linked = await customerModel.findByZaloUser(ctx.userId);
   if (!linked) return say(ctx, TXT.debtUnknown, 'statement');

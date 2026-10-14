@@ -179,7 +179,8 @@ async function toPng(img) {
  * A titled table as a PNG (debt statements). spec:
  *   width (default 720), shopName, title, lines: string[] (centered, under the title),
  *   columns: [{ label, w (relative width), align: 'left'|'right'|'center' }],
- *   rows: [{ cells: string[], bold?, shade? }]  (cells wrap inside their column; at most maxRows rows are drawn),
+ *   rows: [{ cells: string[], bold?, shade? }]  (cells wrap inside their column; at most maxRows rows are drawn: the first ones,
+ *     or with keepLast the LAST ones after a "… N dòng trước đó" row — a statement is read from the bottom),
  *   notes: string[] (small print under the table), fontSize (default 19).
  * Returns null when the picture cannot be drawn (font / pureimage missing).
  */
@@ -224,8 +225,10 @@ async function renderTable(spec) {
   addRow(spec.columns.map((c) => c.label), { bold: true, shade: '#e5e7eb' });
   const maxRows = spec.maxRows || 80;
   const rows = spec.rows || [];
-  rows.slice(0, maxRows).forEach((r) => addRow(r.cells, { bold: r.bold, shade: r.shade }));
-  if (rows.length > maxRows) addRow([`… và ${rows.length - maxRows} dòng nữa`, ...spec.columns.slice(1).map(() => '')], {});
+  const hidden = Math.max(0, rows.length - maxRows);
+  if (hidden && spec.keepLast) addRow([`… ${hidden} dòng trước đó`, ...spec.columns.slice(1).map(() => '')], {});
+  (spec.keepLast ? rows.slice(hidden) : rows.slice(0, maxRows)).forEach((r) => addRow(r.cells, { bold: r.bold, shade: r.shade }));
+  if (hidden && !spec.keepLast) addRow([`… và ${hidden} dòng nữa`, ...spec.columns.slice(1).map(() => '')], {});
   const tableBottom = y;
   y += 14;
   for (const note of spec.notes || []) {

@@ -172,9 +172,42 @@ test('debt tables over the Zalo bot', async (t) => {
     assert.doesNotMatch(other.replies[0].text, /Anh Nam/);
   });
 
-  await t.test('"check nợ" is unchanged: balance and QR only', async () => {
-    const r = await say('check nợ');
-    assert.equal(r.action, 'debt');
-    assert.match(r.replies[0].text, /CÔNG NỢ[\s\S]*Số dư hiện tại: 166\.000đ/);
+  await t.test('a plain "công nợ" / "check nợ" now also carries the debt table of the last 3 months', async () => {
+    SETTINGS.delete('chatbot.bankBin');
+    SETTINGS.delete('chatbot.bankAccount');
+    for (const q of ['công nợ', 'check nợ']) {
+      const r = await say(q);
+      assert.equal(r.action, 'debt');
+      assert.deepEqual(r.replies.map((x) => x.type), ['text', 'image'], q);
+      assert.match(r.replies[0].text, /CÔNG NỢ[\s\S]*Số dư hiện tại: 166\.000đ/);
+      assert.match(r.replies[1].url, /\/api\/zalo\/statement\/[\w-]+\.[\w-]{22}\.png$/);
+    }
+    const { periodFromText } = require('../src/services/zalo/statementService');
+    const p = periodFromText('gan day', new Date('2026-10-14T16:00:00Z'));
+    assert.deepEqual([p.from, p.to, p.label.slice(0, 15)], ['2026-08-01', '2026-10-14', '3 tháng gần đây']);
+    assert.equal(periodFromText('gan day', new Date('2026-01-10T05:00:00Z')).from, '2025-11-01');
+    LAN.balance = 0;
+    assert.equal((await say('công nợ')).replies.length, 1, 'nothing owed: just the "không còn nợ" line');
+    LAN.balance = 166000;
+  });
+
+  await t.test('the owner\'s chat asking a plain "công nợ" gets ALL customers\' table', async () => {
+    const r = await say('công nợ', { senderId: 'owner-1' });
+    assert.equal(r.action, 'statement');
+    assert.match(r.replies[0].text, /ĐỐI CHIẾU CÔNG NỢ[\s\S]*Chị Lan: 166\.000đ/);
+    assert.match(r.replies[1].url, /\/api\/zalo\/reconciliation\//);
+    const owner2 = await say('check nợ', { senderId: 'owner-1' });
+    assert.equal(owner2.action, 'statement');
+  });
+
+  await t.test('a long statement keeps the NEWEST lines (and says how many were left out)', async () => {
+    const { allPng } = require('../src/services/zalo/statementService');
+    const receiptImage = require('../src/services/receiptImage');
+    const rows = Array.from({ length: 70 }, (_, i) => ({ cells: [String(i + 1), `d${i}`, `dong ${i + 1}`, '', '', '']}));
+    const keep = await receiptImage.renderTable({ columns: [{ label: 'a', w: 1 }, { label: 'b', w: 1 }, { label: 'c', w: 3 }, { label: 'd', w: 1 }, { label: 'e', w: 1 }, { label: 'f', w: 1 }], rows, maxRows: 10, keepLast: true });
+    const first = await receiptImage.renderTable({ columns: [{ label: 'a', w: 1 }, { label: 'b', w: 1 }, { label: 'c', w: 3 }, { label: 'd', w: 1 }, { label: 'e', w: 1 }, { label: 'f', w: 1 }], rows, maxRows: 10 });
+    assert.equal(Buffer.from(keep).readUInt32BE(16), 720);
+    assert.notDeepEqual(keep, first, 'a different picture: last rows vs first rows');
+    assert.equal(typeof allPng, 'function');
   });
 });

@@ -119,6 +119,7 @@ test('chatbot through the Bot Client webhook', async (t) => {
   };
   mock.method(customerModel, 'findByZaloUser', async (z) => (CUSTOMERS[z] ? { id: CUSTOMERS[z].id } : null));
   mock.method(customerModel, 'getById', async (id) => Object.values(CUSTOMERS).find((c) => c.id === id) || null);
+  mock.method(customerModel, 'statement', async () => ({ opening: 0, entries: [], increase: 366000, decrease: 0, closing: 366000 }));
   const SETTINGS = new Map([['printer.shopAddress', '12 Lê Lợi, Q.1'], ['printer.shopPhone', '0909000111'], ['chatbot.wifi', 'CoCoffee / 12345678']]);
   mock.method(settingsModel, 'getByPrefix', async (p) => Object.fromEntries([...SETTINGS].filter(([k]) => k.startsWith(p))));
 
@@ -140,7 +141,7 @@ test('chatbot through the Bot Client webhook', async (t) => {
   await t.test('without a bank account: balance only, no picture', async () => {
     const r = await say('check nợ');
     assert.equal(r.action, 'debt');
-    assert.equal(r.replies.length, 1);
+    assert.deepEqual(r.replies.map((x) => x.type), ['text', 'image'], 'the balance, then the debt table (no QR without a bank account)');
     assert.match(r.replies[0].text, /Chị Lan/);
     assert.match(r.replies[0].text, /366\.000đ/);
     assert.match(r.replies[0].text, /thanh toán tại quầy/);
@@ -149,10 +150,11 @@ test('chatbot through the Bot Client webhook', async (t) => {
   await t.test('with a bank account: account line, transfer content and the VietQR picture (inline + signed URL)', async () => {
     SETTINGS.set('chatbot.bankBin', '970436').set('chatbot.bankAccount', '0123456789').set('chatbot.bankAccountName', 'NGUYEN VAN A');
     const r = await say('Mình còn nợ bao nhiêu vậy');
-    assert.deepEqual(r.replies.map((x) => x.type), ['text', 'image']);
+    assert.deepEqual(r.replies.map((x) => x.type), ['text', 'image', 'image'], 'balance, debt table, VietQR');
+    assert.match(r.replies[1].url, /\/api\/zalo\/statement\//);
     assert.match(r.replies[0].text, /Vietcombank · 0123456789 · NGUYEN VAN A/);
     assert.match(r.replies[0].text, /Nội dung: NO KH5/);
-    const img = r.replies[1];
+    const img = r.replies[2];
     assert.equal(img.mime, 'image/png');
     assert.deepEqual(Buffer.from(img.base64, 'base64').subarray(0, 4), PNG_MAGIC);
     assert.match(img.caption, /366\.000đ/);

@@ -18,7 +18,7 @@ const TYPE = { debt: 'Phát sinh nợ', payment: 'Thu nợ', adjust: 'Điều ch
 const METHOD = { cash: 'tiền mặt', transfer: 'chuyển khoản', card: 'thẻ', other: 'khác' };
 
 /**
- * "tháng trước", "tháng 9", "tất cả", "năm nay"; anything else (and nothing) is this month so far.
+ * "tháng trước", "tháng 9", "tất cả", "năm nay", "gan day" (3 months); anything else (and nothing) is this month so far.
  * @param {string} text already normalized (no accents, lower case)
  * @returns {{ from: string, to: string, label: string }} shop days, inclusive
  */
@@ -36,6 +36,11 @@ function periodFromText(text = '', now = new Date()) {
   let r;
   let name;
   if (/\btat ca\b/.test(t)) { r = { from: '2000-01-01', to: today }; name = 'Tất cả'; }
+  else if (/\bgan day\b/.test(t)) {           // what a plain "công nợ" shows: this month and the two before
+    const back = new Date(Date.UTC(year, month - 3, 1));
+    r = { from: `${back.getUTCFullYear()}-${pad(back.getUTCMonth() + 1)}-01`, to: today };
+    name = '3 tháng gần đây';
+  }
   else if (/\bnam nay\b/.test(t)) { r = { from: `${year}-01-01`, to: today }; name = `Năm ${year}`; }
   else if (/\bthang truoc\b/.test(t)) {
     const y = month === 1 ? year - 1 : year;
@@ -117,6 +122,7 @@ async function customerPng({ customerId, from, to }) {
     rows,
     notes: ['Nợ cuối kỳ là số tiền khách còn phải trả cho cửa hàng.'],
     maxRows: 60,
+    keepLast: true,
   });
 }
 
