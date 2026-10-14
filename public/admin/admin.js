@@ -232,11 +232,57 @@
     $('#f-price').value = recipe ? recipe.price : '';
     var cat = $('#f-category');
     if (cat) cat.value = recipe && recipe.category_id != null ? String(recipe.category_id) : (cat.options[0] ? cat.options[0].value : '');
+    $$('[data-image-field]', recipeDlg).forEach(function (f) { setImageField(f, recipe && recipe.image_url ? recipe.image_url : ''); });
     $('#recipe-lines').textContent = '';
     (recipe && recipe.lines.length ? recipe.lines : [{}]).forEach(addLine);
     recalc();
     recipeDlg.showModal();
     $('#f-name').focus();
+  }
+
+  /* ------------------------------------------------------------- photo fields */
+  // [data-image-field] (views/partials/image_field.ejs): the picked picture is centre-cropped to a square,
+  // scaled to 400px and re-encoded as JPEG here, then posted as a data URL in image_data (no multipart upload).
+  var IMG_SIZE = 400;
+  function showImage(field, src) {
+    var img = $('[data-image-preview]', field);
+    var empty = $('[data-image-empty]', field);
+    var clear = $('[data-image-clear]', field);
+    if (src) img.src = src; else img.removeAttribute('src');
+    img.classList.toggle('hidden', !src);
+    empty.classList.toggle('hidden', !!src);
+    clear.classList.toggle('hidden', !src);
+    clear.classList.toggle('inline-flex', !!src);
+    $('[data-image-pick-label]', field).textContent = src ? 'Đổi ảnh' : 'Chọn ảnh';
+  }
+  function setImageField(field, url) {
+    $('[name="image_data"]', field).value = '';
+    $('[name="image_remove"]', field).value = '';
+    $('[data-image-current]', field).value = url || '';
+    var file = $('[data-image-file]', field); if (file) file.value = '';
+    var hint = $('[data-image-hint]', field);   // back to the default help text after a previous pick
+    if (hint) { if (!hint.hasAttribute('data-default')) hint.setAttribute('data-default', hint.textContent); hint.textContent = hint.getAttribute('data-default'); }
+    showImage(field, url || '');
+  }
+  function compressImage(file, done) {
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) { done(new Error('Chỉ nhận ảnh JPEG, PNG hoặc WebP.')); return; }
+    if (file.size > 15 * 1024 * 1024) { done(new Error('Ảnh quá lớn (tối đa 15 MB trước khi nén).')); return; }
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function () {
+      var side = Math.min(img.naturalWidth, img.naturalHeight);
+      var canvas = document.createElement('canvas');
+      canvas.width = canvas.height = Math.min(IMG_SIZE, side);
+      var ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);   // transparent PNG -> white, not black
+      ctx.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      var q = 0.85, data = canvas.toDataURL('image/jpeg', q);
+      while (data.length > 750000 && q > 0.4) { q -= 0.1; data = canvas.toDataURL('image/jpeg', q); }
+      done(null, data);
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); done(new Error('Không đọc được ảnh này.')); };
+    img.src = url;
   }
 
   /* ------------------------------------------- generic dialogs + confirmation */
@@ -253,6 +299,7 @@
     var raw = trigger.getAttribute('data-fill');
     if (form) $$('[data-create-only]', form).forEach(function (el) { el.readOnly = !!raw; });   // identifiers are fixed once created
     if (form) $$('[data-new-only]', form).forEach(function (el) { el.style.display = raw ? 'none' : ''; });   // opening balance exists only when creating
+    if (form) $$('[data-image-field]', form).forEach(function (f) { setImageField(f, ''); });
     if (!form || !raw) return;
     var data = {};
     try { data = JSON.parse(raw) || {}; } catch (err) { data = {}; }
@@ -266,6 +313,7 @@
         else el.value = value == null ? '' : String(value);
       });
     });
+    $$('[data-image-field]', form).forEach(function (f) { setImageField(f, data.image_url || ''); });
   }
   var pendingConfirm = null;
 
@@ -274,6 +322,14 @@
     var t = e.target;
     var el;
 
+    if ((el = t.closest('[data-image-clear]'))) {
+      var imgField = el.closest('[data-image-field]');
+      $('[name="image_data"]', imgField).value = '';
+      $('[name="image_remove"]', imgField).value = $('[data-image-current]', imgField).value ? '1' : '';
+      var fileInput = $('[data-image-file]', imgField); if (fileInput) fileInput.value = '';
+      showImage(imgField, '');
+      return;
+    }
     if ((el = t.closest('[data-sidebar-collapse]'))) { setCollapsed(html.getAttribute('data-sb') !== 'collapsed'); return; }
     if ((el = t.closest('[data-sidebar-toggle]'))) { setDrawer(!drawerOpen(), el); return; }
     if (t.closest('[data-sidebar-overlay]')) { setDrawer(false); return; }
@@ -349,6 +405,18 @@
   });
   document.addEventListener('change', function (e) {
     var t = e.target;
+    if (t.matches('[data-image-file]') && t.files && t.files[0]) {
+      var field = t.closest('[data-image-field]');
+      var hint = $('[data-image-hint]', field);
+      compressImage(t.files[0], function (err, data) {
+        if (err) { toast(err.message, 'error'); t.value = ''; return; }
+        $('[name="image_data"]', field).value = data;
+        $('[name="image_remove"]', field).value = '';
+        showImage(field, data);
+        if (hint) hint.textContent = 'Ảnh mới sẽ được lưu khi bấm Lưu (' + Math.round(data.length * 0.75 / 1024) + ' KB).';
+      });
+      return;
+    }
     if (recipeDlg && recipeDlg.contains(t) && t.matches('[data-line-ref]')) recalc();
   });
 

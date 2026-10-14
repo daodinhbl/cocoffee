@@ -87,4 +87,10 @@ async function movements(itemId, limit = 100, conn) {
   return rows;
 }
 
-module.exports = { list, listAll, getById, lockByIds, create, update, setStock, addMovement, movements };
+/** Photo of an ingredient (null clears it). */
+async function setImage(id, url, conn) {
+  await db(conn).query('UPDATE inventory_items SET image_url = ? WHERE id = ?', [url, id]);
+}
+
+module.exports = {
+  setImage, list, listAll, getById, lockByIds, create, update, setStock, addMovement, movements };

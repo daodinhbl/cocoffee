@@ -5,6 +5,7 @@ const adminModel = require('../../models/adminModel');
 const { AppError } = require('../../utils/httpError');
 const v = require('../../utils/validate');
 const { render, formFlag, optional } = require('./common');
+const imageStore = require('../../services/imageStore');
 
 async function page(req, res) {
   const items = await inventoryModel.listAll();
@@ -34,8 +35,10 @@ async function create(req) {
   const name = v.str(b.name, 'Tên', { max: 150 });
   // Opening stock at cost 0 would zero the COGS of every drink using it and drag down later average cost.
   if (quantity > 0 && !(cost > 0)) throw new AppError(400, 'VALIDATION', 'Nhập giá vốn (đ/đơn vị) cho tồn đầu kỳ.');
+  if (b.image_data) imageStore.decode(b.image_data);
+  let id;
   await withTransaction(async (conn) => {
-    const id = await inventoryModel.create({
+    id = await inventoryModel.create({
       sku: v.str(b.sku, 'Mã SKU', { max: 40 }),
       name,
       unit: v.str(b.unit, 'Đơn vị', { max: 20 }),
@@ -46,18 +49,22 @@ async function create(req) {
     }, conn);
     if (quantity > 0) await inventoryService.receive(conn, id, quantity, cost, { userId: req.user.id, note: 'Tồn đầu kỳ' });
   });
+  await imageStore.applyFromForm(b, { dirKey: 'ingredients', id, name, currentUrl: null, setImage: inventoryModel.setImage });
   return { message: `Đã thêm nguyên liệu ${name}.` };
 }
 
 async function update(req) {
   const id = v.id(req.params.id);
-  if (!(await inventoryModel.getById(id))) throw new AppError(404, 'NOT_FOUND', 'Không tìm thấy nguyên liệu.');
+  const current = await inventoryModel.getById(id);
+  if (!current) throw new AppError(404, 'NOT_FOUND', 'Không tìm thấy nguyên liệu.');
+  if (req.body.image_data) imageStore.decode(req.body.image_data);
   await inventoryModel.update(id, {
     name: v.str(optional(req.body.name), 'Tên', { max: 150, required: false }),
     unit: v.str(optional(req.body.unit), 'Đơn vị', { max: 20, required: false }),
     min_stock: v.num(optional(req.body.min_stock), 'Tồn tối thiểu', { required: false }),
     is_active: formFlag(req.body.is_active),
   });
+  await imageStore.applyFromForm(req.body, { dirKey: 'ingredients', id, name: optional(req.body.name) || current.name, currentUrl: current.image_url, setImage: inventoryModel.setImage });
   return { message: 'Đã cập nhật nguyên liệu.' };
 }
 

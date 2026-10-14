@@ -5,6 +5,7 @@ const inventoryModel = require('../../models/inventoryModel');
 const { AppError } = require('../../utils/httpError');
 const v = require('../../utils/validate');
 const { render, formFlag, optional } = require('./common');
+const imageStore = require('../../services/imageStore');
 
 /** Textarea "a, b\nc" -> ['a','b','c'] (the model de-duplicates by normalized form). */
 function parseAliases(raw) {
@@ -53,8 +54,10 @@ async function createProduct(req) {
   const b = req.body;
   const name = v.str(b.name, 'Tên món', { max: 150 });
   const aliases = parseAliases(b.aliases);
+  if (b.image_data) imageStore.decode(b.image_data);
+  let id;
   await withTransaction(async (conn) => {
-    const id = await productModel.create({
+    id = await productModel.create({
       category_id: v.id(b.category_id, 'Nhóm'),
       sku: v.str(b.sku, 'Mã SKU', { max: 40 }),
       name,
@@ -65,6 +68,7 @@ async function createProduct(req) {
     }, conn);
     await productModel.setAliases(id, name, aliases, conn);
   });
+  await imageStore.applyFromForm(b, { dirKey: 'products', id, name, currentUrl: null, setImage: productModel.setImage });
   return { message: `Đã thêm ${name}.` };
 }
 
@@ -76,6 +80,7 @@ async function updateProduct(req) {
   const name = v.str(b.name, 'Tên món', { max: 150 });
   const direct = current.stock_mode === 'direct';
   const aliases = parseAliases(b.aliases);
+  if (b.image_data) imageStore.decode(b.image_data);
 
   await withTransaction(async (conn) => {
     await productModel.update(id, {
@@ -88,6 +93,7 @@ async function updateProduct(req) {
     }, conn);
     await productModel.setAliases(id, name, aliases, conn);
   });
+  await imageStore.applyFromForm(b, { dirKey: 'products', id, name, currentUrl: current.image_url, setImage: productModel.setImage });
   return { message: `Đã cập nhật ${name}.` };
 }
 

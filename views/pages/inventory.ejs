@@ -89,7 +89,7 @@
     </thead>
     <tbody>
       <% shown.forEach((i) => {
-           const fillEdit = { name: i.name, unit: i.unit, min_stock: i.min_stock, sku: i.sku, is_active: Boolean(i.is_active) };
+           const fillEdit = { name: i.name, unit: i.unit, min_stock: i.min_stock, sku: i.sku, is_active: Boolean(i.is_active), image_url: i.image_url || '' };
            const fillAdj = { new_quantity: i.quantity_on_hand };
            const lv = level(i); %>
         <tr data-row class="border-b border-milk-200 last:border-b-0 hover:bg-milk-50 <%= i.is_active ? '' : 'text-milk-500' %>">
@@ -175,6 +175,7 @@
         </div>
         <p class="col-span-2 -mt-2 text-xs text-gray-500">Chỉ dùng khi thêm mới. Sau đó tồn kho thay đổi qua Nhập kho và Kiểm kê.</p>
       </div>
+      <%- include('../partials/image_field', { fieldId: 'i-img' }) %>
       <label class="flex items-center gap-2 text-sm">
         <input type="hidden" name="is_active" value="0">
         <input type="checkbox" name="is_active" value="1" checked class="h-4 w-4 rounded border-gray-300 accent-blue-700">

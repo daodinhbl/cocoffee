@@ -73,7 +73,7 @@ async function setActive(id, active, conn) {
 async function listForAdmin(conn) {
   const [rows] = await db(conn).query(
     `SELECT p.id, p.category_id, c.name AS category_name, p.sku, p.name, p.price, p.stock_mode,
-            p.inventory_item_id, i.name AS inventory_item_name, p.is_active
+            p.inventory_item_id, i.name AS inventory_item_name, p.is_active, p.image_url
        FROM products p
        JOIN categories c ON c.id = p.category_id
        LEFT JOIN inventory_items i ON i.id = p.inventory_item_id
@@ -94,7 +94,7 @@ async function listForAdmin(conn) {
  */
 async function listWithCost(conn) {
   const [products] = await db(conn).query(
-    `SELECT p.id, p.category_id, c.name AS category_name, p.sku, p.name, p.price, p.stock_mode, p.inventory_item_id
+    `SELECT p.id, p.category_id, c.name AS category_name, p.sku, p.name, p.price, p.stock_mode, p.inventory_item_id, p.image_url
        FROM products p JOIN categories c ON c.id = p.category_id
       WHERE p.is_active = 1 ORDER BY c.sort_order, p.name`
   );
@@ -184,7 +184,14 @@ async function listForMatching(conn) {
   return catalog;
 }
 
+/** Photo shown on the POS card and in the admin (null clears it). */
+async function setImage(id, url, conn) {
+  await db(conn).query('UPDATE products SET image_url = ? WHERE id = ?', [url, id]);
+  invalidateCatalog();
+}
+
 module.exports = {
+  setImage,
   list, listForAdmin, listWithCost, getById, getManyByIds, create, update, setActive, setRecipe, setAliases,
   getStockSpecs, listForMatching, invalidateCatalog,
 };

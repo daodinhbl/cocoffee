@@ -5,6 +5,7 @@ const inventoryModel = require('../../models/inventoryModel');
 const { AppError } = require('../../utils/httpError');
 const v = require('../../utils/validate');
 const { render } = require('./common');
+const imageStore = require('../../services/imageStore');
 
 async function page(_req, res) {
   const [products, categories, items] = await Promise.all([
@@ -45,8 +46,10 @@ async function create(req) {
   const b = req.body;
   const recipe = readRecipe(b.recipe);
   const name = v.str(b.name, 'Tên món', { max: 150 });
+  if (b.image_data) imageStore.decode(b.image_data);              // reject a bad picture before writing anything
+  let id;
   await withTransaction(async (conn) => {
-    const id = await productModel.create({
+    id = await productModel.create({
       category_id: v.id(b.category_id, 'Nhóm'),
       sku: v.str(b.sku, 'Mã SKU', { max: 40 }),
       name,
@@ -57,6 +60,7 @@ async function create(req) {
     await productModel.setRecipe(id, recipe, conn);
     await productModel.setAliases(id, name, [], conn);
   });
+  await imageStore.applyFromForm(b, { dirKey: 'products', id, name, currentUrl: null, setImage: productModel.setImage });
   return { message: `Đã thêm công thức ${name}.` };
 }
 
@@ -68,6 +72,7 @@ async function update(req) {
   if (current.stock_mode !== 'bom') throw new AppError(409, 'CONFLICT', 'Hàng bán lẻ không có công thức, hãy sửa ở trang Thực đơn.');
   const recipe = readRecipe(b.recipe);
   const name = v.str(b.name, 'Tên món', { max: 150 });
+  if (b.image_data) imageStore.decode(b.image_data);
 
   await withTransaction(async (conn) => {
     await productModel.update(id, {
@@ -83,6 +88,7 @@ async function update(req) {
     const kept = name === current.name ? current.aliases : current.aliases.filter((a) => a !== current.name);
     await productModel.setAliases(id, name, kept, conn);
   });
+  await imageStore.applyFromForm(b, { dirKey: 'products', id, name, currentUrl: current.image_url, setImage: productModel.setImage });
   return { message: `Đã lưu công thức ${name}.` };
 }
 

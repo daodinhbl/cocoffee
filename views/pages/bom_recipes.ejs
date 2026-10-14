@@ -90,7 +90,7 @@
                const tone = marginTone(r.margin);
                const shown = r.ingredients.slice(0, MAX_BADGES);
                const rest = r.ingredients.slice(MAX_BADGES);
-               const payload = { id: r.id, name: r.name, sku: r.sku, price: r.price, category_id: r.category_id, lines: r.ingredients.map((g) => ({ ref: g.ref, qty: g.qty })) };
+               const payload = { id: r.id, name: r.name, sku: r.sku, price: r.price, category_id: r.category_id, image_url: r.image_url || null, lines: r.ingredients.map((g) => ({ ref: g.ref, qty: g.qty })) };
           %>
             <tr data-row class="border-b border-gray-200 hover:bg-gray-50">
               <td data-label="" class="rt-title px-4 py-3 align-top">
@@ -183,6 +183,8 @@
           </select>
         </div>
       </div>
+
+      <%- include('../partials/image_field', { fieldId: 'f-img' }) %>
 
       <div>
         <div class="mb-2 flex items-center justify-between">

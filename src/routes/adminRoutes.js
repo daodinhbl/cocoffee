@@ -24,7 +24,7 @@ const router = express.Router();
 
 // Server-rendered Web Admin (EJS + Tailwind CDN + vanilla JS). Every page except /login needs an admin session;
 // every POST needs the session's CSRF token (see middlewares/adminAuth.js).
-router.use(adminSecurity, pageRenderer, express.urlencoded({ extended: false, limit: '200kb' }), flash, loadSession);
+router.use(adminSecurity, pageRenderer, express.urlencoded({ extended: false, limit: '1mb' }), flash, loadSession);
 
 router.get('/login', auth.loginForm);
 router.post('/login', rateLimit({ windowMs: 15 * 60 * 1000, max: 20 }), auth.login);
