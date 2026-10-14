@@ -14,7 +14,7 @@ const customerModel = require('../models/customerModel');
 const METHODS = ['cash', 'transfer', 'card', 'other'];
 
 async function lockCustomer(conn, customerId) {
-  const [rows] = await conn.query('SELECT id, name FROM customers WHERE id = ? FOR UPDATE', [customerId]);
+  const [rows] = await conn.query('SELECT id, name, zalo_user_id FROM customers WHERE id = ? FOR UPDATE', [customerId]);
   if (!rows[0]) throw new AppError(404, 'NOT_FOUND', 'Không tìm thấy khách hàng.');
   return rows[0];
 }
@@ -78,9 +78,10 @@ async function adjust(customerId, { amount, note, userId }) {
   if (Math.abs(value) > 1e9) throw new AppError(400, 'VALIDATION', 'Số tiền điều chỉnh quá lớn.');
   if (!note || !String(note).trim()) throw new AppError(400, 'VALIDATION', 'Ghi rõ lý do điều chỉnh.');
   return withTransaction(async (conn) => {
-    await lockCustomer(conn, customerId);
-    await customerModel.addEntry({ customerId, type: 'adjust', amount: value, note: String(note).trim().slice(0, 255), userId }, conn);
-    return { balance: await balanceOf(conn, customerId) };
+    const customer = await lockCustomer(conn, customerId);
+    const cleanNote = String(note).trim().slice(0, 255);
+    await customerModel.addEntry({ customerId, type: 'adjust', amount: value, note: cleanNote, userId }, conn);
+    return { balance: await balanceOf(conn, customerId), amount: value, note: cleanNote, customer };
   });
 }
 

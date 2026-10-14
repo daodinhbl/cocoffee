@@ -35,6 +35,8 @@ async function get() {
     tokenSource: env.zalo.botToken ? 'env' : stored[`${PREFIX}botToken`] ? 'admin' : null,
     secretSource: env.zalo.botWebhookSecret ? 'env' : stored[`${PREFIX}webhookSecret`] ? 'admin' : null,
     tokenHint: botToken ? `…${botToken.slice(-4)}` : '',
+    debtOwnerChatId: stored[PREFIX + 'debtOwnerChatId'] || '',
+    debtOwnerChatType: stored[PREFIX + 'debtOwnerChatType'] === 'group' ? 'group' : 'user',
   };
   cache = { value, until: Date.now() + TTL_MS };
   return value;
@@ -52,4 +54,13 @@ async function saveBotToken(token, userId) {
   return get();
 }
 
-module.exports = { get, invalidate, saveBotToken };
+async function saveDebtRecipient(chatId, chatType, userId) {
+  await settingsModel.setMany({
+    [PREFIX + 'debtOwnerChatId']: chatId,
+    [PREFIX + 'debtOwnerChatType']: chatType,
+  }, userId);
+  invalidate();
+  return get();
+}
+
+module.exports = { get, invalidate, saveBotToken, saveDebtRecipient };

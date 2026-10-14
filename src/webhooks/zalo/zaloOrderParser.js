@@ -15,6 +15,7 @@ const TRAILING_FILLER = new Set(['nhe', 'nha', 'nhen', 'voi', 'nua', 'di', 'a', 
 const CONFIRM_RE = /^(o+k+(e+|ie|ay|i)?|dong y|xac nhan)( (nhe|nha|nhen|em|a|ah|ban|shop))?$/;
 const CANCEL_RE = /^(huy|huy don|huy het|cancel)( (nhe|nha|em))?$/;
 const MENU_RE = /^(menu|thuc don|xem menu)$/;
+const ID_RE = /^(id|chat id|ma chat|lay id|lay ma chat)$/;
 
 /** Zalo group mentions arrive as "[@id]" tokens. */
 const stripMentions = (text) => String(text || '').replace(/\[@[^\]]*\]/g, ' ');
@@ -22,6 +23,7 @@ const stripMentions = (text) => String(text || '').replace(/\[@[^\]]*\]/g, ' ');
 /** @returns {'confirm'|'cancel'|'menu'|null} */
 function detectCommand(text) {
   const n = normalize(stripMentions(text));
+  if (ID_RE.test(n)) return 'identity';
   if (CONFIRM_RE.test(n)) return 'confirm';
   if (CANCEL_RE.test(n)) return 'cancel';
   if (MENU_RE.test(n)) return 'menu';

@@ -6,6 +6,7 @@ const { render, optional, describeError } = require('./common');
 const env = require('../../config/env');
 const printerSettings = require('../../services/printerSettings');
 const { shopDay, parseDay, dayBounds } = require('../../utils/shopTime');
+const debtNotifications = require('../../services/zalo/debtNotificationService');
 
 const PAGE_SIZE = 25;
 
@@ -210,7 +211,19 @@ async function adjust(req) {
     note: v.str(req.body.note, 'Lý do', { max: 255 }),
     userId: req.user.id,
   });
-  return { message: `Đã điều chỉnh công nợ. Số dư mới ${r.balance.toLocaleString('vi-VN')}đ.`, to: `/admin/customers/${id}` };
+  let message = 'Đã điều chỉnh công nợ. Số dư mới ' + r.balance.toLocaleString('vi-VN') + 'đ.';
+  if (r.amount > 0) {
+    const sent = await debtNotifications.notifyIncrease(r);
+    if (sent.customer === 'sent') message += ' Đã gửi Zalo cho khách.';
+    else if (sent.customer === 'not_linked') message += ' Khách chưa liên kết Zalo nên chưa nhận được tin.';
+    else if (sent.customer === 'failed') message += ' Gửi Zalo cho khách không thành công.';
+    else if (sent.customer === 'push_not_supported') message += ' Chế độ Zalo hiện tại không hỗ trợ gửi tin chủ động cho khách.';
+    if (sent.owner === 'sent') message += ' Đã báo chủ quán qua Zalo.';
+    else if (sent.owner === 'not_configured') message += ' Chưa cấu hình Chat ID Zalo nhận công nợ của chủ quán.';
+    else if (sent.owner === 'failed') message += ' Gửi Zalo cho chủ quán không thành công.';
+    else if (sent.owner === 'push_not_supported') message += ' Chế độ Zalo hiện tại không hỗ trợ gửi tin chủ động cho chủ quán.';
+  }
+  return { message, to: '/admin/customers/' + id };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -72,6 +72,16 @@ async function handleText({ chatType, chatId, userId, text, msgId }, io) {
   const ctx = { io, chatType, chatId, userId, msgId, isGroup };
 
   const command = parser.detectCommand(text);
+  if (command === 'identity') {
+    if (isGroup) return 'ignored';
+    return say(ctx, [
+      '🆔 THÔNG TIN CHAT ZALO',
+      'Chat ID: ' + chatId,
+      'User ID: ' + userId,
+      'Loại chat: ' + chatType,
+      'Sao chép Chat ID để cấu hình nhận thông báo công nợ.',
+    ].join('\n'), 'identity');
+  }
   if (command === 'confirm') return confirm(ctx);
   if (command === 'cancel') return cancel(ctx);
   if (command === 'menu') return say(ctx, await menuText(), 'menu');
