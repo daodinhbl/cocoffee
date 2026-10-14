@@ -80,9 +80,49 @@ async function addMovement(
 
 async function movements(itemId, limit = 100, conn) {
   const [rows] = await db(conn).query(
-    `SELECT id, movement_type, quantity_change, unit_cost, balance_after, order_id, note, created_at
-       FROM inventory_movements WHERE inventory_item_id = ? ORDER BY id DESC LIMIT ?`,
+    `SELECT m.id, m.movement_type, m.quantity_change, m.unit_cost, m.balance_after, m.order_id, m.note, m.created_at,
+            u.full_name AS created_by_name
+       FROM inventory_movements m
+       LEFT JOIN users u ON u.id = m.created_by
+      WHERE m.inventory_item_id = ? ORDER BY m.id DESC LIMIT ?`,
     [itemId, Math.min(Number(limit) || 100, 500)]
+  );
+  return rows;
+}
+
+/**
+ * What went through an item over the last `days` days: used = sold minus returned (positive number),
+ * wasted = written off as waste, received = purchased; lastPurchase = the latest purchase ever.
+ */
+async function usage(itemId, days = 30, conn) {
+  const [[sum]] = await db(conn).query(
+    `SELECT COALESCE(-SUM(CASE WHEN movement_type IN ('sale', 'return') THEN quantity_change END), 0) AS used,
+            COALESCE(-SUM(CASE WHEN movement_type = 'waste' AND quantity_change < 0 THEN quantity_change END), 0) AS wasted,
+            COALESCE(SUM(CASE WHEN movement_type = 'purchase' THEN quantity_change END), 0) AS received
+       FROM inventory_movements
+      WHERE inventory_item_id = ? AND created_at >= NOW() - INTERVAL ? DAY`,
+    [itemId, days]
+  );
+  const [[last]] = await db(conn).query(
+    `SELECT quantity_change AS quantity, unit_cost, created_at FROM inventory_movements
+      WHERE inventory_item_id = ? AND movement_type = 'purchase' ORDER BY id DESC LIMIT 1`,
+    [itemId]
+  );
+  return { days, used: Math.max(0, Number(sum.used)), wasted: Number(sum.wasted), received: Number(sum.received), lastPurchase: last || null };
+}
+
+/** Products that consume the item: BOM lines (quantity per unit sold) and retail goods sold 1:1 from it. */
+async function usedIn(itemId, conn) {
+  const [rows] = await db(conn).query(
+    `SELECT p.id, p.name, p.sku, p.price, p.is_active, p.image_url, p.stock_mode, r.quantity
+       FROM recipes r JOIN products p ON p.id = r.product_id
+      WHERE r.inventory_item_id = ?
+     UNION ALL
+     SELECT p.id, p.name, p.sku, p.price, p.is_active, p.image_url, p.stock_mode, 1 AS quantity
+       FROM products p
+      WHERE p.stock_mode = 'direct' AND p.inventory_item_id = ?
+      ORDER BY is_active DESC, name`,
+    [itemId, itemId]
   );
   return rows;
 }
@@ -93,4 +133,4 @@ async function setImage(id, url, conn) {
 }
 
 module.exports = {
-  setImage, list, listAll, getById, lockByIds, create, update, setStock, addMovement, movements };
+  setImage, list, listAll, getById, lockByIds, create, update, setStock, addMovement, movements, usage, usedIn };

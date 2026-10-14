@@ -106,6 +106,10 @@ async function start() {
     { id: 1, movement_type: 'purchase', quantity_change: 1000, unit_cost: 280, balance_after: 5000, order_id: null, note: 'NCC A', created_at: NOW },
     { id: 2, movement_type: 'sale', quantity_change: -36, unit_cost: 280, balance_after: 4000, order_id: 42, note: ORDER.order_code, created_at: NOW }]);
   mock.method(inventoryModel, 'create', rec('inventory.create', 7));
+  mock.method(inventoryModel, 'usage', async (_id, days = 30) => ({ days, used: 1200, wasted: 40, received: 1000, lastPurchase: { quantity: 1000, unit_cost: 280, created_at: NOW } }));
+  mock.method(inventoryModel, 'usedIn', async () => [
+    { id: 1, name: 'Cà phê sữa đá', sku: 'CF-SUA-DA', price: 25000, is_active: 1, image_url: null, stock_mode: 'bom', quantity: 18 },
+    { id: 2, name: 'Thuốc lá 555 <b>', sku: 'T555', price: 60000, is_active: 0, image_url: '/media/3-x.jpg', stock_mode: 'direct', quantity: 1 }]);
   mock.method(inventoryModel, 'update', rec('inventory.update'));
   mock.method(inventoryModel, 'setImage', rec('inventory.setImage'));
   mock.method(inventoryService, 'receive', rec('inventory.receive', { quantity_on_hand: 6000, avg_cost: 285.5 }));

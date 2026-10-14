@@ -107,7 +107,19 @@ const ui = {
 /** JSON that is safe inside an HTML attribute / <script type="application/json"> */
 const safeJson = (v) => JSON.stringify(v).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
 
+/**
+ * Stock level of an inventory item against its minimum: bar width in % (full at 3x the minimum), bar colour,
+ * badge tone and text. Shared by the inventory list and the item page so both say the same thing.
+ */
+function stockLevel(i) {
+  const q = Number(i.quantity_on_hand), m = Number(i.min_stock);
+  if (!i.is_active) return { pct: 0, cls: 'bg-milk-300', tone: 'neutral', text: 'Ngừng dùng' };
+  if (q <= 0) return { pct: 0, cls: 'bg-red-600', tone: 'bad', text: 'Hết hàng' };
+  if (m > 0 && q <= m) return { pct: Math.max(4, Math.round((q / (m * 3)) * 100)), cls: 'bg-amber-500', tone: 'warn', text: 'Sắp hết' };
+  return { pct: m > 0 ? Math.min(100, Math.round((q / (m * 3)) * 100)) : 100, cls: 'bg-emerald-500', tone: 'good', text: 'Đủ' };
+}
+
 module.exports = {
-  icon, money, pct, marginTone, ICONS, esc, num, badge, orderStatusBadge, sourceBadge, METHOD_LABEL, ui, safeJson,
+  icon, money, pct, marginTone, ICONS, esc, num, badge, orderStatusBadge, sourceBadge, METHOD_LABEL, ui, safeJson, stockLevel,
   fmtTime: (d) => (d ? formatShopTime(d) : '—'), ago,
 };

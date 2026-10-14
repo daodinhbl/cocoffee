@@ -1,0 +1,92 @@
+<%
+  /*
+   * Stock balance after each movement of one inventory item: a step line (stock jumps, it never slides),
+   * server-rendered, no library, no script. One series, so no legend: the title names it.
+   *   locals.movements - newest first (as inventoryModel.movements returns them)
+   *   locals.item      - { min_stock, unit }
+   * The x axis is the sequence of movements (equal steps), not clock time: a quiet week and a busy hour get
+   * the same width, and the dates sit under both ends. The SVG stretches (preserveAspectRatio="none",
+   * non-scaling strokes); labels, the end dot and the hover layer are HTML on top, so text never distorts.
+   * Hover a column: crosshair + tooltip (CSS group-hover). Keyboard and screen-reader users get the summary in
+   * the aria-label and every value in the ledger table below (the table view); 200 tab stops would help nobody.
+   */
+  const rows = locals.movements.slice().reverse();
+  const unit = locals.item.unit;
+  const min = Number(locals.item.min_stock) || 0;
+  const first = rows[0];
+  const pts = !first ? [] : [
+    { balance: Number(first.balance_after) - Number(first.quantity_change), at: first.created_at, start: true },
+    ...rows.map((m) => ({ balance: Number(m.balance_after), at: m.created_at, change: Number(m.quantity_change), type: m.movement_type })),
+  ];
+  const TYPE = { purchase: 'Nhập kho', sale: 'Bán hàng', adjustment: 'Kiểm kê', waste: 'Hao hụt', return: 'Trả hàng' };
+  const top = Math.max(min, ...pts.map((p) => p.balance), 1) * 1.15;
+  const n = pts.length;
+  const X = (i) => (n <= 1 ? 50 : (i / (n - 1)) * 100);                 // % from the left
+  const Y = (val) => 100 - (Math.max(0, val) / top) * 100;               // % from the top
+  const f = (x) => Number(x.toFixed(2));
+  let line = '';
+  pts.forEach((p, i) => { line += i === 0 ? `M${f(X(0) * 10)},${f(Y(p.balance))}` : ` H${f(X(i) * 10)} V${f(Y(p.balance))}`; });
+  const area = n ? `${line} V100 H${f(X(0) * 10)} Z` : '';
+  const last = pts[n - 1];
+  const colW = n <= 1 ? 100 : 100 / (n - 1);
+  const day = (d) => fmtTime(d).split(' ')[0];
+%>
+<section aria-labelledby="trend-title" class="rounded-xl border border-milk-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,.04)] sm:p-5">
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div class="min-w-0">
+      <h2 id="trend-title" class="text-base font-semibold text-navy-darker">Diễn biến tồn kho</h2>
+      <p class="mt-0.5 text-xs text-milk-500"><%= n ? `Tồn sau mỗi lần xuất nhập · ${rows.length} lần gần nhất` : 'Chưa có lần xuất nhập nào' %></p>
+    </div>
+    <% if (min > 0 && n) { %>
+      <p class="flex items-center gap-1.5 text-xs text-milk-500"><span class="inline-block h-0.5 w-4 rounded-full bg-amber-500" aria-hidden="true"></span>Mức tối thiểu <span class="font-mono text-ink-800 tnum"><%= num(min) %> <%= unit %></span></p>
+    <% } %>
+  </div>
+
+  <% if (!n) { %>
+    <div class="mt-4 flex h-40 items-center justify-center rounded-lg border border-dashed border-milk-200 text-sm text-milk-500">Biểu đồ sẽ hiện khi có nhập kho, bán hàng hoặc kiểm kê.</div>
+  <% } else { %>
+  <div class="mt-4 grid grid-cols-[auto_minmax(0,1fr)] gap-x-2">
+    <!-- y axis: top of the scale and zero, in ink, never in the series colour -->
+    <div class="relative h-40 w-12 font-mono text-[11px] text-milk-500 tnum" aria-hidden="true">
+      <span class="absolute right-0 top-0 -translate-y-1/2"><%= num(Math.round(top)) %></span>
+      <span class="absolute right-0 top-1/2 -translate-y-1/2"><%= num(Math.round(top / 2)) %></span>
+      <span class="absolute bottom-0 right-0 translate-y-1/2">0</span>
+    </div>
+    <div class="relative h-40" role="img" aria-label="Tồn kho <%= item.name %>: từ <%= num(pts[0].balance) %> xuống <%= num(last.balance) %> <%= unit %> qua <%= rows.length %> lần xuất nhập<%= min > 0 ? `, mức tối thiểu ${num(min)} ${unit}` : '' %>.">
+      <!-- hairline grid: solid, one step off the surface -->
+      <div class="absolute inset-x-0 top-0 border-t border-milk-200" aria-hidden="true"></div>
+      <div class="absolute inset-x-0 top-1/2 border-t border-milk-200" aria-hidden="true"></div>
+      <div class="absolute inset-x-0 bottom-0 border-t border-milk-300" aria-hidden="true"></div>
+      <svg class="absolute inset-0 h-full w-full overflow-visible" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+        <path d="<%= area %>" fill="#1e3a8a" fill-opacity="0.07"/>
+        <path d="<%= line %>" fill="none" stroke="#1e3a8a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>
+      </svg>
+      <% if (min > 0) { %>
+        <div class="absolute inset-x-0 border-t border-amber-500" style="top: <%= f(Y(min)) %>%" aria-hidden="true"></div>
+      <% } %>
+      <!-- end marker with a surface ring -->
+      <span class="absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-navy ring-2 ring-white" style="left: <%= f(X(n - 1)) %>%; top: <%= f(Y(last.balance)) %>%" aria-hidden="true"></span>
+      <!-- hover / focus layer: one column per point, wider than the mark -->
+      <% pts.forEach((p, i) => {
+           const left = Math.max(0, X(i) - colW / 2), right = Math.min(100, X(i) + colW / 2);
+           const where = X(i) > 70 ? 'right-0' : X(i) < 30 ? 'left-0' : 'left-1/2 -translate-x-1/2';
+           const what = p.start ? 'Tồn trước lần đầu' : `${TYPE[p.type] || p.type} ${p.change > 0 ? '+' : '−'}${num(Math.abs(p.change))}`;
+      %>
+        <div class="group absolute inset-y-0" style="left: <%= f(left) %>%; width: <%= f(right - left) %>%" aria-hidden="true">
+          <div class="pointer-events-none absolute inset-y-0 hidden w-px bg-navy-accent/40 group-hover:block" style="left: <%= f(right - left > 0 ? ((X(i) - left) / (right - left)) * 100 : 50) %>%"></div>
+          <span class="pointer-events-none absolute hidden h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-navy-accent ring-2 ring-white group-hover:block" style="left: <%= f(right - left > 0 ? ((X(i) - left) / (right - left)) * 100 : 50) %>%; top: <%= f(Y(p.balance)) %>%"></span>
+          <div role="tooltip" class="pointer-events-none absolute -top-2 z-10 hidden -translate-y-full whitespace-nowrap rounded-md bg-navy-darker px-2.5 py-1.5 text-xs text-white shadow-lg group-hover:block <%= where %>">
+            <span class="font-mono font-semibold tnum"><%= num(p.balance) %> <%= unit %></span>
+            <span class="block text-navy-soft"><%= what %> · <%= fmtTime(p.at) %></span>
+          </div>
+        </div>
+      <% }) %>
+    </div>
+    <div></div>
+    <div class="mt-2 flex justify-between text-[11px] text-milk-500 tnum" aria-hidden="true">
+      <span><%= day(pts[0].at) %></span>
+      <span><%= day(last.at) %></span>
+    </div>
+  </div>
+  <% } %>
+</section>

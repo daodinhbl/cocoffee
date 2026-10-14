@@ -18,14 +18,24 @@ async function page(req, res) {
   });
 }
 
+const MOVEMENT_TYPES = ['purchase', 'sale', 'adjustment', 'waste', 'return'];
+const USAGE_DAYS = 30;
+
+/** Item page: stock and cost, a chart of the balance after each movement, usage, the drinks using it, the ledger. */
 async function detail(req, res) {
   const id = v.id(req.params.id);
   const item = await inventoryModel.getById(id);
   if (!item) throw new AppError(404, 'NOT_FOUND', 'Không tìm thấy nguyên liệu.');
+  const [movements, usage, usedIn] = await Promise.all([
+    inventoryModel.movements(id, 200),
+    inventoryModel.usage(id, USAGE_DAYS),
+    inventoryModel.usedIn(id),
+  ]);
+  const type = MOVEMENT_TYPES.includes(req.query.type) ? req.query.type : '';
   await render(res, 'inventory_detail', {
     title: item.name, activeMenu: 'inventory',
     breadcrumbs: [{ label: 'Nguyên liệu', href: '/admin/inventory' }, { label: item.name }],
-  }, { item, movements: await inventoryModel.movements(id, 200) });
+  }, { item, movements, usage, usedIn, type, MOVEMENT_TYPES });
 }
 
 async function create(req) {

@@ -6,14 +6,6 @@
   const outCount = active.filter((i) => Number(i.quantity_on_hand) <= 0).length;
   const card = 'rounded-xl border border-milk-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,.04)]';
   const swipe = 'min-w-[60%] shrink-0 snap-start sm:min-w-0';
-  // stock level vs the minimum: the bar is full at 3x the minimum
-  const level = (i) => {
-    const q = Number(i.quantity_on_hand), m = Number(i.min_stock);
-    if (!i.is_active) return { pct: 0, cls: 'bg-milk-300', tone: 'neutral', text: 'Ngừng dùng' };
-    if (q <= 0) return { pct: 0, cls: 'bg-red-600', tone: 'bad', text: 'Hết hàng' };
-    if (m > 0 && q <= m) return { pct: Math.max(4, Math.round((q / (m * 3)) * 100)), cls: 'bg-amber-500', tone: 'warn', text: 'Sắp hết' };
-    return { pct: m > 0 ? Math.min(100, Math.round((q / (m * 3)) * 100)) : 100, cls: 'bg-emerald-500', tone: 'good', text: 'Đủ' };
-  };
 %>
 <div class="flex flex-wrap items-end justify-between gap-4">
   <div>
@@ -91,7 +83,7 @@
       <% shown.forEach((i) => {
            const fillEdit = { name: i.name, unit: i.unit, min_stock: i.min_stock, sku: i.sku, is_active: Boolean(i.is_active), image_url: i.image_url || '' };
            const fillAdj = { new_quantity: i.quantity_on_hand };
-           const lv = level(i); %>
+           const lv = stockLevel(i); %>
         <tr data-row class="border-b border-milk-200 last:border-b-0 hover:bg-milk-50 <%= i.is_active ? '' : 'text-milk-500' %>">
           <td data-label="" class="rt-title px-4 py-3">
             <div class="flex items-center gap-3">
@@ -136,88 +128,4 @@
   </table>
 </div>
 
-<!-- Dialog: create / edit item -->
-<dialog id="item-dialog" aria-labelledby="item-title" class="max-w-lg max-sm:h-[94dvh] <%= sheet %>">
-  <form method="post" action="/admin/inventory" class="flex max-h-[calc(100dvh-2rem)] flex-col max-sm:h-full max-sm:max-h-none">
-    <%- include('../partials/csrf') %>
-    <%- grabber %>
-    <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4">
-      <h2 id="item-title" data-dialog-title class="text-lg font-semibold">Nguyên liệu</h2>
-      <button type="button" data-modal-close aria-label="Đóng" class="<%= btnGhost %>"><%- icon('x', 'h-5 w-5') %></button>
-    </div>
-    <div class="space-y-4 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
-      <div>
-        <label for="i-name" class="<%= label %>">Tên</label>
-        <input id="i-name" name="name" required maxlength="150" class="<%= input %>" autocomplete="off">
-      </div>
-      <div class="grid grid-cols-2 gap-4">
-        <div>
-          <label for="i-sku" class="<%= label %>">Mã (SKU)</label>
-          <input id="i-sku" name="sku" maxlength="40" class="<%= input %> font-mono read-only:bg-gray-50 read-only:text-gray-500" autocomplete="off" autocapitalize="characters" data-create-only>
-        </div>
-        <div>
-          <label for="i-unit" class="<%= label %>">Đơn vị</label>
-          <input id="i-unit" name="unit" required maxlength="20" class="<%= input %>" placeholder="g, ml, bao…" autocomplete="off">
-        </div>
-      </div>
-      <div>
-        <label for="i-min" class="<%= label %>">Tồn tối thiểu (cảnh báo khi bằng hoặc thấp hơn)</label>
-        <input id="i-min" name="min_stock" type="number" min="0" step="any" value="0" inputmode="decimal" class="<%= input %> text-right font-mono">
-      </div>
-      <div class="grid grid-cols-2 gap-4" data-new-only>
-        <div>
-          <label for="i-qty" class="<%= label %>">Tồn đầu kỳ</label>
-          <input id="i-qty" name="quantity_on_hand" type="number" min="0" step="any" value="0" inputmode="decimal" class="<%= input %> text-right font-mono">
-        </div>
-        <div>
-          <label for="i-cost" class="<%= label %>">Giá vốn / đơn vị (đ)</label>
-          <input id="i-cost" name="avg_cost" type="number" min="0" step="any" value="0" inputmode="decimal" class="<%= input %> text-right font-mono">
-        </div>
-        <p class="col-span-2 -mt-2 text-xs text-gray-500">Chỉ dùng khi thêm mới. Sau đó tồn kho thay đổi qua Nhập kho và Kiểm kê.</p>
-      </div>
-      <%- include('../partials/image_field', { fieldId: 'i-img' }) %>
-      <label class="flex items-center gap-2 text-sm">
-        <input type="hidden" name="is_active" value="0">
-        <input type="checkbox" name="is_active" value="1" checked class="h-4 w-4 rounded border-gray-300 accent-blue-700">
-        Đang sử dụng
-      </label>
-    </div>
-    <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-4 py-3 max-sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
-      <button type="button" data-modal-close class="<%= btnSecondary %> max-sm:flex-1">Hủy</button>
-      <button type="submit" class="<%= btnPrimary %> max-sm:flex-[2]">Lưu</button>
-    </div>
-  </form>
-</dialog>
-
-<!-- Dialog: stocktake / waste -->
-<dialog id="adjust-dialog" aria-labelledby="adjust-title" class="max-w-md <%= sheet %>">
-  <form method="post" action="#" class="flex flex-col">
-    <%- include('../partials/csrf') %>
-    <%- grabber %>
-    <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4">
-      <h2 id="adjust-title" data-dialog-title class="text-lg font-semibold">Kiểm kê</h2>
-      <button type="button" data-modal-close aria-label="Đóng" class="<%= btnGhost %>"><%- icon('x', 'h-5 w-5') %></button>
-    </div>
-    <div class="space-y-4 px-4 py-4 sm:px-6 sm:py-5">
-      <div>
-        <label for="a-type" class="<%= label %>">Loại điều chỉnh</label>
-        <select id="a-type" name="type" class="<%= input %>">
-          <option value="adjustment">Kiểm kê (đặt lại số thực tế)</option>
-          <option value="waste">Hao hụt / hỏng (đặt lại số còn lại)</option>
-        </select>
-      </div>
-      <div>
-        <label for="a-qty" class="<%= label %>">Số lượng thực tế còn lại</label>
-        <input id="a-qty" name="new_quantity" type="number" min="0" step="any" required inputmode="decimal" class="<%= input %> text-right font-mono">
-      </div>
-      <div>
-        <label for="a-note" class="<%= label %>">Ghi chú</label>
-        <input id="a-note" name="note" maxlength="255" class="<%= input %>" placeholder="VD: kiểm kê cuối tháng" autocomplete="off">
-      </div>
-    </div>
-    <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-4 py-3 max-sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
-      <button type="button" data-modal-close class="<%= btnSecondary %> max-sm:flex-1">Hủy</button>
-      <button type="submit" class="<%= btnPrimary %> max-sm:flex-[2]">Ghi nhận</button>
-    </div>
-  </form>
-</dialog>
+<%- include('../partials/inventory_dialogs') %>

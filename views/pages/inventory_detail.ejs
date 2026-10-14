@@ -1,41 +1,151 @@
 <%
   const { btnPrimary, btnSecondary } = ui;
-  const TYPE = { purchase: ['Nhập kho', 'good'], sale: ['Bán hàng', 'info'], adjustment: ['Kiểm kê', 'warn'], waste: ['Hao hụt', 'bad'], return: ['Trả hàng', 'neutral'] };
+  const card = 'rounded-xl border border-milk-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,.04)]';
+  const swipe = 'min-w-[60%] shrink-0 snap-start sm:min-w-0';
+  const TYPE = {
+    purchase:   { label: 'Nhập kho', icon: 'upload',   cls: 'bg-emerald-50 text-emerald-700' },
+    sale:       { label: 'Bán hàng', icon: 'receipt',  cls: 'bg-blue-50 text-blue-700' },
+    adjustment: { label: 'Kiểm kê',  icon: 'sliders',  cls: 'bg-amber-50 text-amber-700' },
+    waste:      { label: 'Hao hụt',  icon: 'trash',    cls: 'bg-red-50 text-red-700' },
+    return:     { label: 'Trả hàng', icon: 'chevrons', cls: 'bg-milk-100 text-milk-500' },
+  };
+  const q = Number(item.quantity_on_hand), min = Number(item.min_stock), cost = Number(item.avg_cost);
+  const lv = stockLevel(item);
+  const perDay = usage.used / usage.days;
+  const cover = perDay > 0 ? q / perDay : null;
+  const coverText = cover === null ? null : cover < 1 ? 'dưới 1 ngày' : cover > 365 ? 'trên 1 năm' : `khoảng ${num(Math.round(cover))} ngày`;
+  const counts = MOVEMENT_TYPES.reduce((acc, t) => { acc[t] = movements.filter((m) => m.movement_type === t).length; return acc; }, {});
+  const shown = type ? movements.filter((m) => m.movement_type === type) : movements;
+  const fillEdit = { name: item.name, unit: item.unit, min_stock: item.min_stock, sku: item.sku, is_active: Boolean(item.is_active), image_url: item.image_url || '' };
+  const pill = (on) => `inline-flex h-9 shrink-0 items-center gap-2 rounded-full border px-3.5 text-sm font-medium transition ${on ? 'border-navy bg-navy text-white shadow-sm' : 'border-milk-200 bg-white hover:border-navy-accent'}`;
+  const pillCount = (on) => `rounded-full px-1.5 py-0.5 font-mono text-xs tnum ${on ? 'bg-white/15' : 'bg-milk-100 text-milk-500'}`;
+  const signed = (x) => `${x > 0 ? '+' : x < 0 ? '−' : ''}${num(Math.abs(x))}`;
 %>
-<div class="flex flex-wrap items-start justify-between gap-4">
-  <div>
-    <h1 class="text-xl font-semibold tracking-tight sm:text-2xl"><%= item.name %></h1>
-    <p class="mt-1 text-sm text-gray-500"><span class="font-mono"><%= item.sku %></span> · đơn vị <%= item.unit %> <%- item.is_active ? '' : badge('Ngừng dùng', 'neutral') %></p>
-  </div>
-  <div class="flex gap-3">
-    <a href="/admin/inventory" class="<%= btnSecondary %>">← Nguyên liệu</a>
-    <a href="/admin/receiving?item=<%= item.id %>" class="<%= btnPrimary %>">Nhập kho</a>
-  </div>
-</div>
-
-<section aria-label="Tóm tắt" class="mt-5 grid grid-cols-12 gap-3 sm:gap-6">
-  <div class="col-span-6 rounded border border-gray-200 p-3 sm:col-span-3 sm:p-4">
-    <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 sm:text-xs">Tồn kho</p>
-    <p class="mt-2 font-mono text-xl font-semibold tnum"><%= num(item.quantity_on_hand) %> <span class="text-sm font-normal text-gray-500"><%= item.unit %></span></p>
-  </div>
-  <div class="col-span-6 rounded border border-gray-200 p-3 sm:col-span-3 sm:p-4">
-    <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 sm:text-xs">Tối thiểu</p>
-    <p class="mt-2 font-mono text-xl font-semibold tnum"><%= num(item.min_stock) %></p>
-  </div>
-  <div class="col-span-6 rounded border border-gray-200 p-3 sm:col-span-3 sm:p-4">
-    <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 sm:text-xs">Giá vốn bình quân</p>
-    <p class="mt-2 font-mono text-xl font-semibold tnum"><%= money(item.avg_cost) %></p>
-  </div>
-  <div class="col-span-6 rounded border border-gray-200 p-3 sm:col-span-3 sm:p-4">
-    <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 sm:text-xs">Giá trị tồn</p>
-    <p class="mt-2 font-mono text-xl font-semibold tnum"><%= money(item.quantity_on_hand * item.avg_cost) %></p>
+<!-- Item header: photo, name, state, quick actions -->
+<section class="<%= card %> p-4 sm:p-5">
+  <div class="flex flex-wrap items-center justify-between gap-4">
+    <div class="flex min-w-0 items-center gap-4">
+      <% if (item.image_url) { %>
+        <img src="<%= item.image_url %>" alt="" width="72" height="72" class="h-16 w-16 shrink-0 rounded-xl object-cover ring-1 ring-milk-200 sm:h-[72px] sm:w-[72px]">
+      <% } else { %>
+        <span class="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-milk-100 text-2xl font-bold text-navy sm:h-[72px] sm:w-[72px]" aria-hidden="true"><%= String(item.name).trim().charAt(0).toUpperCase() %></span>
+      <% } %>
+      <div class="min-w-0">
+        <div class="flex flex-wrap items-center gap-2">
+          <h1 class="text-xl font-semibold tracking-tight text-navy-darker sm:text-2xl"><%= item.name %></h1>
+          <%- badge(lv.text, lv.tone) %>
+        </div>
+        <p class="mt-1 text-sm text-milk-500"><span class="font-mono"><%= item.sku %></span> · đơn vị <span class="font-medium text-ink-800"><%= item.unit %></span><% if (usedIn.length) { %> · dùng trong <%= usedIn.length %> món<% } %></p>
+      </div>
+    </div>
+    <div class="flex w-full gap-2 sm:w-auto">
+      <a href="/admin/receiving?item=<%= item.id %>" class="<%= btnPrimary %> whitespace-nowrap max-sm:flex-1 max-sm:px-2"><%- icon('upload', 'h-4 w-4') %> Nhập kho</a>
+      <button type="button" class="<%= btnSecondary %> whitespace-nowrap max-sm:flex-1 max-sm:px-2" data-modal-open="#adjust-dialog" data-action="/admin/inventory/<%= item.id %>/adjust" data-title="Kiểm kê — <%= item.name %>" data-fill="<%= safeJson({ new_quantity: item.quantity_on_hand }) %>"><%- icon('sliders', 'h-4 w-4') %> Kiểm kê</button>
+      <button type="button" class="<%= btnSecondary %> whitespace-nowrap max-sm:flex-1 max-sm:px-2" data-modal-open="#item-dialog" data-action="/admin/inventory/<%= item.id %>" data-title="Sửa nguyên liệu" data-fill="<%= safeJson(fillEdit) %>"><%- icon('pencil', 'h-4 w-4') %> Sửa</button>
+    </div>
   </div>
 </section>
 
-<section class="mt-6 rounded border border-gray-200 max-lg:border-0" aria-labelledby="mv-title">
-  <h2 id="mv-title" class="border-b border-gray-200 px-4 py-4 text-base font-semibold max-lg:border-b-0 max-lg:px-0">Lịch sử xuất nhập (200 dòng gần nhất)</h2>
-  <table class="rtable w-full border-collapse text-left text-sm lg:min-w-[720px]">
-    <caption class="sr-only">Lịch sử biến động kho</caption>
+<!-- Key numbers -->
+<section aria-label="Tóm tắt" class="no-scrollbar -mx-4 mt-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 lg:grid-cols-4">
+  <div class="<%= card %> <%= swipe %> p-4">
+    <div class="flex items-start justify-between gap-2">
+      <p class="text-xs font-semibold uppercase tracking-wide text-milk-500">Tồn kho</p>
+      <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-milk-100 text-navy" aria-hidden="true"><%- icon('box', 'h-5 w-5') %></span>
+    </div>
+    <p class="mt-1 font-mono text-2xl font-bold tnum <%= lv.tone === 'bad' ? 'text-red-700' : lv.tone === 'warn' ? 'text-amber-700' : 'text-navy-darker' %>"><%= num(q) %> <span class="text-sm font-normal text-milk-500"><%= item.unit %></span></p>
+    <!-- level bar: full at 3x the minimum, the tick marks the minimum -->
+    <div class="relative mt-2 h-1.5 w-full rounded-full bg-milk-100" role="img" aria-label="<%= lv.text %>: tồn <%= num(q) %>, tối thiểu <%= num(min) %> <%= item.unit %>">
+      <div class="h-1.5 rounded-full <%= lv.cls %>" style="width: <%= lv.pct %>%"></div>
+      <% if (min > 0) { %><span class="absolute -top-1 h-3.5 w-0.5 rounded-full bg-ink-500" style="left: 33.3%" aria-hidden="true"></span><% } %>
+    </div>
+    <p class="mt-1.5 text-xs text-milk-500"><%= min > 0 ? `Tối thiểu ${num(min)} ${item.unit}` : 'Chưa đặt mức tối thiểu' %></p>
+  </div>
+  <div class="<%= card %> <%= swipe %> p-4">
+    <div class="flex items-start justify-between gap-2">
+      <p class="text-xs font-semibold uppercase tracking-wide text-milk-500">Giá vốn bình quân</p>
+      <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-navy" aria-hidden="true"><%- icon('receipt', 'h-5 w-5') %></span>
+    </div>
+    <p class="mt-1 font-mono text-2xl font-bold text-navy-darker tnum"><%= money(cost) %> <span class="text-sm font-normal text-milk-500">/ <%= item.unit %></span></p>
+    <p class="mt-1 text-xs text-milk-500">
+      <% if (usage.lastPurchase) { %>Nhập gần nhất <span class="font-mono tnum"><%= money(usage.lastPurchase.unit_cost) %></span> · <%= fmtTime(usage.lastPurchase.created_at).split(' ')[0] %><% } else { %>Chưa có phiếu nhập kho<% } %>
+    </p>
+  </div>
+  <div class="<%= card %> <%= swipe %> p-4">
+    <div class="flex items-start justify-between gap-2">
+      <p class="text-xs font-semibold uppercase tracking-wide text-milk-500">Giá trị tồn</p>
+      <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-navy text-white" aria-hidden="true"><%- icon('chart', 'h-5 w-5') %></span>
+    </div>
+    <p class="mt-1 font-mono text-2xl font-bold text-navy-darker tnum"><%= money(q * cost) %></p>
+    <p class="mt-1 text-xs text-milk-500">Tồn kho × giá vốn bình quân</p>
+  </div>
+  <div class="<%= card %> <%= swipe %> p-4">
+    <div class="flex items-start justify-between gap-2">
+      <p class="text-xs font-semibold uppercase tracking-wide text-milk-500">Tiêu hao <%= usage.days %> ngày</p>
+      <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 text-amber-700" aria-hidden="true"><%- icon('flask', 'h-5 w-5') %></span>
+    </div>
+    <p class="mt-1 font-mono text-2xl font-bold text-navy-darker tnum"><%= num(usage.used) %> <span class="text-sm font-normal text-milk-500"><%= item.unit %></span></p>
+    <p class="mt-1 text-xs text-milk-500">
+      <% if (usage.used > 0) { %>TB <span class="font-mono tnum"><%= num(Math.round(perDay * 10) / 10) %></span> <%= item.unit %>/ngày · đủ dùng <%= coverText %><% } else { %>Chưa xuất bán trong <%= usage.days %> ngày qua<% } %><% if (usage.wasted > 0) { %> · hao hụt <span class="font-mono tnum"><%= num(usage.wasted) %></span><% } %>
+    </p>
+  </div>
+</section>
+
+<!-- Chart + drinks using the item -->
+<div class="mt-4 grid gap-4 lg:grid-cols-3">
+  <div class="lg:col-span-2">
+    <%- include('../partials/stock_trend', { movements, item }) %>
+  </div>
+  <section aria-labelledby="used-title" class="<%= card %> p-4 sm:p-5">
+    <div class="flex items-start justify-between gap-3">
+      <div>
+        <h2 id="used-title" class="text-base font-semibold text-navy-darker">Dùng trong món</h2>
+        <p class="mt-0.5 text-xs text-milk-500">Định mức cho mỗi phần bán ra</p>
+      </div>
+      <a href="/admin/bom-recipes" class="shrink-0 text-xs font-medium text-blue-700 hover:text-navy">Công thức →</a>
+    </div>
+    <% if (!usedIn.length) { %>
+      <p class="py-8 text-center text-sm text-milk-500">Chưa có món nào dùng nguyên liệu này.</p>
+    <% } else { %>
+      <ul class="mt-3 divide-y divide-milk-200">
+        <% usedIn.forEach((p) => { const direct = p.stock_mode === 'direct'; %>
+          <li class="flex items-center gap-3 py-2.5 <%= p.is_active ? '' : 'opacity-60' %>">
+            <% if (p.image_url) { %>
+              <img src="<%= p.image_url %>" alt="" loading="lazy" width="36" height="36" class="h-9 w-9 shrink-0 rounded-lg object-cover ring-1 ring-milk-200">
+            <% } else { %>
+              <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-milk-100 text-xs font-bold text-navy" aria-hidden="true"><%= String(p.name).trim().charAt(0).toUpperCase() %></span>
+            <% } %>
+            <div class="min-w-0 flex-1">
+              <a href="<%= direct ? '/admin/menu' : '/admin/bom-recipes' %>" class="block truncate text-sm font-medium text-ink-800 hover:text-navy-accent hover:underline"><%= p.name %></a>
+              <p class="text-xs text-milk-500"><%= direct ? 'Bán lẻ, trừ 1 : 1' : `${num(p.quantity)} ${item.unit} / phần` %><%= p.is_active ? '' : ' · ngừng bán' %></p>
+            </div>
+            <div class="shrink-0 text-right">
+              <p class="font-mono text-sm font-semibold text-navy-darker tnum"><%= money(Math.round(Number(p.quantity) * cost)) %></p>
+              <p class="text-[11px] text-milk-500">giá vốn / phần</p>
+            </div>
+          </li>
+        <% }) %>
+      </ul>
+    <% } %>
+  </section>
+</div>
+
+<!-- Ledger -->
+<section id="lich-su" aria-labelledby="mv-title" class="<%= card %> mt-4 overflow-hidden max-lg:border-0 max-lg:bg-transparent max-lg:shadow-none">
+  <div class="flex flex-wrap items-center justify-between gap-3 border-b border-milk-200 px-4 py-4 max-lg:border-b-0 max-lg:px-0 sm:px-5">
+    <div>
+      <h2 id="mv-title" class="text-base font-semibold text-navy-darker">Lịch sử xuất nhập</h2>
+      <p class="mt-0.5 text-xs text-milk-500"><%= movements.length >= 200 ? '200 lần gần nhất' : `${movements.length} lần` %></p>
+    </div>
+    <nav class="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:px-0" aria-label="Lọc theo loại">
+      <a href="/admin/inventory/<%= item.id %>#lich-su" class="<%= pill(!type) %>" <%- !type ? 'aria-current="true"' : '' %>>Tất cả <span class="<%= pillCount(!type) %>"><%= movements.length %></span></a>
+      <% MOVEMENT_TYPES.filter((t) => counts[t] || t === type).forEach((t) => { %>
+        <a href="/admin/inventory/<%= item.id %>?type=<%= t %>#lich-su" class="<%= pill(type === t) %>" <%- type === t ? 'aria-current="true"' : '' %>><%= TYPE[t].label %> <span class="<%= pillCount(type === t) %>"><%= counts[t] %></span></a>
+      <% }) %>
+    </nav>
+  </div>
+  <table class="rtable w-full border-collapse text-left text-sm lg:min-w-[860px]">
+    <caption class="sr-only">Lịch sử biến động kho của <%= item.name %></caption>
     <thead class="<%= ui.thead %>">
       <tr>
         <th scope="col" class="px-4 py-3">Thời gian</th>
@@ -43,23 +153,33 @@
         <th scope="col" class="px-4 py-3 text-right">Thay đổi</th>
         <th scope="col" class="px-4 py-3 text-right">Tồn sau</th>
         <th scope="col" class="px-4 py-3 text-right">Đơn giá</th>
-        <th scope="col" class="px-4 py-3">Ghi chú</th>
+        <th scope="col" class="px-4 py-3">Chứng từ / ghi chú</th>
+        <th scope="col" class="px-4 py-3">Người ghi</th>
       </tr>
     </thead>
     <tbody>
-      <% movements.forEach((m) => { const [label, tone] = TYPE[m.movement_type] || [m.movement_type, 'neutral']; %>
-        <tr class="border-b border-gray-200 last:border-b-0">
+      <% shown.forEach((m) => { const t = TYPE[m.movement_type] || { label: m.movement_type, icon: 'box', cls: 'bg-milk-100 text-milk-500' }; const ch = Number(m.quantity_change); %>
+        <tr class="border-b border-milk-200 transition-colors last:border-b-0 hover:bg-milk-50">
           <td data-label="" class="rt-title px-4 py-3 tnum"><%= fmtTime(m.created_at) %></td>
-          <td data-label="Loại" class="px-4 py-3"><%- badge(label, tone) %></td>
-          <td data-label="Thay đổi" class="px-4 py-3 text-right font-mono tnum <%= m.quantity_change < 0 ? 'text-red-700' : 'text-green-700' %>"><%= m.quantity_change > 0 ? '+' : '' %><%= num(m.quantity_change) %></td>
-          <td data-label="Tồn sau" class="px-4 py-3 text-right font-mono tnum"><%= num(m.balance_after) %></td>
-          <td data-label="Đơn giá" class="px-4 py-3 text-right font-mono tnum"><%= money(m.unit_cost) %></td>
-          <td data-label="Ghi chú" class="px-4 py-3 text-gray-600">
-            <% if (m.order_id) { %><a href="/admin/orders/<%= m.order_id %>" class="font-mono text-[13px] text-blue-700 hover:text-navy hover:underline"><%= m.note || ('#' + m.order_id) %></a><% } else { %><%= m.note || '—' %><% } %>
+          <td data-label="Loại" class="px-4 py-3">
+            <span class="inline-flex items-center gap-2 font-medium">
+              <span class="flex h-7 w-7 items-center justify-center rounded-lg <%= t.cls %>" aria-hidden="true"><%- icon(t.icon, 'h-4 w-4') %></span><%= t.label %>
+            </span>
           </td>
+          <td data-label="Thay đổi" class="px-4 py-3 text-right font-mono font-semibold tnum <%= ch < 0 ? 'text-red-700' : ch > 0 ? 'text-emerald-700' : 'text-milk-500' %>"><span class="whitespace-nowrap"><%= signed(ch) %> <span class="font-normal text-milk-500"><%= item.unit %></span></span></td>
+          <td data-label="Tồn sau" class="px-4 py-3 text-right font-mono tnum"><%= num(m.balance_after) %></td>
+          <td data-label="Đơn giá" class="px-4 py-3 text-right font-mono text-milk-500 tnum"><%= Number(m.unit_cost) ? money(m.unit_cost) : '—' %></td>
+          <td data-label="Chứng từ" class="px-4 py-3 text-gray-600">
+            <% if (m.order_id) { %><a href="/admin/orders/<%= m.order_id %>" class="font-mono text-[13px] font-semibold text-blue-700 hover:text-navy hover:underline"><%= m.note || ('#' + m.order_id) %></a><% } else { %><%= m.note || '—' %><% } %>
+          </td>
+          <td data-label="Người ghi" class="px-4 py-3 text-milk-500"><%= m.created_by_name || (m.order_id ? 'Tự động (đơn hàng)' : '—') %></td>
         </tr>
       <% }) %>
-      <% if (!movements.length) { %><tr><td colspan="6" data-label="" class="px-4 py-10 text-center text-gray-500">Chưa có biến động nào.</td></tr><% } %>
+      <% if (!shown.length) { %>
+        <tr><td colspan="7" data-label="" class="px-4 py-12 text-center text-sm text-milk-500"><%= movements.length ? 'Không có lần nào thuộc loại này.' : 'Chưa có biến động nào. Nhập kho lần đầu để bắt đầu theo dõi.' %></td></tr>
+      <% } %>
     </tbody>
   </table>
 </section>
+
+<%- include('../partials/inventory_dialogs') %>
