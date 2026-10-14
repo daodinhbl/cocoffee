@@ -29,7 +29,7 @@ const publicUser = ({ password_hash, ...u }) => ({ ...u, pw_stamp: stampOf(passw
 const ITEMS = [
   { id: 1, sku: 'CF', name: 'Cà phê rang xay', unit: 'g', quantity_on_hand: 5000, avg_cost: 280, min_stock: 1000, is_active: 1, is_low: 0, stock_value: 1400000 },
   { id: 2, sku: 'SUA', name: 'Sữa tươi', unit: 'ml', quantity_on_hand: 420, avg_cost: 30, min_stock: 500, is_active: 1, is_low: 1, stock_value: 12600 },
-  { id: 3, sku: 'LY', name: 'Ly nhựa + nắp', unit: 'pcs', quantity_on_hand: 900, avg_cost: 900, min_stock: 50, is_active: 1, is_low: 0, stock_value: 810000 },
+  { id: 3, sku: 'LY', name: 'Ly nhựa + nắp', unit: 'pcs', quantity_on_hand: 900, avg_cost: 900, min_stock: 50, is_active: 1, is_low: 0, stock_value: 810000, image_url: '/media/900-ly-nhua-nap.jpg' },
 ];
 const CATEGORIES = [{ id: 1, code: 'mixed_drink', name: 'Đồ uống', sort_order: 1, is_active: 1 }, { id: 2, code: 'cigarette', name: 'Thuốc lá', sort_order: 2, is_active: 1 }];
 const ORDER = {
@@ -59,6 +59,7 @@ async function start() {
   const settingsModel = require('../../src/models/settingsModel');
   const customerModel = require('../../src/models/customerModel');
   const customerService = require('../../src/services/customerService');
+  const mediaModel = require('../../src/models/mediaModel');
   const { pool } = require('../../src/config/db');
 
   // Password changes are kept per app instance, so a changed password really invalidates older sessions.
@@ -106,6 +107,7 @@ async function start() {
     { id: 2, movement_type: 'sale', quantity_change: -36, unit_cost: 280, balance_after: 4000, order_id: 42, note: ORDER.order_code, created_at: NOW }]);
   mock.method(inventoryModel, 'create', rec('inventory.create', 7));
   mock.method(inventoryModel, 'update', rec('inventory.update'));
+  mock.method(inventoryModel, 'setImage', rec('inventory.setImage'));
   mock.method(inventoryService, 'receive', rec('inventory.receive', { quantity_on_hand: 6000, avg_cost: 285.5 }));
   mock.method(inventoryService, 'adjust', rec('inventory.adjust', { quantity_on_hand: 100, delta: -20 }));
 
@@ -132,6 +134,7 @@ async function start() {
   mock.method(productModel, 'setActive', rec('product.setActive'));
   mock.method(productModel, 'setRecipe', rec('product.setRecipe'));
   mock.method(productModel, 'setAliases', rec('product.setAliases'));
+  mock.method(productModel, 'setImage', rec('product.setImage'));
   mock.method(categoryModel, 'list', async () => CATEGORIES);
   mock.method(categoryModel, 'create', rec('category.create', 3));
   mock.method(categoryModel, 'update', rec('category.update'));
@@ -165,6 +168,10 @@ async function start() {
   mock.method(customerModel, 'update', rec('customer.update'));
   mock.method(customerService, 'collect', rec('customer.collect', { amount: 50000, balance: 70000, settled: [ORDER.order_code] }));
   mock.method(customerService, 'adjust', rec('customer.adjust', { balance: 100000 }));
+  const MEDIA = new Map(); let mediaSeq = 0;   // media_files, in memory
+  mock.method(mediaModel, 'create', rec('media.create', ({ folder, mime, bytes }) => { const id = ++mediaSeq; MEDIA.set(id, { id, folder, mime, bytes }); return id; }));
+  mock.method(mediaModel, 'get', async (id) => MEDIA.get(Number(id)) || null);
+  mock.method(mediaModel, 'remove', rec('media.remove', (id) => { MEDIA.delete(Number(id)); }));
   const SETTINGS = new Map();   // app_settings, in memory
   mock.method(settingsModel, 'getByPrefix', async (prefix) => Object.fromEntries([...SETTINGS].filter(([k]) => k.startsWith(prefix))));
   mock.method(settingsModel, 'setMany', rec('settings.setMany', (values) => { for (const [k, v] of Object.entries(values)) SETTINGS.set(k, String(v)); }));

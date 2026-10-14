@@ -87,7 +87,7 @@ async function movements(itemId, limit = 100, conn) {
   return rows;
 }
 
-/** Photo of an ingredient (null clears it). */
+/** Photo of an ingredient: a URL, '' = removed by the admin, null = never set (menuPhotos may fill it). */
 async function setImage(id, url, conn) {
   await db(conn).query('UPDATE inventory_items SET image_url = ? WHERE id = ?', [url, id]);
 }

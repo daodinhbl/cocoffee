@@ -13,6 +13,7 @@ const productModel = require('./src/models/productModel');
 const logger = require('./src/utils/logger');
 const routes = require('./src/routes');
 const adminRoutes = require('./src/routes/adminRoutes');
+const mediaRoutes = require('./src/routes/mediaRoutes');
 const viewHelpers = require('./src/utils/viewHelpers');
 const { notFound, errorHandler } = require('./src/middlewares/errorHandler');
 
@@ -34,6 +35,9 @@ app.use(express.json({
 
 // Express 5 leaves req.body undefined when there is no body; controllers expect an object.
 app.use((req, _res, next) => { if (req.body === undefined) req.body = {}; next(); });
+
+// Photos uploaded from the admin (stored in MySQL, see services/imageStore.js).
+app.use('/media', mediaRoutes);
 
 // Static files: receipt images served to Zalo + Zalo domain-verification file (drop it into /public).
 app.use(express.static(path.join(__dirname, 'public'), { index: false, redirect: false, dotfiles: 'ignore', maxAge: '1h' }));

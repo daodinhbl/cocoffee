@@ -8,33 +8,29 @@
  *   node scripts/sync_images.js --force             # also replace photos that are already set
  *
  * Flow per record (strictly one at a time):
- *   1. read rows whose image_url is NULL/empty           (MySQL via the app's pool, mysql2/promise)
+ *   1. read rows whose image_url is NULL (never set)     (MySQL via the app's pool, mysql2/promise)
  *   2. search Pexels with an English query built from the Vietnamese name
  *   3. download the first hit as a square ~400px JPEG    (Pexels CDN resizes: small file, light on the host)
- *   4. save to public/uploads/{products|ingredients}/<slug>-<id>.jpg (written to a .part file, then renamed)
- *   5. UPDATE image_url = '/uploads/products/<slug>-<id>.jpg'
+ *   4. store it in media_files (same validation as an admin upload: real JPEG/PNG/WebP, <= 600 KB)
+ *   5. UPDATE image_url = '/media/<id>-<slug>.jpg'
  *   ...then sleep 2.5s before the next record (Pexels rate limit + shared-hosting CPU limits).
- * A failure on one record (no result, HTTP error, disk) is logged and the loop moves on.
+ * A failure on one record (no result, HTTP error, bad image) is logged and the loop moves on.
  *
  * Hostinger: run it over SSH or as a cron job from the app folder. Plain HTTP only (axios), no browser.
- * NOTE: a Node.js redeploy replaces public_html, so re-run this script after each deploy (it only fetches
- * what is missing), or keep the uploads folder outside the deploy archive.
+ * Photos are stored in MySQL (media_files, served at /media/...) like photos uploaded in the admin, so a
+ * Node.js redeploy (which replaces public_html) does not lose them.
  *
  * Needs PEXELS_API_KEY (free: https://www.pexels.com/api/). Photos are credited in the log; Pexels' licence
  * allows commercial use without attribution, but keep the credit if you show it publicly.
  */
-const fs = require('fs');
-const path = require('path');
-const { pipeline } = require('stream/promises');
 const axios = require('axios');
-const env = require('../src/config/env');
 const { pool } = require('../src/config/db');
 const { ensureSchemaUpgrades } = require('../src/config/bootstrapDb');
+const imageStore = require('../src/services/imageStore');
 
 const PEXELS_API_KEY = process.env.PEXELS_API_KEY || '[YOUR_PEXELS_API_KEY]';
 const DELAY_MS = 2500;                 // pause between records (>= 2s as required on shared hosting)
 const SIZE = 400;                      // square edge in px
-const UPLOAD_ROOT = path.join(env.rootDir, 'public', 'uploads');
 
 const args = process.argv.slice(2);
 const has = (f) => args.includes(`--${f}`);
@@ -84,31 +80,24 @@ async function searchPexels(query) {
 }
 
 /** Stream the image to disk safely: <file>.part first, renamed only when complete and non-trivial. */
-async function download(url, file) {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const part = `${file}.part`;
-  const res = await axios.get(url, { responseType: 'stream', timeout: 30000, maxContentLength: 5 * 1024 * 1024 });
+/** Download the image into memory (Pexels sends ~30-80 KB at 400px); the size/type check happens in imageStore. */
+async function download(url) {
+  const res = await axios.get(url, { responseType: 'arraybuffer', timeout: 30000, maxContentLength: 5 * 1024 * 1024 });
   const type = String(res.headers['content-type'] || '');
   if (!type.startsWith('image/')) throw new Error(`not an image (${type || 'no content-type'})`);
-  try {
-    await pipeline(res.data, fs.createWriteStream(part));
-    if (fs.statSync(part).size < 1024) throw new Error('downloaded file is too small');
-    fs.renameSync(part, file);
-  } catch (err) {
-    fs.rmSync(part, { force: true });
-    throw err;
-  }
+  return Buffer.from(res.data);
 }
 
 const SOURCES = {
-  products: { table: 'products', dir: 'products' },
-  ingredients: { table: 'inventory_items', dir: 'ingredients' },
+  products: { table: 'products', folder: 'products' },
+  ingredients: { table: 'inventory_items', folder: 'ingredients' },
 };
 
 async function rowsMissing(kind) {
   const { table } = SOURCES[kind];
-  const where = has('force') ? 'is_active = 1' : "is_active = 1 AND (image_url IS NULL OR image_url = '')";
-  const [rows] = await pool.query(`SELECT id, name FROM ${table} WHERE ${where} ORDER BY id`);
+  // '' = photo removed in the admin on purpose: only NULL (never set) is missing.
+  const where = has('force') ? 'is_active = 1' : 'is_active = 1 AND image_url IS NULL';
+  const [rows] = await pool.query(`SELECT id, name, image_url FROM ${table} WHERE ${where} ORDER BY id`);
   return rows;
 }
 
@@ -134,19 +123,18 @@ async function main() {
       if (done >= limit) break;
       done += 1;
       const query = queryFor(row.name, kind);
-      const fileName = `${slugify(row.name)}-${row.id}.jpg`;
-      const publicUrl = `/uploads/${SOURCES[kind].dir}/${fileName}`;
       try {
         if (has('dry-run')) {
-          console.log(`  [dry-run] #${row.id} ${row.name} -> "${query}" -> ${publicUrl}`);
+          console.log(`  [dry-run] #${row.id} ${row.name} -> "${query}"`);
         } else {
           const hit = await searchPexels(query);
           if (!hit) {
             stats.notFound += 1;
             console.log(`  -  #${row.id} ${row.name}: no photo for "${query}"`);
           } else {
-            await download(hit.url, path.join(UPLOAD_ROOT, SOURCES[kind].dir, fileName));
+            const publicUrl = await imageStore.saveBuffer(await download(hit.url), SOURCES[kind].folder, row.name);
             await pool.query(`UPDATE ${SOURCES[kind].table} SET image_url = ? WHERE id = ?`, [publicUrl, row.id]);
+            if (row.image_url && row.image_url !== publicUrl) await imageStore.remove(row.image_url);   // --force: drop the replaced upload
             stats.ok += 1;
             console.log(`  ok #${row.id} ${row.name} -> ${publicUrl}  (photo: ${hit.credit})`);
           }

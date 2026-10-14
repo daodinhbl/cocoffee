@@ -184,7 +184,7 @@ async function listForMatching(conn) {
   return catalog;
 }
 
-/** Photo shown on the POS card and in the admin (null clears it). */
+/** Photo shown on the POS card and in the admin: a URL, '' = removed by the admin, null = never set. */
 async function setImage(id, url, conn) {
   await db(conn).query('UPDATE products SET image_url = ? WHERE id = ?', [url, id]);
   invalidateCatalog();

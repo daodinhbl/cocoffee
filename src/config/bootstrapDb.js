@@ -155,6 +155,16 @@ UPGRADES.push(
      CONSTRAINT fk_ledger_customer FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE CASCADE,
      CONSTRAINT fk_ledger_order    FOREIGN KEY (order_id)    REFERENCES orders (id)    ON DELETE SET NULL
    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  // Photos uploaded from the admin live in the database: a Node.js redeploy replaces public_html (public/uploads).
+  `CREATE TABLE IF NOT EXISTS media_files (
+     id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+     folder      VARCHAR(20)  NOT NULL,
+     mime        VARCHAR(30)  NOT NULL,
+     bytes       MEDIUMBLOB   NOT NULL,
+     size        INT UNSIGNED NOT NULL,
+     created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     PRIMARY KEY (id)
+   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 );
 
 /** Columns added to existing tables: [table, column, ALTER statement]. MySQL 8 has no ADD COLUMN IF NOT EXISTS. */

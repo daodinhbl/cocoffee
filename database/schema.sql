@@ -6,7 +6,7 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
-DROP TABLE IF EXISTS customer_ledger, customers, app_settings, zalo_tokens, zalo_events, zalo_sessions, payments, inventory_movements,
+DROP TABLE IF EXISTS media_files, customer_ledger, customers, app_settings, zalo_tokens, zalo_events, zalo_sessions, payments, inventory_movements,
                      order_items, orders, dining_tables, recipes, product_aliases, products,
                      inventory_items, categories, users;
 
@@ -304,6 +304,18 @@ CREATE TABLE customers (
   PRIMARY KEY (id),
   UNIQUE KEY uq_customers_phone (phone),
   UNIQUE KEY uq_customers_zalo (zalo_user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Photos uploaded from the Web Admin (products, ingredients), served at /media/<id>-<slug>.<ext>.
+-- Kept in the database because a Node.js redeploy replaces public_html. Also created at startup (ensureSchemaUpgrades).
+CREATE TABLE media_files (
+  id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  folder      VARCHAR(20)  NOT NULL,             -- products | ingredients
+  mime        VARCHAR(30)  NOT NULL,
+  bytes       MEDIUMBLOB   NOT NULL,
+  size        INT UNSIGNED NOT NULL,
+  created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Debt ledger (sổ công nợ). Balance of a customer = SUM(amount): a confirmed-but-unpaid order adds a

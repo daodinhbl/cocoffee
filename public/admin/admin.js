@@ -267,8 +267,11 @@
   function compressImage(file, done) {
     if (!/^image\/(jpeg|png|webp)$/.test(file.type)) { done(new Error('Chỉ nhận ảnh JPEG, PNG hoặc WebP.')); return; }
     if (file.size > 15 * 1024 * 1024) { done(new Error('Ảnh quá lớn (tối đa 15 MB trước khi nén).')); return; }
-    var url = URL.createObjectURL(file);
+    // Read as a data: URL, not URL.createObjectURL: the admin CSP allows img-src 'self' data: only (no blob:).
+    var reader = new FileReader();
     var img = new Image();
+    reader.onload = function () { img.src = reader.result; };
+    reader.onerror = function () { done(new Error('Không đọc được ảnh này.')); };
     img.onload = function () {
       var side = Math.min(img.naturalWidth, img.naturalHeight);
       var canvas = document.createElement('canvas');
@@ -276,13 +279,12 @@
       var ctx = canvas.getContext('2d');
       ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, canvas.width, canvas.height);   // transparent PNG -> white, not black
       ctx.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(url);
       var q = 0.85, data = canvas.toDataURL('image/jpeg', q);
       while (data.length > 750000 && q > 0.4) { q -= 0.1; data = canvas.toDataURL('image/jpeg', q); }
       done(null, data);
     };
-    img.onerror = function () { URL.revokeObjectURL(url); done(new Error('Không đọc được ảnh này.')); };
-    img.src = url;
+    img.onerror = function () { done(new Error('Không đọc được ảnh này.')); };
+    reader.readAsDataURL(file);
   }
 
   /* ------------------------------------------- generic dialogs + confirmation */
