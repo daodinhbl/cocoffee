@@ -249,4 +249,21 @@ test('API security', async (t) => {
     assert.equal(called('order.createPos').length, 2);
     assert.equal((await api('POST', '/api/orders', { token: cashier.token, json: body, headers: { 'idempotency-key': 'bad key!' } })).status, 400);
   });
+
+  await t.test('Idempotency-Key on the writes the app replays from its offline queue: executed once', async () => {
+    fx.calls.length = 0;
+    const headers = { 'idempotency-key': 'off-queue-collect-1' };
+    const collect = { amount: 50000, method: 'cash' };
+    const a = await api('POST', '/api/admin/customers/5/collect', { token: boss.token, json: collect, headers });
+    const b = await api('POST', '/api/admin/customers/5/collect', { token: boss.token, json: collect, headers });
+    assert.equal(a.status, 200);
+    assert.deepEqual(b.body, a.body);
+    assert.equal(b.headers.get('idempotent-replayed'), 'true');
+    assert.equal(called('customer.collect').length, 1, 'the debt was collected once');
+    const recv = { quantity: 10, unit_cost: 100 };
+    const h2 = { 'idempotency-key': 'off-queue-receive-1' };
+    await api('POST', '/api/inventory/1/receive', { token: boss.token, json: recv, headers: h2 });
+    await api('POST', '/api/inventory/1/receive', { token: boss.token, json: recv, headers: h2 });
+    assert.equal(called('inventory.receive').length, 1, 'the stock was received once');
+  });
 });

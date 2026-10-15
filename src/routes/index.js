@@ -52,8 +52,8 @@ router.post('/inventory', admin, inventory.create);
 router.get('/inventory/purchases', admin, inventory.purchases);           // before /inventory/:id
 router.get('/inventory/:id', admin, inventory.get);
 router.put('/inventory/:id', admin, inventory.update);
-router.post('/inventory/:id/receive', admin, inventory.receive);
-router.post('/inventory/:id/adjust', admin, inventory.adjust);
+router.post('/inventory/:id/receive', admin, idempotency(), inventory.receive);     // replayed by the app's offline queue
+router.post('/inventory/:id/adjust', admin, idempotency(), inventory.adjust);
 router.get('/inventory/:id/movements', admin, inventory.movements);
 
 router.get('/orders/summary', admin, orders.summary);                    // before /orders/:id
@@ -63,7 +63,7 @@ router.get('/orders/:id', orders.get);
 router.get('/orders/:id/receipt', orders.receipt);
 router.put('/orders/:id/items', orders.replaceItems);
 router.post('/orders/:id/pay', idempotency(), orders.pay);                              // debt settlement: admin only (orderService)
-router.post('/orders/:id/cancel', orders.cancel);
+router.post('/orders/:id/cancel', idempotency(), orders.cancel);
 router.post('/orders/:id/resend-receipt', orders.resendReceipt);
 
 // ---- management screens: admins only, guarded once ----------------------------

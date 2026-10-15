@@ -1,4 +1,5 @@
 const express = require('express');
+const idempotency = require('../middlewares/idempotency');
 
 const shell = require('../controllers/api/shellApi');
 const analytics = require('../controllers/api/dashboardApi');
@@ -19,13 +20,13 @@ router.get('/dashboard', analytics.dashboard);
 router.get('/reports', analytics.reports);
 
 router.get('/customers', customers.list);
-router.post('/customers', customers.create);
+router.post('/customers', idempotency(), customers.create);          // customers.* writes are replayed by the app's offline queue
 router.get('/customers/reconciliation', customers.reconciliation);        // before /customers/:id
 router.get('/customers/:id', customers.detail);
-router.put('/customers/:id', customers.update);
+router.put('/customers/:id', idempotency(), customers.update);
 router.get('/customers/:id/statement', customers.statement);
-router.post('/customers/:id/collect', customers.collect);
-router.post('/customers/:id/adjust', customers.adjust);
+router.post('/customers/:id/collect', idempotency(), customers.collect);
+router.post('/customers/:id/adjust', idempotency(), customers.adjust);
 router.post('/orders/:id/record-debt', customers.recordOrderDebt);          // "Ghi công nợ" for a Zalo order
 
 router.get('/menu', menu.menu);
