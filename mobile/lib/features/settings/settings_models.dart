@@ -5,6 +5,9 @@ import '../../core/session.dart';
 /// Shown under "Ứng dụng"; keep in step with `version:` in pubspec.yaml.
 const kAppVersion = '1.3.0 (4)';
 
+/// versionCode (the number after `+` in pubspec.yaml): the OTA update compares it with the server's manifest.
+const kAppBuild = 4;
+
 int _int(Object? v, int fallback) => v is num ? v.toInt() : int.tryParse('${v ?? ''}') ?? fallback;
 bool _bool(Object? v) => v == true || v == 1 || v == '1' || v == 'true';
 String _str(Object? v) => v == null ? '' : '$v';

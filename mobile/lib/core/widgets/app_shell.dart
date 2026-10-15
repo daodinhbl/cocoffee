@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../nav.dart';
 import '../session.dart';
 import '../theme/app_theme.dart';
+import '../update/app_update.dart';
 import 'common.dart';
 import 'offline_banner.dart';
 
@@ -47,12 +48,12 @@ class AppShell extends ConsumerWidget {
       return Scaffold(
         body: Row(children: [
           _Sidebar(shell: shell),
-          Expanded(child: Column(children: [const OfflineBanner(), Expanded(child: shell)])),
+          Expanded(child: Column(children: [const UpdateBanner(), const OfflineBanner(), Expanded(child: shell)])),
         ]),
       );
     }
     return Scaffold(
-      body: Column(children: [const OfflineBanner(), Expanded(child: shell)]),
+      body: Column(children: [const UpdateBanner(), const OfflineBanner(), Expanded(child: shell)]),
       bottomNavigationBar: NavigationBar(
         selectedIndex: shell.currentIndex,
         onDestinationSelected: (i) => shell.goBranch(i, initialLocation: i == shell.currentIndex),

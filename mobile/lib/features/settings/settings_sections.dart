@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/update/app_update.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -485,6 +486,8 @@ class AppInfoCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final server = ref.watch(serverUrlProvider);
+    final update = ref.watch(updateCheckProvider);
+    final found = update.asData?.value;
     return SectionCard(
       title: 'Ứng dụng',
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -502,6 +505,18 @@ class AppInfoCard extends ConsumerWidget {
           leading: Icon(Icons.info_outline_rounded),
           title: Text('Phiên bản ứng dụng'),
           trailing: Text(kAppVersion, style: TextStyle(fontFeatures: tabular)),
+        ),
+        const Divider(),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.system_update_rounded),
+          title: const Text('Kiểm tra cập nhật'),
+          subtitle: Text(update.isLoading ? 'Đang kiểm tra…' : (found == null ? 'Bạn đang dùng bản mới nhất.' : 'Có bản mới ${found.label}.')),
+          trailing: GhostAction(
+            label: found == null ? 'Kiểm tra' : 'Cập nhật',
+            icon: found == null ? Icons.refresh_rounded : Icons.download_rounded,
+            onPressed: () => found == null ? ref.invalidate(updateCheckProvider) : showUpdateDialog(context, found),
+          ),
         ),
       ]),
     );
