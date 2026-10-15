@@ -74,14 +74,14 @@
             <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-navy-100 text-xs font-semibold text-navy-800">1</span>
               <span>Cài ứng dụng <b>TestFlight</b> từ App Store: <a href="https://apps.apple.com/app/testflight/id899247664" rel="noopener" class="font-semibold text-navy-700 hover:underline">Tải TestFlight</a>.</span></li>
             <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-navy-100 text-xs font-semibold text-navy-800">2</span>
-              <span>Quay lại trang này, nhấn <b>Mở trong TestFlight</b>, rồi chọn <b>Accept</b> và <b>Install</b>.</span></li>
+              <span>Quay lại trang này, nhấn <b>Mở trong TestFlight</b>, rồi chọn <b>Chấp nhận</b> (Accept) và <b>Cài đặt</b> (Install).</span></li>
             <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-navy-100 text-xs font-semibold text-navy-800">3</span>
-              <span>Mở <b><%= meta.name %></b> và đăng nhập bằng tài khoản dùng trên trang quản trị. Ứng dụng đã trỏ sẵn về máy chủ <code class="font-mono text-navy-700"><%= host %></code>.</span></li>
+              <span>Mở <b><%= meta.name %></b> và đăng nhập bằng tài khoản dùng trên trang quản trị. Khi đăng nhập, kiểm tra địa chỉ máy chủ trong ứng dụng là <code class="font-mono text-navy-700"><%= host %></code> (đổi được ngay trên màn hình đăng nhập của ứng dụng).</span></li>
           <% } else { %>
             <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-navy-100 text-xs font-semibold text-navy-800">1</span>
               <span>Nhấn <b>Tải trên App Store</b> rồi chọn <b>Nhận</b> (Get) và xác nhận bằng Face ID / mật khẩu Apple.</span></li>
             <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-navy-100 text-xs font-semibold text-navy-800">2</span>
-              <span>Mở <b><%= meta.name %></b> và đăng nhập bằng tài khoản dùng trên trang quản trị. Ứng dụng đã trỏ sẵn về máy chủ <code class="font-mono text-navy-700"><%= host %></code>.</span></li>
+              <span>Mở <b><%= meta.name %></b> và đăng nhập bằng tài khoản dùng trên trang quản trị. Khi đăng nhập, kiểm tra địa chỉ máy chủ trong ứng dụng là <code class="font-mono text-navy-700"><%= host %></code> (đổi được ngay trên màn hình đăng nhập của ứng dụng).</span></li>
           <% } %>
         </ol>
         <p class="mt-4 text-xs text-gray-500"><% if (app.kind === 'testflight') { %>Cập nhật: TestFlight tự báo khi có bản mới; mỗi bản thử nghiệm dùng được 90 ngày, sau đó cài bản mới từ chính TestFlight.<% } else { %>Cập nhật: App Store tự cập nhật ứng dụng như mọi ứng dụng khác.<% } %></p>

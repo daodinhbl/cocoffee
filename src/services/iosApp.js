@@ -26,13 +26,15 @@ const KINDS = [
 
 let cache = null;   // { at, link }
 
+const MAX_URL = 300;   // applies to the normalised href: that is what gets stored and read back
+
 /** { kind, label, action, url } for an https TestFlight / App Store link, or null for anything else. */
 function classify(value) {
   const raw = typeof value === 'string' ? value.trim() : '';
-  if (!raw || raw.length > 300) return null;
+  if (!raw || raw.length > 4 * MAX_URL) return null;
   let u;
   try { u = new URL(raw); } catch (_) { return null; }
-  if (u.protocol !== 'https:' || u.username || u.password) return null;
+  if (u.protocol !== 'https:' || u.username || u.password || u.href.length > MAX_URL) return null;
   const k = KINDS.find((x) => x.hosts.includes(u.hostname.toLowerCase()));
   return k ? { kind: k.kind, label: k.label, action: k.action, url: u.href } : null;
 }

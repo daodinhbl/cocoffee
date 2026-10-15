@@ -33,7 +33,7 @@ test('Android app download', async (t) => {
   t.after(() => { fx.stop(); fs.rmSync(dir, { recursive: true, force: true }); fs.rmSync(work, { recursive: true, force: true }); });
   const get = (p, headers = {}) => fetch(fx.base + p, { redirect: 'manual', headers });
 
-  await t.test('nothing published yet: the page says so, APK and manifest are 404, the login page has no QR card', async () => {
+  await t.test('nothing published yet: the page says so, APK and manifest are 404, the login page has no Android row', async () => {
     const page = await get('/download');
     assert.equal(page.status, 200);
     assert.match(await page.text(), /Chưa có bản cài đặt/);

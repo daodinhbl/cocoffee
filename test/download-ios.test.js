@@ -36,8 +36,23 @@ test('iOS app download', async (t) => {
     assert.equal(iosApp.classify('https://TESTFLIGHT.apple.com/join/x').kind, 'testflight');
     const bad = ['', null, 42, 'not a url', 'http://testflight.apple.com/join/x', 'https://evil.example/testflight.apple.com/join/x',
       'https://testflight.apple.com.evil.example/join/x', 'itms-services://?action=download-manifest', 'https://user:pw@apps.apple.com/x',
-      'javascript:alert(1)', `https://apps.apple.com/${'a'.repeat(300)}`];
+      'javascript:alert(1)', `https://apps.apple.com/${'a'.repeat(300)}`,
+      `https://apps.apple.com/${'ă'.repeat(60)}`];   // 84 chars typed, but the stored (percent-encoded) href would be 383: refused up front, not dropped later
     for (const v of bad) assert.equal(iosApp.classify(v), null, String(v));
+    assert.equal(iosApp.classify(`https://apps.apple.com/${'a'.repeat(277)}`).url.length, 300, 'exactly at the cap is accepted');
+    assert.equal(iosApp.classify(`https://apps.apple.com/${'a'.repeat(278)}`), null, 'one over the cap is refused');
+  });
+
+  await t.test('the login page still renders from the admin error handler (rate-limited POST): no app-card local is required', async () => {
+    const c = fx.client();
+    let res;
+    for (let i = 0; i < 9; i++) res = await c.post('/admin/login', { username: 'nobody-here', password: 'wrong-password' });   // 8 tries per account, then 429
+    assert.equal(res.status, 429);
+    assert.match(res.headers.get('content-type'), /^text\/html/);
+    const html = await res.text();
+    assert.match(html, /Thử đăng nhập quá nhiều lần/);
+    assert.match(html, /iPhone \/ iPad · POS Tasotek <span[^>]*>sắp có</, 'the iOS row falls back to its defaults');
+    assert.doesNotMatch(html, /src="\/download\/qr\.svg"/);
   });
 
   await t.test('nothing configured: the page says the build is coming, the QR code works, the login page shows the iOS row as "sắp có"', async () => {
