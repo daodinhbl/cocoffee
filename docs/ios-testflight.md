@@ -1,5 +1,7 @@
 # POS Tasotek trên iOS — build và đẩy TestFlight bằng GitHub Actions
 
+> Hướng dẫn làm theo từng bước cho chủ app (tài khoản Apple, secret, đăng ký máy thử, phát hành): `docs/huong-dan-trien-khai-ios.md`. File này là phần kỹ thuật.
+
 Bản iOS dùng chung mã Flutter với bản Android (`mobile/`). Không cần máy Mac: macOS runner của GitHub build, ký và đẩy lên TestFlight.
 Bản Android giữ nguyên quy trình cũ (`scripts\build-apk.ps1`, `scripts\build-aab.ps1`).
 
