@@ -63,7 +63,8 @@ app.get('/health', async (_req, res) => {
   }
 });
 
-// Android app for staff phones: landing page, APK, manifest, QR code (public; see routes/downloadRoutes.js).
+// Apps for staff phones (public; see routes/downloadRoutes.js): Android landing page, APK, manifest and QR code;
+// iOS landing page (/download/ios -> TestFlight / App Store link) and its QR code.
 app.use('/download', downloadRoutes);
 
 // Product introduction page (public; linked from the login page "Xem thêm").

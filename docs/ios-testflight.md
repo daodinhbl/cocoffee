@@ -61,3 +61,10 @@ Workflow chỉ chạy khi bấm tay hoặc đẩy tag `ios-v*`; không chạy tr
 7. Chạy build đầu tiên (Run workflow). Nếu lỗi quyền ký, kiểm tra quyền Admin của API key và App ID ở bước 2.
 8. TestFlight: thêm tester nội bộ (Internal Testing) để cài thử trên iPhone/iPad; điền thông tin *Test Information* và *Export Compliance* nếu được hỏi (app chỉ dùng mã hóa HTTPS chuẩn).
 9. Chưa chạy trên máy thật: nên thử đăng nhập, bán hàng, thông báo đơn mới và mở hóa đơn trên iPhone và iPad trước khi nộp App Store.
+
+## Trang tải iOS và mã QR trên trang đăng nhập
+
+- `/download/ios` là trang tải cho iPhone/iPad (tương ứng `/download` của Android); trang đăng nhập có mã QR riêng dẫn tới đó. iOS không cài được từ file như APK, nên trang này dẫn tới **liên kết công khai TestFlight** (bản thử nghiệm: tối đa 10 000 người, không cần đăng ký thiết bị, mỗi bản dùng 90 ngày) hoặc **trang App Store** khi đã phát hành.
+- Khai báo liên kết trong Web Admin → **Cài đặt → Ứng dụng iOS** (lưu trong `app_settings`, đổi được ngay không cần deploy). Biến môi trường `IOS_APP_URL` là giá trị mặc định khi ô này để trống. Chỉ nhận địa chỉ https của `testflight.apple.com`, `beta.itunes.apple.com`, `apps.apple.com`. Chưa có liên kết thì trang và thẻ trên trang đăng nhập hiện "sắp có".
+- Lấy liên kết TestFlight: App Store Connect → TestFlight → **External Testing** → tạo nhóm, thêm build, bật **Public Link** → sao chép. Lần đầu Apple duyệt sơ bộ (Beta App Review) khoảng 1–2 ngày; nhóm **Internal Testing** (tối đa 100 người có tài khoản App Store Connect) dùng được ngay nhưng không có public link.
+- Khi app lên App Store, thay bằng `https://apps.apple.com/...`: nút trên trang tự đổi thành "Tải trên App Store".

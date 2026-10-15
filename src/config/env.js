@@ -48,6 +48,9 @@ module.exports = {
   nodeEnv: optional('NODE_ENV', 'development'),
   rootDir: path.resolve(__dirname, '../..'),
   publicBaseUrl: optional('PUBLIC_BASE_URL').replace(/\/+$/, ''),
+  // iOS app for staff iPhones/iPads: TestFlight public link or App Store page, used while nothing is set in
+  // Web Admin > Cài đặt > Ứng dụng iOS (see services/iosApp.js).
+  iosAppUrl: optional('IOS_APP_URL'),
   // Where Web Admin > Sao lưu keeps its .sql.gz files. A redeploy replaces the app folder, so the default is a
   // sibling folder OUTSIDE it (<app>/../cocoffee-backups); backupService falls back to <app>/backups (with a
   // warning) when that folder cannot be created. Set BACKUP_DIR to choose another place.

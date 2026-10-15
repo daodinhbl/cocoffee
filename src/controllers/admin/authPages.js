@@ -3,6 +3,7 @@ const userModel = require('../../models/userModel');
 const { AppError } = require('../../utils/httpError');
 const env = require('../../config/env');
 const appRelease = require('../../services/appRelease');
+const iosApp = require('../../services/iosApp');
 const { startSession, endSession, safeBack } = require('../../middlewares/adminAuth');
 
 // Constant-time-ish: always run bcrypt, even for unknown users.
@@ -14,8 +15,11 @@ const MIN_PASSWORD = 10;
 const isDemoAccount = (user) => Boolean(env.demo.enabled && user && user.username === env.demo.username);
 const demoCredentials = () => (env.demo.enabled ? { username: env.demo.username, password: env.demo.password } : null);
 
-const renderLogin = (res, { status = 200, error = null, username = '', next = '' } = {}) =>
-  res.status(status).render('login', { shopName: env.business.shopName, error, username, next: safeBack(next, ''), demo: demoCredentials(), appDownload: appRelease.loginCard() });
+const renderLogin = async (res, { status = 200, error = null, username = '', next = '' } = {}) =>
+  res.status(status).render('login', {
+    shopName: env.business.shopName, error, username, next: safeBack(next, ''), demo: demoCredentials(),
+    appDownload: appRelease.loginCard(), iosApp: await iosApp.get(), iosMeta: iosApp.APP,
+  });
 
 function loginForm(req, res) {
   if (req.user) return res.redirect(303, safeBack(req.query.next));

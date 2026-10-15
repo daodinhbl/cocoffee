@@ -2,6 +2,7 @@ const express = require('express');
 const { adminSecurity } = require('../middlewares/adminSecurity');
 const rateLimit = require('../middlewares/rateLimit');
 const appRelease = require('../services/appRelease');
+const iosApp = require('../services/iosApp');
 const env = require('../config/env');
 const { formatShopTime } = require('../utils/text');
 
@@ -12,6 +13,10 @@ const { formatShopTime } = require('../utils/text');
  *   GET /download/cocoffee.apk   the APK (stable URL; the saved file name carries the version)
  *   GET /download/manifest.json  version/size/sha256 for an in-app update check
  *   GET /download/qr.svg         QR code of the landing page URL (printed on the login page)
+ *
+ * The iOS app cannot be sideloaded, so its page links out instead of serving a file (services/iosApp.js):
+ *   GET /download/ios            landing page for iPhone/iPad: the TestFlight / App Store link set in Web Admin
+ *   GET /download/ios/qr.svg     QR code of that page (the iOS row of the app card on the login page)
  */
 const router = express.Router();
 const APK_PATH = '/download/cocoffee.apk';
@@ -69,9 +74,10 @@ router.get('/cocoffee.apk', apkLimit, (req, res, next) => {
   });
 });
 
-router.get('/qr.svg', pageLimit, async (req, res, next) => {
+/** QR code (SVG) pointing at `pagePath` on the public origin. */
+async function sendQr(req, res, next, pagePath) {
   try {
-    const svg = await appRelease.qrSvg(`${appRelease.baseUrl(req)}/download`);
+    const svg = await appRelease.qrSvg(`${appRelease.baseUrl(req)}${pagePath}`);
     res.set({
       'Content-Type': 'image/svg+xml; charset=utf-8',
       'Cache-Control': 'public, max-age=3600',
@@ -80,7 +86,24 @@ router.get('/qr.svg', pageLimit, async (req, res, next) => {
     });
     res.send(svg);
   } catch (err) { next(err); }
+}
+
+router.get('/qr.svg', pageLimit, (req, res, next) => sendQr(req, res, next, '/download'));
+
+router.get('/ios', pageLimit, adminSecurity, async (req, res, next) => {
+  try {
+    const base = appRelease.baseUrl(req);
+    res.render('download-ios', {
+      shopName: env.business.shopName,
+      app: await iosApp.get(),
+      meta: iosApp.APP,
+      pageUrl: `${base}/download/ios`,
+      host: base.replace(/^https?:\/\//, ''),
+    });
+  } catch (err) { next(err); }
 });
+
+router.get('/ios/qr.svg', pageLimit, (req, res, next) => sendQr(req, res, next, '/download/ios'));
 
 router.use((_req, res) => res.status(404).type('text').send('Không tìm thấy.'));
 

@@ -3,6 +3,7 @@ const userModel = require('../../models/userModel');
 const v = require('../../utils/validate');
 const { render, formBool } = require('./common');
 const printerSettings = require('../../services/printerSettings');
+const iosApp = require('../../services/iosApp');
 const userService = require('../../services/userService');
 const { systemConfig } = require('../../services/settingsService');
 const payon = require('./payon');
@@ -17,6 +18,7 @@ async function page(req, res) {
     users: forced ? [] : await userModel.list(),
     printer: forced ? null : await printerSettings.get(),
     payonPanel: forced ? null : await payon.settingsPanel(),
+    iosApp: forced ? null : await iosApp.view(),
     config: { ...systemConfig(), publicBaseUrl: env.publicBaseUrl || '(chưa đặt)' },
   });
 }
@@ -43,4 +45,10 @@ async function savePrinter(req) {
   return { message: 'Đã lưu cấu hình máy in.', to: '/admin/settings' };
 }
 
-module.exports = { page, createUser, resetPassword, setActive, savePrinter };
+/** iOS app: the TestFlight public link or App Store page that /download/ios and the login page QR lead to. */
+async function saveIosApp(req) {
+  const link = await iosApp.save(req.body, req.user.id);
+  return { message: link ? `Đã lưu liên kết tải ứng dụng iOS (${link.label}).` : 'Đã bỏ liên kết tải ứng dụng iOS.', to: '/admin/settings' };
+}
+
+module.exports = { page, createUser, resetPassword, setActive, savePrinter, saveIosApp };

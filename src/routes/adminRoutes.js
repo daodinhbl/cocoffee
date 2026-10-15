@@ -123,6 +123,7 @@ router.get('/settings', settings.page);
 router.get('/settings/password', settings.page);
 router.post('/settings/password', act(auth.changeOwnPassword));
 router.post('/settings/printer', act(settings.savePrinter));
+router.post('/settings/ios-app', act(settings.saveIosApp));
 router.post('/settings/payon', act(payon.saveSettings));
 router.post('/settings/payon/test', act(payon.testConnection));
 router.post('/settings/payon/ip', act(payon.showServerIp));
