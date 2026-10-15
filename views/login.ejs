@@ -28,116 +28,166 @@
     :focus-visible { outline: 2px solid #1E3A8A; outline-offset: 2px; }
     @media (max-width: 767px) { input { font-size: 16px !important; } }
     .steam { background-image: radial-gradient(circle at 20% 15%, rgba(30,58,138,.08) 0, transparent 45%), radial-gradient(circle at 85% 80%, rgba(30,58,138,.10) 0, transparent 50%); }
+
+    /* Brand panel: deep navy with a soft light, a hairline paper grain and two faint cup rings — CSS only. */
+    .panel {
+      background-color: #172554;
+      background-image:
+        radial-gradient(ellipse at 12% 0%, rgba(255,255,255,.16) 0, transparent 55%),
+        radial-gradient(ellipse at 100% 100%, rgba(147,168,216,.30) 0, transparent 55%),
+        repeating-linear-gradient(135deg, rgba(255,255,255,.035) 0 1px, transparent 1px 8px);
+    }
+    .ring { position: absolute; border-radius: 9999px; border: 12px solid rgba(255,255,255,.045); box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), 0 0 0 1px rgba(255,255,255,.07); pointer-events: none; }
+    .logo-light { filter: brightness(0) invert(1); }
+
+    /* Inset-label fields: label and input share one bordered box; the box carries the focus ring. */
+    .field { position: relative; border: 1px solid #C9D1E2; border-radius: 6px; background: #fff; transition: border-color .15s, box-shadow .15s; }
+    .field:hover { border-color: #93A8D8; }
+    .field:focus-within { border-color: #1E3A8A; box-shadow: 0 0 0 3px rgba(30,58,138,.14); }
+    .field label { display: block; padding: 10px 14px 0; font-size: 12px; line-height: 1; letter-spacing: .12em; text-transform: uppercase; color: #5B6475; }
+    .field input { display: block; width: 100%; height: 42px; padding: 2px 14px 8px; border: 0; border-radius: 6px; background: transparent; font: inherit; font-size: 17px; color: #16181A; }
+    .field input:focus, .field input:focus-visible { outline: none; }
+    .field input:-webkit-autofill { -webkit-box-shadow: 0 0 0 1000px #fff inset; -webkit-text-fill-color: #16181A; }
+    .field-pw input { padding-right: 56px; }
+    #pw-toggle .i-off { display: none; }
+    #pw-toggle[aria-pressed="true"] .i-on { display: none; }
+    #pw-toggle[aria-pressed="true"] .i-off { display: block; }
+
+    .card { box-shadow: 0 1px 2px rgba(23,37,84,.06), 0 28px 56px -28px rgba(30,58,138,.40); outline: 1px solid rgba(30,58,138,.10); outline-offset: 5px; }
+    .badge { box-shadow: 0 10px 20px -14px rgba(23,37,84,.6); }
+    @media (prefers-reduced-motion: reduce) { .field, .badge, button, a { transition: none !important; } }
   </style>
 </head>
 <body class="min-h-full bg-navy-50 font-sans text-gray-900 antialiased">
-  <main class="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
+  <div class="lg:grid lg:min-h-screen lg:grid-cols-[1.05fr_minmax(0,1fr)]">
 
     <!-- Brand panel (laptop/desktop) -->
-    <section class="steam relative hidden flex-col items-center justify-center overflow-hidden bg-navy-100 px-12 lg:flex" aria-hidden="true">
-      <img src="/brand/logo.png" alt="" width="480" height="472" class="w-full max-w-md drop-shadow-sm">
-      <p class="mt-10 max-w-sm text-center text-lg italic text-navy-700">Quản lý quán — đơn hàng, thực đơn, kho và báo cáo — ở một nơi.</p>
-      <div class="absolute inset-x-0 bottom-0 h-1.5 bg-navy-700"></div>
+    <section class="panel relative hidden overflow-hidden text-navy-50 lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:justify-between lg:self-start lg:px-14 lg:py-12 xl:px-20" aria-hidden="true">
+      <div class="ring -right-40 -top-40 h-[560px] w-[560px]"></div>
+      <div class="ring -bottom-32 left-8 h-[360px] w-[360px]"></div>
+      <div class="pointer-events-none absolute inset-6 rounded-lg border border-white/15"></div>
+      <p class="relative text-[11px] font-semibold uppercase tracking-[.3em] text-white/70"><%= shopName %> · Trang quản trị</p>
+      <div class="relative">
+        <img src="/brand/logo.png" alt="" width="480" height="472" class="logo-light w-full max-w-[280px] xl:max-w-[340px]">
+        <div class="mt-10 h-px w-16 bg-white/40"></div>
+        <p class="mt-6 max-w-md text-3xl italic leading-snug text-navy-50 xl:text-4xl">Quản lý quán — đơn hàng, thực đơn, kho và báo cáo — ở một nơi.</p>
+      </div>
+      <p class="relative text-[11px] uppercase tracking-[.3em] text-white/60">POS · Thực đơn · Kho · Công nợ · Báo cáo · Zalo</p>
     </section>
 
-    <!-- Form -->
-    <section class="flex flex-col items-center justify-center px-4 py-10 sm:px-8">
-      <div class="w-full max-w-sm">
-        <div class="mb-8 flex flex-col items-center text-center lg:items-start lg:text-left">
-          <img src="/brand/mark.png" alt="<%= shopName %>" width="256" height="200" class="h-20 w-auto lg:hidden">
-          <h1 class="mt-4 text-3xl font-semibold text-navy-800 lg:mt-0"><%= shopName %></h1>
-          <p class="mt-1 text-sm text-gray-500">Đăng nhập trang quản trị</p>
-        </div>
+    <!-- Form column -->
+    <div class="steam flex min-h-screen flex-col">
+      <!-- Masthead (phone/tablet): the mark on navy; the card below overlaps it -->
+      <header class="panel relative overflow-hidden px-4 pb-16 pt-9 text-center text-navy-50 lg:hidden">
+        <div class="ring -right-20 -top-28 h-72 w-72"></div>
+        <div class="ring -left-16 bottom-0 h-40 w-40"></div>
+        <img src="/brand/mark.png" alt="<%= shopName %>" width="256" height="232" class="logo-light relative mx-auto h-16 w-auto">
+        <p class="relative mt-3 text-2xl font-semibold tracking-wide"><%= shopName %></p>
+        <p class="relative mx-auto mt-1 max-w-xs text-sm italic text-navy-200">Quản lý quán — đơn hàng, thực đơn, kho và báo cáo — ở một nơi.</p>
+      </header>
 
-        <div class="rounded-xl border border-navy-200 bg-white p-6 shadow-[0_10px_30px_-12px_rgba(30,58,138,.25)] sm:p-8">
+      <main class="relative z-10 mx-auto -mt-10 w-full max-w-lg flex-1 px-4 pb-10 sm:px-6 lg:mt-0 lg:flex lg:max-w-xl lg:flex-col lg:justify-center lg:px-12 lg:py-12">
+
+        <div class="card rounded-xl border border-navy-200 bg-white p-5 sm:p-8">
+          <p class="text-[11px] font-semibold uppercase tracking-[.2em] text-navy-600 lg:hidden">Trang quản trị · <%= shopName %></p>
+          <h1 class="mt-2 text-3xl font-semibold leading-tight text-navy-800 sm:text-4xl">Đăng nhập</h1>
+          <p class="mt-2 text-sm text-gray-500">Vào trang quản trị để quản lý đơn hàng, thực đơn, kho và báo cáo.</p>
+          <div class="mt-5 h-px bg-navy-100"></div>
+
           <% if (error) { %>
-            <div role="alert" class="mb-5 flex gap-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+            <div role="alert" class="mt-5 flex gap-2.5 rounded-md border border-red-200 border-l-4 border-l-red-600 bg-red-50 px-3.5 py-2.5 text-sm text-red-800">
               <svg class="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
               <span><%= error %></span>
             </div>
           <% } %>
 
-          <% if (locals.demo) { %>
-            <div class="mb-5 rounded border border-navy-200 bg-navy-50 px-3 py-3 text-sm text-navy-800">
-              <div class="flex items-center justify-between gap-3">
-                <p class="font-semibold">Tài khoản demo</p>
-                <button type="button" id="demo-fill" class="rounded border border-navy-300 bg-white px-2.5 py-1 text-xs font-semibold text-navy-700 hover:bg-navy-100">Dùng tài khoản này</button>
-              </div>
-              <p class="mt-1.5">Tên đăng nhập: <code class="font-mono font-semibold"><%= demo.username %></code> · Mật khẩu: <code class="font-mono font-semibold"><%= demo.password %></code></p>
-            </div>
-          <% } %>
 
-          <form method="post" action="/admin/login" class="space-y-4">
+          <form method="post" action="/admin/login" class="mt-5 space-y-3.5">
             <input type="hidden" name="next" value="<%= next %>">
-            <div>
-              <label for="username" class="mb-1.5 block text-sm font-medium text-gray-700">Tên đăng nhập</label>
-              <div class="relative">
-                <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
-                <input id="username" name="username" value="<%= username %>" required maxlength="50" autocomplete="username" autocapitalize="none" spellcheck="false" autofocus
-                  class="h-11 w-full rounded border border-gray-300 pl-9 pr-3 text-sm focus:border-navy-600 focus:outline-none focus:ring-1 focus:ring-navy-600">
-              </div>
+            <div class="field">
+              <label for="username">Tên đăng nhập</label>
+              <input id="username" name="username" value="<%= username %>" required maxlength="50" autocomplete="username" autocapitalize="none" spellcheck="false" autofocus>
             </div>
-            <div>
-              <label for="password" class="mb-1.5 block text-sm font-medium text-gray-700">Mật khẩu</label>
-              <div class="relative">
-                <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
-                <input id="password" name="password" type="password" required maxlength="200" autocomplete="current-password"
-                  class="h-11 w-full rounded border border-gray-300 pl-9 pr-11 text-sm focus:border-navy-600 focus:outline-none focus:ring-1 focus:ring-navy-600">
-                <button type="button" id="pw-toggle" aria-label="Hiện mật khẩu" aria-pressed="false"
-                  class="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded text-gray-400 hover:text-navy-700">
-                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
-                </button>
-              </div>
+            <div class="field field-pw">
+              <label for="password">Mật khẩu</label>
+              <input id="password" name="password" type="password" required maxlength="200" autocomplete="current-password">
+              <button type="button" id="pw-toggle" aria-label="Hiện mật khẩu" aria-pressed="false"
+                class="absolute right-1.5 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded text-gray-400 hover:bg-navy-50 hover:text-navy-700">
+                <svg class="i-on h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg class="i-off h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18M10.6 10.6A3 3 0 0 0 13.4 13.4M9.9 5.2A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.3 6.3C3.6 8.3 2 12 2 12s3.5 7 10 7c1.6 0 3-.4 4.2-1"/></svg>
+              </button>
             </div>
             <button type="submit" id="login-submit"
-              class="inline-flex h-11 w-full items-center justify-center gap-2 rounded bg-navy-700 text-sm font-semibold text-white hover:bg-navy-800 active:bg-navy-900 disabled:opacity-70">Đăng nhập</button>
+              class="!mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-navy-700 text-base font-semibold tracking-wide text-white shadow-[0_14px_28px_-14px_rgba(30,58,138,.8)] transition hover:bg-navy-800 active:bg-navy-900 disabled:opacity-70">Đăng nhập<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
           </form>
+          <p class="mt-4 flex items-center justify-center gap-1.5 text-xs text-gray-500">
+            <svg class="h-3.5 w-3.5 text-navy-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6l7-3z"/><path d="m9.5 12 1.8 1.8L15 10"/></svg>
+            Phiên đăng nhập bảo mật · tự chặn khi dò mật khẩu
+          </p>
         </div>
 
-        <%# Staff apps: the Android row needs a published APK (services/appRelease.js); the iOS row is always there and
+        <%# Staff apps: the Android badge needs a published APK (services/appRelease.js); the iOS badge is always there and
             says "sắp có" until the TestFlight / App Store link is set in Cài đặt (services/iosApp.js). Every local is
             optional: the admin error handler (routes/adminRoutes.js) renders this view with only shopName/error/username/next. %>
         <% const iosLink = locals.iosApp || null; const iosBuild = locals.iosRelease || null; const iosName = (locals.iosMeta && iosMeta.name) || 'POS Tasotek'; %>
-        <aside class="mt-5 rounded-xl border border-navy-200 bg-white p-4" aria-labelledby="app-dl-title">
-          <p id="app-dl-title" class="text-sm font-semibold text-navy-800">Ứng dụng cho điện thoại và máy tính bảng</p>
-          <% if (locals.appDownload) { %>
-            <div class="mt-3 flex items-center gap-4">
-              <a href="/download" class="hidden shrink-0 sm:block" aria-hidden="true" tabindex="-1">
-                <img src="/download/qr.svg" alt="" width="80" height="80" class="h-20 w-20 rounded border border-navy-100 bg-white p-1">
-              </a>
-              <div class="min-w-0">
-                <p class="text-sm font-semibold text-navy-800">Android · <%= appDownload.app_name %> <span class="font-normal text-gray-400">v<%= appDownload.version_name %></span></p>
-                <p class="mt-0.5 text-xs text-gray-500">Quét mã QR bằng camera điện thoại để tải bản cài đặt (<%= appDownload.sizeLabel %>), hoặc mở liên kết này trên điện thoại.</p>
-                <a href="/download" class="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-navy-700 hover:underline">Tải bản Android
-                  <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+        <aside class="mt-7" aria-labelledby="app-dl-title">
+          <div class="flex items-center gap-3">
+            <p id="app-dl-title" class="text-[11px] font-semibold uppercase tracking-[.1em] text-navy-600 sm:tracking-[.14em]">Ứng dụng cho điện thoại và máy tính bảng</p>
+            <span class="hidden h-px flex-1 bg-navy-200 sm:block" aria-hidden="true"></span>
+          </div>
+          <p class="mt-1 text-xs text-gray-500">Cùng tài khoản này: nhân viên bán ở quầy, chủ quán xem báo cáo.</p>
+          <div class="mt-3 grid gap-3 sm:grid-cols-2">
+            <% if (locals.appDownload) { %>
+              <div class="flex flex-col rounded-xl border border-navy-200 bg-white p-4">
+                <div class="flex items-start gap-3">
+                  <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-navy-800 text-white" aria-hidden="true">
+                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 15a6 6 0 0 1 12 0v1H6z"/><path d="M7.2 8.4 5.6 6.1M16.8 8.4l1.6-2.3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="9.5" cy="12.5" r=".9" fill="#172554"/><circle cx="14.5" cy="12.5" r=".9" fill="#172554"/><rect x="6" y="17" width="12" height="2" rx="1"/></svg>
+                  </span>
+                  <p class="min-w-0 text-sm font-semibold leading-snug text-navy-800">Android · <%= appDownload.app_name %> <span class="font-normal text-gray-400">v<%= appDownload.version_name %></span></p>
+                </div>
+                <p class="mt-2 text-xs leading-relaxed text-gray-500">Quét mã QR bằng camera điện thoại để tải bản cài đặt (<%= appDownload.sizeLabel %>), hoặc mở liên kết này trên điện thoại.</p>
+                <div class="mt-auto flex flex-wrap items-center gap-3 pt-3">
+                  <a href="/download" class="hidden shrink-0 sm:block" aria-hidden="true" tabindex="-1">
+                    <img src="/download/qr.svg" alt="" width="80" height="80" class="h-20 w-20 rounded border border-navy-100 bg-white p-1">
+                  </a>
+                  <a href="/download" class="badge inline-flex min-h-11 min-w-[9rem] flex-1 items-center justify-center gap-x-2 whitespace-nowrap rounded-md bg-navy-800 px-3 py-2 text-center text-sm font-semibold leading-tight text-white hover:bg-navy-900">Tải bản Android
+                    <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+                </div>
               </div>
-            </div>
-          <% } %>
-          <div class="mt-3 flex items-center gap-4<%= locals.appDownload ? ' border-t border-navy-100 pt-3' : '' %>">
-            <a href="/download/ios" class="hidden shrink-0 sm:block" aria-hidden="true" tabindex="-1">
-              <img src="/download/ios/qr.svg" alt="" width="80" height="80" class="h-20 w-20 rounded border border-navy-100 bg-white p-1">
-            </a>
-            <div class="min-w-0">
-              <p class="text-sm font-semibold text-navy-800">iPhone / iPad · <%= iosName %> <span class="font-normal text-gray-400"><%= iosBuild ? `v${iosBuild.version_name} nội bộ` : (iosLink ? iosLink.label : 'sắp có') %></span></p>
-              <p class="mt-0.5 text-xs text-gray-500"><% if (iosBuild) { %>Quét mã QR bằng camera iPhone/iPad (mở bằng Safari) để cài bản nội bộ (<%= iosBuild.sizeLabel %>) trên máy đã đăng ký<%= iosLink ? `, hoặc cài qua ${iosLink.label}` : '' %>.<% } else if (iosLink) { %>Quét mã QR bằng camera iPhone/iPad để mở trang cài đặt qua <%= iosLink.label %>, hoặc mở liên kết này trên máy.<% } else { %>Bản iOS đang phát hành thử nghiệm qua TestFlight; liên kết cài đặt sẽ có ở trang này.<% } %></p>
-              <a href="/download/ios" class="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-navy-700 hover:underline">Tải bản iOS
-                <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+            <% } %>
+            <div class="flex flex-col rounded-xl border border-navy-200 bg-white p-4<%= locals.appDownload ? '' : ' sm:col-span-2' %>">
+              <div class="flex items-start gap-3">
+                <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-navy-800 text-white" aria-hidden="true">
+                  <svg class="h-[18px] w-[18px]" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg>
+                </span>
+                <p class="min-w-0 text-sm font-semibold leading-snug text-navy-800">iPhone / iPad · <%= iosName %> <span class="font-normal text-gray-400"><%= iosBuild ? `v${iosBuild.version_name} nội bộ` : (iosLink ? iosLink.label : 'sắp có') %></span></p>
+              </div>
+              <p class="mt-2 text-xs leading-relaxed text-gray-500"><% if (iosBuild) { %>Quét mã QR bằng camera iPhone/iPad (mở bằng Safari) để cài bản nội bộ (<%= iosBuild.sizeLabel %>) trên máy đã đăng ký<%= iosLink ? `, hoặc cài qua ${iosLink.label}` : '' %>.<% } else if (iosLink) { %>Quét mã QR bằng camera iPhone/iPad để mở trang cài đặt qua <%= iosLink.label %>, hoặc mở liên kết này trên máy.<% } else { %>Bản iOS đang phát hành thử nghiệm qua TestFlight; liên kết cài đặt sẽ có ở trang này.<% } %></p>
+              <div class="mt-auto flex flex-wrap items-center gap-3 pt-3">
+                <a href="/download/ios" class="hidden shrink-0 sm:block" aria-hidden="true" tabindex="-1">
+                  <img src="/download/ios/qr.svg" alt="" width="80" height="80" class="h-20 w-20 rounded border border-navy-100 bg-white p-1">
+                </a>
+                <a href="/download/ios" class="badge inline-flex min-h-11 min-w-[9rem] flex-1 items-center justify-center gap-x-2 whitespace-nowrap rounded-md bg-navy-800 px-3 py-2 text-center text-sm font-semibold leading-tight text-white hover:bg-navy-900">Tải bản iOS
+                  <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+              </div>
             </div>
           </div>
         </aside>
 
-        <aside class="mt-5 rounded-xl border border-navy-200 bg-white p-4" aria-labelledby="intro-title">
-          <p id="intro-title" class="text-sm font-semibold text-navy-800">Tìm hiểu <%= shopName %></p>
-          <p class="mt-0.5 text-xs text-gray-500">POS, thực đơn, kho, công nợ, báo cáo, chatbot Zalo và ứng dụng Android trong một hệ thống.</p>
-          <a href="/gioi-thieu" class="mt-2 inline-flex h-9 items-center gap-1 rounded border border-navy-300 px-3 text-sm font-semibold text-navy-700 hover:bg-navy-100">Xem thêm
+        <aside class="mt-4 flex flex-col gap-3 rounded-xl border border-navy-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4" aria-labelledby="intro-title">
+          <div class="min-w-0">
+            <p id="intro-title" class="text-sm font-semibold text-navy-800">Tìm hiểu <%= shopName %></p>
+            <p class="mt-0.5 text-xs leading-relaxed text-gray-500">POS, thực đơn, kho, công nợ, báo cáo, chatbot Zalo và ứng dụng Android trong một hệ thống.</p>
+          </div>
+          <a href="/gioi-thieu" class="inline-flex h-10 shrink-0 items-center gap-1 self-start rounded border border-navy-300 px-3 text-sm font-semibold text-navy-700 hover:bg-navy-100 sm:self-auto">Xem thêm
             <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
         </aside>
 
-        <p class="mt-6 text-center text-xs text-gray-500 lg:text-left">Quản trị viên vào trang quản lý; thu ngân vào thẳng màn hình bán hàng.</p>
-        <p class="mt-1 text-center text-xs text-gray-400 lg:text-left">© <%= new Date().getFullYear() %> <%= shopName %></p>
-      </div>
-    </section>
-  </main>
+        <p class="mt-8 text-center text-xs text-gray-500">Quản trị viên vào trang quản lý; thu ngân vào thẳng màn hình bán hàng.</p>
+        <p class="mt-1 text-center text-xs text-gray-400">© <%= new Date().getFullYear() %> <%= shopName %></p>
+      </main>
+    </div>
+  </div>
 
   <script nonce="<%= nonce %>">
     (function () {
@@ -148,12 +198,6 @@
         pw.type = show ? 'text' : 'password';
         toggle.setAttribute('aria-pressed', String(show));
         toggle.setAttribute('aria-label', show ? 'Ẩn mật khẩu' : 'Hiện mật khẩu');
-      });
-      var fill = document.getElementById('demo-fill');
-      if (fill) fill.addEventListener('click', function () {
-        document.getElementById('username').value = <%- safeJson(locals.demo ? demo.username : '') %>;
-        pw.value = <%- safeJson(locals.demo ? demo.password : '') %>;
-        document.getElementById('login-submit').focus();
       });
       document.querySelector('form').addEventListener('submit', function (e) {
         var b = document.getElementById('login-submit');
