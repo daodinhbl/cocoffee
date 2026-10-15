@@ -74,6 +74,9 @@ android {
         release {
             // Native debug symbols (.sym) travel in the bundle's metadata, so Play can symbolicate native crashes.
             ndk { debugSymbolLevel = "SYMBOL_TABLE" }
+            if (!hasReleaseKey && gradle.startParameter.taskNames.any { it.contains("release", ignoreCase = true) }) {
+                throw GradleException("android/key.properties is missing: refusing to sign a release build with the debug key")
+            }
             signingConfig = if (hasReleaseKey) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
         }
     }

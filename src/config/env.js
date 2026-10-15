@@ -28,6 +28,10 @@ const int = (key, fallback) => {
 const jwtSecret = () => {
   const explicit = optional('JWT_SECRET');
   if (explicit) return explicit;
+  if (bool('REQUIRE_JWT_SECRET', false)) throw new Error('Missing required environment variable: JWT_SECRET (REQUIRE_JWT_SECRET is on)');
+  if (optional('NODE_ENV', 'development') === 'production') {
+    console.warn('[warn] JWT_SECRET is not set: the signing key is derived from DB_PASSWORD. Set JWT_SECRET (and REQUIRE_JWT_SECRET=1) so a leaked database password cannot forge tokens.');
+  }
   return crypto.createHmac('sha256', required('DB_PASSWORD')).update('cocoffee-fnb:jwt:v1').digest('hex');
 };
 
@@ -35,8 +39,11 @@ module.exports = {
   nodeEnv: optional('NODE_ENV', 'development'),
   rootDir: path.resolve(__dirname, '../..'),
   publicBaseUrl: optional('PUBLIC_BASE_URL').replace(/\/+$/, ''),
-  // Where Web Admin > Sao lưu keeps its .sql.gz files. A redeploy replaces the app folder, so point this outside it if you can.
-  backupDir: path.resolve(optional('BACKUP_DIR', path.resolve(__dirname, '../../backups'))),
+  // Where Web Admin > Sao lưu keeps its .sql.gz files. A redeploy replaces the app folder, so the default is a
+  // sibling folder OUTSIDE it (<app>/../cocoffee-backups); backupService falls back to <app>/backups (with a
+  // warning) when that folder cannot be created. Set BACKUP_DIR to choose another place.
+  backupDir: path.resolve(optional('BACKUP_DIR', path.resolve(__dirname, '../../../cocoffee-backups'))),
+  backupDirFallback: path.resolve(__dirname, '../../backups'),
 
   db: {
     // Hostinger writes DB_HOST=localhost, which Node may resolve to ::1 (no grant there): force IPv4 loopback.

@@ -23,16 +23,17 @@ const n = (x) => Number(x) || 0;
 
 async function recentOrders(limit) {
   const rows = await orderModel.list({ limit });
-  const full = [];
-  for (let i = 0; i < rows.length; i += 20) {                                   // small batches: the pool is tiny
-    const slice = rows.slice(i, i + 20);
-    const parts = await Promise.all(slice.map(async (o) => ({
-      ...o, ...(await orderModel.getById(o.id) || {}),            // the full row: subtotal, discount, table_name, paid_at...
-      items: await orderModel.getItems(o.id), payments: await orderModel.getPayments(o.id),
-    })));
-    full.push(...parts);
-  }
-  return full;
+  const ids = rows.map((o) => o.id);
+  const [full, items, payments] = await Promise.all([
+    orderModel.getFullByIds(ids), orderModel.getItemsByOrderIds(ids), orderModel.getPaymentsByOrderIds(ids),
+  ]);
+  const group = (arr) => { const m = new Map(); for (const x of arr) { if (!m.has(x.order_id)) m.set(x.order_id, []); m.get(x.order_id).push(x); } return m; };
+  const fullById = new Map(full.map((o) => [o.id, o]));
+  const itemsBy = group(items);
+  const paymentsBy = group(payments);
+  return rows.map((o) => ({                       // the full row (subtotal, discount, table_name, paid_at...) over the list row
+    ...o, ...(fullById.get(o.id) || {}), items: itemsBy.get(o.id) || [], payments: paymentsBy.get(o.id) || [],
+  }));
 }
 
 /** { customerId: newest ledger rows } for the customers the shop is most likely to open offline. */

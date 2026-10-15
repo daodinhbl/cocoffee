@@ -141,6 +141,36 @@ async function getPayments(orderId, conn) {
   return rows;
 }
 
+/** Batch forms of getById / getItems / getPayments for many orders at once (3 queries instead of 3 per order). */
+async function getFullByIds(ids, conn) {
+  if (!ids.length) return [];
+  const [rows] = await db(conn).query(
+    `SELECT o.*, t.code AS table_code, t.name AS table_name, c.name AS customer_name
+       FROM orders o LEFT JOIN dining_tables t ON t.id = o.table_id
+                     LEFT JOIN customers c ON c.id = o.customer_id
+      WHERE o.id IN (?)`,
+    [ids]
+  );
+  return rows;
+}
+
+async function getItemsByOrderIds(ids, conn) {
+  if (!ids.length) return [];
+  const [rows] = await db(conn).query('SELECT * FROM order_items WHERE order_id IN (?) ORDER BY id', [ids]);
+  return rows;
+}
+
+async function getPaymentsByOrderIds(ids, conn) {
+  if (!ids.length) return [];
+  const [rows] = await db(conn).query(
+    `SELECT p.id, p.order_id, p.method, p.amount, p.reference, p.paid_at, u.full_name AS received_by_name
+       FROM payments p LEFT JOIN users u ON u.id = p.received_by
+      WHERE p.order_id IN (?) ORDER BY p.id`,
+    [ids]
+  );
+  return rows;
+}
+
 async function list({ limit = 50, offset = 0, ...filter } = {}, conn) {
   const { where, params } = buildFilter(filter);
   const [rows] = await db(conn).query(
@@ -196,5 +226,5 @@ async function summary(from, to, conn) {
 
 module.exports = {
   insert, getById, getItems, replaceItems, recalcTotals, setDiscount, setItemCogs, markCompleted, markPaid,
-  markCancelled, insertPayment, markReceipt, list, count, getPayments, summary, breakdown,
+  markCancelled, insertPayment, markReceipt, getFullByIds, getItemsByOrderIds, getPaymentsByOrderIds, list, count, getPayments, summary, breakdown,
 };

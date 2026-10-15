@@ -75,7 +75,17 @@ const tzMinutes = () => {
 const stamp = () => new Date(Date.now() + tzMinutes() * 60000).toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
 const newName = (kind) => `cocoffee-${kind}-${stamp()}-${crypto.randomBytes(2).toString('hex')}.sql.gz`;
 
-async function ensureDir() { await fsp.mkdir(env.backupDir, { recursive: true }); }
+async function ensureDir() {
+  try {
+    await fsp.mkdir(env.backupDir, { recursive: true });
+    await fsp.access(env.backupDir, fs.constants.W_OK);
+  } catch (err) {
+    if (env.backupDir === env.backupDirFallback) throw err;
+    logger.warn(`Backup folder ${env.backupDir} is not usable (${err.code || err.message}): using ${env.backupDirFallback}, which a redeploy may erase. Set BACKUP_DIR to a writable folder outside the app.`);
+    env.backupDir = env.backupDirFallback;
+    await fsp.mkdir(env.backupDir, { recursive: true });
+  }
+}
 
 /** A stored file by name. Only names we generate are accepted, so a request can never leave the backup folder. */
 function pathOf(name) {

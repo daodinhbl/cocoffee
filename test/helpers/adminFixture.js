@@ -82,6 +82,9 @@ async function start() {
   mock.method(orderModel, 'getItems', async () => ORDER.items);
   mock.method(orderModel, 'getPayments', async () => [{ id: 1, method: 'cash', amount: 79000, reference: null, paid_at: NOW, received_by_name: 'Thu Ngân' }]);
   mock.method(orderModel, 'getById', async () => ORDER);
+  mock.method(orderModel, 'getFullByIds', async (ids) => ids.map(() => ORDER));
+  mock.method(orderModel, 'getItemsByOrderIds', async (ids) => ids.flatMap((id) => ORDER.items.map((i) => ({ ...i, order_id: id }))));
+  mock.method(orderModel, 'getPaymentsByOrderIds', async (ids) => ids.map((id) => ({ id: 1, order_id: id, method: 'cash', amount: 79000, reference: null, paid_at: NOW, received_by_name: 'Thu Ngân' })));
   mock.method(orderService, 'getWithItems', async (id) => { if (id === 404) { const { AppError } = require('../../src/utils/httpError'); throw new AppError(404, 'NOT_FOUND', 'Order not found'); } return ORDER; });
   mock.method(orderService, 'cancelOrder', rec('order.cancel', ORDER));
   mock.method(orderService, 'createPosOrder', rec('order.createPos', { ...ORDER, id: 77, order_code: 'CF-NEW', status: 'open' }));
