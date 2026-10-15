@@ -279,6 +279,7 @@ class _AdjustSheetState extends ConsumerState<AdjustSheet> {
         path: '/inventory/${widget.item.id}/adjust',
         body: {
           'new_quantity': newQuantity,
+          'expected_quantity': widget.item.quantity, // the stock the count was based on: the server applies the difference
           'type': _type,
           if (note.isNotEmpty) 'note': note,
         },

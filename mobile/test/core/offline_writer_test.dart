@@ -188,7 +188,7 @@ void main() {
 
   test('cancelling an order locally frees its table', () async {
     final o = await db.cancelOrderLocally(7);
-    expect(o!['status'], 'cancelled');
+    expect(o['status'], 'cancelled');
     final t = ((await OfflineResolverFor(db).tables())['tables'] as List).single as Map;
     expect(t['status'], 'available');
     expect(t['current_order_id'], isNull);

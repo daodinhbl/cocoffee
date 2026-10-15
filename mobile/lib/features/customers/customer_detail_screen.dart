@@ -455,7 +455,8 @@ class _CollectSheetState extends ConsumerState<_CollectSheet> {
         local: {'customer': c.name, 'total': amount},
         effect: (db) async {
           await db.addLedgerEntry(c.id, type: 'payment', amount: -amount, method: _method, note: note.isEmpty ? null : note);
-          return {'amount': amount, 'balance': await db.addCustomerBalance(c.id, -amount), 'settled': <String>[]};
+          final balance = await db.addCustomerBalance(c.id, -amount);
+          return {'amount': amount, 'balance': balance, 'settled': await db.settleOrdersLocally(c.id, method: _method)};
         },
       );
       if (mounted) Navigator.of(context).pop(out.body);

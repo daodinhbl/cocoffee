@@ -114,6 +114,22 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                 child: Text('Đơn từ máy POS và chatbot Zalo. Bấm vào mã đơn để xem món, thu tiền, in hóa đơn hoặc hủy.',
                     style: context.tt.bodyMedium?.copyWith(color: context.co.muted, fontSize: 14)),
               ),
+              if (data?.offlineNote != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: Material(
+                    color: context.co.warnTint,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      child: Row(children: [
+                        Icon(Icons.wifi_off_rounded, size: 18, color: context.co.warn),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(data!.offlineNote!, style: context.tt.bodySmall?.copyWith(color: context.co.warn))),
+                      ]),
+                    ),
+                  ),
+                ),
               if (counts != null) ...[
                 const SizedBox(height: 16),
                 _SummaryCards(

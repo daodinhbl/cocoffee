@@ -138,7 +138,10 @@ void main() {
     await tester.pumpAndSettle();
 
     final body = verify(() => api.post('/inventory/2/adjust', captureAny(), any())).captured.single as Map;
-    expect(body, {'new_quantity': 3, 'type': 'waste', 'note': 'Móp 1 lon'});
+    expect(body['new_quantity'], 3);
+    expect(body['type'], 'waste');
+    expect(body['note'], 'Móp 1 lon');
+    expect(body['expected_quantity'], isA<num>(), reason: 'the stock the count was based on');
     expect(find.text('Đã điều chỉnh tồn kho (−1).'), findsOneWidget);
     expect(find.text('Kiểm kê — Sữa đặc Ông Thọ'), findsNothing);
   });

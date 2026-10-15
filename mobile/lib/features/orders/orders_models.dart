@@ -134,7 +134,7 @@ class OrderCounts {
 
 /// GET /api/orders -> { orders, total, page, pages, page_size, counts }
 class OrdersPage {
-  const OrdersPage({required this.orders, required this.total, required this.page, required this.pages, required this.pageSize, this.counts});
+  const OrdersPage({required this.orders, required this.total, required this.page, required this.pages, required this.pageSize, this.counts, this.offlineNote});
 
   factory OrdersPage.fromJson(Map<String, dynamic> j) {
     final orders = [for (final o in _list(j['orders'])) OrderRow.fromJson(o)];
@@ -149,6 +149,7 @@ class OrdersPage {
       pages: pages < 1 ? 1 : pages,
       pageSize: pageSize,
       counts: counts is Map ? OrderCounts.fromJson(Map<String, dynamic>.from(counts)) : null,
+      offlineNote: j['offline_note'] is String ? j['offline_note'] as String : null,
     );
   }
 
@@ -160,6 +161,9 @@ class OrdersPage {
 
   /// Null when the server does not send the breakdown (summary cards and tab counts are then hidden).
   final OrderCounts? counts;
+
+  /// Set when the answer came from the offline copy, which holds only the most recent orders.
+  final String? offlineNote;
 
   int get firstIndex => total == 0 ? 0 : (page - 1) * pageSize + 1;
   int get lastIndex => total == 0 ? 0 : (firstIndex + orders.length - 1);

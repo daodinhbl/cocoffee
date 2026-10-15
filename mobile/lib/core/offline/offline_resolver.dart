@@ -20,6 +20,7 @@ class OfflineResolver {
 
   static final _orderId = RegExp(r'^/orders/(\d+)$');
   static final _customerId = RegExp(r'^/admin/customers/(-?\d+)$');
+  static final _inventoryId = RegExp(r'^/inventory/(\d+)$');
 
   /// [detail] true also answers single-record pages from whatever the copy holds (used after the response cache
   /// missed, because the copy has no ledger or movements).
@@ -56,6 +57,8 @@ class OfflineResolver {
       if (order != null) return await _order(database, int.parse(order.group(1)!), q);
       final customer = _customerId.firstMatch(path);
       if (customer != null && detail) return await _customer(database, int.parse(customer.group(1)!));
+      final item = _inventoryId.firstMatch(path);
+      if (item != null && detail) return await _inventoryItem(database, int.parse(item.group(1)!));
     } catch (_) {
       return null; // a damaged row must never break the screen: fall back to the cache
     }
@@ -86,13 +89,13 @@ class OfflineResolver {
     final list = [for (final r in rows) _json(r['data'])];
     list.sort((a, b) {
       final c = (cats[a['category_id']] ?? 0).compareTo(cats[b['category_id']] ?? 0);
-      return c != 0 ? c : '${a['name']}'.compareTo('${b['name']}');
+      return c != 0 ? c : foldVi('${a['name']}').compareTo(foldVi('${b['name']}')); // like the server's collation
     });
     return list;
   }
 
   Future<List<Map<String, dynamic>>> _tables(Database d, {bool all = false}) async {
-    final rows = await d.query('tables', where: all ? null : 'is_active = 1', orderBy: 'code');
+    final rows = await d.query('tables', where: all ? null : 'is_active = 1', orderBy: all ? 'is_active DESC, code' : 'code');
     return [for (final r in rows) _json(r['data'])];
   }
 
@@ -136,6 +139,13 @@ class OfflineResolver {
     final out = <String, dynamic>{'items': [for (final r in rows) _json(r['data'])]};
     if (all) out['stock_value'] = num.tryParse(await db.meta('inventory_stock_value') ?? '') ?? 0;
     return out;
+  }
+
+  /// GET /inventory/:id: the item row; usage, recipes using it and movements are only known online.
+  Future<Map<String, dynamic>?> _inventoryItem(Database d, int id) async {
+    final rows = await d.query('inventory', where: 'id = ?', whereArgs: [id], limit: 1);
+    if (rows.isEmpty) return null;
+    return {'item': _json(rows.first['data']), 'usage': null, 'used_in': const [], 'movements': const []};
   }
 
   // --------------------------------------------------------------------------------------------- customers
@@ -277,6 +287,7 @@ class OfflineResolver {
       if (st == 'open') counts['openAmount'] = counts['openAmount']! + amount;
     }
 
+    final inCopy = Sqflite.firstIntValue(await d.rawQuery('SELECT COUNT(*) FROM orders')) ?? 0;
     return {
       'orders': [for (final r in rows) _orderRow(_json(r['data']))],
       'total': total,
@@ -284,6 +295,7 @@ class OfflineResolver {
       'pages': pages,
       'page_size': pageSize,
       'counts': counts,
+      'offline_note': 'Ngoại tuyến: danh sách, tổng số, số trang và các con số tổng chỉ tính trên $inCopy đơn gần nhất có trên máy.',
     };
   }
 
