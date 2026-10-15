@@ -3,6 +3,7 @@ const { requireAuth, requireRole } = require('../middlewares/auth');
 const rateLimit = require('../middlewares/rateLimit');
 const idempotency = require('../middlewares/idempotency');
 const zaloWebhookRoutes = require('../webhooks/zalo/zaloWebhookRoutes');
+const payonRoutes = require('../webhooks/payon/payonRoutes');
 const apiAdminRoutes = require('./apiAdminRoutes');
 
 const auth = require('../controllers/authController');
@@ -17,6 +18,7 @@ const router = express.Router();
 const admin = requireRole('admin');
 
 // ---- public ---------------------------------------------------------------
+router.use('/payon', payonRoutes);                                          // POST /api/payon/ipn (PayOn notification, checksum-verified, no JWT)
 router.use('/zalo', zaloWebhookRoutes);                                   // POST /api/zalo/webhook (signature-verified, no JWT)
 router.post('/auth/login', rateLimit({ windowMs: 15 * 60 * 1000, max: 20 }), auth.login);
 

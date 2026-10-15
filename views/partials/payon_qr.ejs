@@ -1,0 +1,52 @@
+<%
+  // QR payment through PayOn on the order page. `panel` = controllers/admin/payon.js orderPanel().
+  const p = panel.payment;
+  const open = p && p.open;
+%>
+<% if (panel.ready) { %>
+<section class="overflow-hidden rounded-xl border border-sky-200 bg-sky-50 shadow-[0_1px_2px_rgba(15,23,42,.04)]" aria-labelledby="payon-title">
+  <h2 id="payon-title" class="border-b border-sky-200 px-5 py-3.5 text-sm font-semibold uppercase tracking-wide text-sky-800">
+    <%- icon('receipt', 'h-4 w-4 inline-block mr-1.5 -mt-0.5') %>Thanh toán QR (PayOn)
+  </h2>
+  <div class="px-5 py-4 text-sm">
+    <% if (open) { %>
+      <div class="flex flex-col items-center gap-3 sm:flex-row sm:items-start"
+           data-payon-poll="/admin/payon/<%= p.id %>/status">
+        <div class="h-[240px] w-[240px] shrink-0 rounded bg-white p-1">
+          <% if (panel.qrSrc) { %>
+            <img src="<%= panel.qrSrc %>" alt="Mã QR thanh toán <%= money(p.amount) %>" class="h-full w-full object-contain">
+          <% } else { %>
+            <%- panel.qrSvg %>
+          <% } %>
+        </div>
+        <div class="space-y-1 text-sky-900">
+          <p class="text-lg font-semibold"><%= money(p.amount) %></p>
+          <p>Khách mở app ngân hàng và quét mã. Đơn tự được thu khi tiền về.</p>
+          <p class="text-xs text-sky-700">Hết hạn lúc <%= new Date(p.expiresAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' }) %> · <span data-payon-state>đang chờ khách thanh toán…</span></p>
+          <form method="post" action="/admin/payon/<%= p.id %>/refresh" class="pt-2">
+            <%- include('csrf') %>
+            <input type="hidden" name="_back" value="/admin/orders/<%= order.id %>">
+            <button type="submit" class="<%= ui.btnSecondary %>">Kiểm tra thanh toán</button>
+          </form>
+        </div>
+      </div>
+    <% } else { %>
+      <% if (p && p.status === 'manual') { %>
+        <p class="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-red-800">Đã nhận tiền nhưng chưa ghi nhận được vào đơn: <%= p.note || 'cần xử lý tay.' %></p>
+      <% } else if (p && p.status === 'expired') { %>
+        <p class="mb-3 text-sky-800">QR trước đã hết hạn.</p>
+      <% } else if (p && p.status === 'failed') { %>
+        <p class="mb-3 text-sky-800">QR trước không thành công<%= p.note ? `: ${p.note}` : '.' %></p>
+      <% } %>
+      <p class="mb-3 text-sky-900">Tạo mã QR theo đúng số tiền của đơn (<%= money(order.total) %>); khách chuyển khoản xong, đơn tự chuyển sang "Đã thu".</p>
+      <form method="post" action="/admin/orders/<%= order.id %>/payon-qr">
+        <%- include('csrf') %>
+        <input type="hidden" name="_back" value="/admin/orders/<%= order.id %>">
+        <button type="submit" class="<%= ui.btnPrimary %>">Tạo mã QR PayOn</button>
+      </form>
+    <% } %>
+  </div>
+</section>
+<% } else if (panel.configured) { %>
+<p class="text-xs text-gray-500">Thanh toán QR PayOn đã cấu hình nhưng chưa bật hoặc chưa chọn ngân hàng: xem <a class="underline" href="/admin/settings">Cài đặt</a>.</p>
+<% } %>

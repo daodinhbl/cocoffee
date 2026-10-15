@@ -113,6 +113,80 @@
     </form>
   </section>
 
+  <% const px = payonPanel.config; %>
+  <section class="col-span-12 rounded border border-gray-200 bg-white p-5" aria-labelledby="payon-cfg-title">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h2 id="payon-cfg-title" class="text-base font-semibold">Thanh toán QR (PayOn / NextPay)</h2>
+        <p class="mt-1 text-xs text-gray-500">Mỗi đơn có một mã QR ngân hàng theo đúng số tiền; khách chuyển khoản xong, PayOn báo về máy chủ và đơn tự chuyển sang "Đã thu" (kèm tin Zalo cho khách và chủ quán). Khóa lấy trong cổng PayOn → Tích hợp thanh toán → Thông tin kết nối. Để trống ô mật khẩu/khóa để giữ giá trị đã lưu.</p>
+      </div>
+      <span><%- px.ready ? badge('Đang bật', 'good') : (px.complete ? badge('Chưa bật', 'warn') : badge('Chưa cấu hình', 'neutral')) %></span>
+    </div>
+    <dl class="mt-3 grid gap-x-6 gap-y-1 text-xs text-gray-600 sm:grid-cols-2">
+      <div class="flex justify-between gap-3"><dt>Địa chỉ nhận thông báo (url_notify)</dt><dd class="break-all text-right font-mono"><%= payonPanel.ipnUrl || '(chưa đặt PUBLIC_BASE_URL)' %></dd></div>
+      <div class="flex justify-between gap-3"><dt>Máy chủ PayOn</dt><dd class="break-all text-right font-mono"><%= px.baseUrl %></dd></div>
+    </dl>
+    <form method="post" action="/admin/settings/payon" class="mt-4 grid grid-cols-12 gap-4" autocomplete="off">
+      <%- include('../partials/csrf') %>
+      <input type="hidden" name="_back" value="/admin/settings">
+      <div class="col-span-12 sm:col-span-4">
+        <label for="px-env" class="<%= label %>">Môi trường</label>
+        <select id="px-env" name="env" class="<%= input %>" <%= px.fromEnv.env ? 'disabled' : '' %>>
+          <option value="sandbox" <%= px.env === 'sandbox' ? 'selected' : '' %>>Thử nghiệm (sandbox)</option>
+          <option value="production" <%= px.env === 'production' ? 'selected' : '' %>>Thật (production)</option>
+        </select>
+      </div>
+      <div class="col-span-12 sm:col-span-4">
+        <label for="px-app" class="<%= label %>">APP_ID</label>
+        <input id="px-app" name="appId" maxlength="60" value="<%= px.appId %>" class="<%= input %> font-mono" <%= px.fromEnv.appId ? 'readonly' : '' %>>
+      </div>
+      <div class="col-span-12 sm:col-span-4">
+        <label for="px-mc" class="<%= label %>">Mã merchant (MC_ID, số)</label>
+        <input id="px-mc" name="merchantId" maxlength="20" inputmode="numeric" value="<%= px.merchantId %>" class="<%= input %> font-mono" <%= px.fromEnv.merchantId ? 'readonly' : '' %>>
+      </div>
+      <div class="col-span-12 sm:col-span-4">
+        <label for="px-user" class="<%= label %>">MC_AUTH_USER</label>
+        <input id="px-user" name="authUser" maxlength="100" value="<%= px.authUser %>" class="<%= input %> font-mono" <%= px.fromEnv.authUser ? 'readonly' : '' %>>
+      </div>
+      <div class="col-span-12 sm:col-span-4">
+        <label for="px-pass" class="<%= label %>">MC_AUTH_PASS <span class="font-normal text-gray-500"><%= px.authPassSet ? `(đã lưu ${px.authPassHint})` : '(chưa có)' %></span></label>
+        <input id="px-pass" name="authPass" type="password" maxlength="200" class="<%= input %>" placeholder="<%= px.authPassSet ? 'Để trống = giữ nguyên' : '' %>" autocomplete="new-password" <%= px.fromEnv.authPass ? 'readonly' : '' %>>
+      </div>
+      <div class="col-span-12 sm:col-span-4">
+        <label for="px-key" class="<%= label %>">MC_SECRET_KEY <span class="font-normal text-gray-500"><%= px.secretKeySet ? `(đã lưu ${px.secretKeyHint})` : '(chưa có)' %></span></label>
+        <input id="px-key" name="secretKey" type="password" maxlength="200" class="<%= input %>" placeholder="<%= px.secretKeySet ? 'Để trống = giữ nguyên' : '' %>" autocomplete="new-password" <%= px.fromEnv.secretKey ? 'readonly' : '' %>>
+      </div>
+      <div class="col-span-12 sm:col-span-6">
+        <label for="px-bank" class="<%= label %>">Ngân hàng nhận tiền bằng QR</label>
+        <select id="px-bank" name="bankCode" class="<%= input %>">
+          <option value="">— bấm "Kiểm tra kết nối" để tải danh sách —</option>
+          <% payonPanel.banks.forEach((b) => { %><option value="<%= b.code %>" <%= px.bankCode === b.code ? 'selected' : '' %>><%= b.name %></option><% }) %>
+          <% if (px.bankCode && !payonPanel.banks.some((b) => b.code === px.bankCode)) { %><option value="<%= px.bankCode %>" selected><%= px.bankName || px.bankCode %></option><% } %>
+        </select>
+      </div>
+      <div class="col-span-12 sm:col-span-3">
+        <label for="px-exp" class="<%= label %>">QR hết hạn sau (phút)</label>
+        <input id="px-exp" name="expireMinutes" type="number" min="3" max="60" step="1" value="<%= px.expireMinutes %>" class="<%= input %> text-right font-mono">
+      </div>
+      <div class="col-span-12 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+        <label class="flex min-h-10 items-center gap-2">
+          <input type="hidden" name="enabled" value="0">
+          <input type="checkbox" name="enabled" value="1" <%= px.enabled ? 'checked' : '' %> class="h-4 w-4 rounded border-gray-300 accent-blue-700">
+          Bật thanh toán QR PayOn trên trang đơn hàng
+        </label>
+      </div>
+      <div class="col-span-12 flex flex-wrap gap-2">
+        <button type="submit" class="<%= btnPrimary %> w-full sm:w-auto">Lưu cấu hình PayOn</button>
+      </div>
+    </form>
+    <div class="mt-3 flex flex-wrap gap-2 border-t border-gray-200 pt-3">
+      <form method="post" action="/admin/settings/payon/test"><%- include('../partials/csrf') %><input type="hidden" name="_back" value="/admin/settings">
+        <button type="submit" class="<%= btnSecondary %>" <%= px.complete ? '' : 'disabled' %>>Kiểm tra kết nối &amp; tải danh sách ngân hàng</button></form>
+      <form method="post" action="/admin/settings/payon/ip"><%- include('../partials/csrf') %><input type="hidden" name="_back" value="/admin/settings">
+        <button type="submit" class="<%= btnSecondary %>">Xem IP máy chủ (để NextPay khai báo)</button></form>
+    </div>
+  </section>
+
   <section class="col-span-12 rounded border border-gray-200 max-lg:border-0" aria-labelledby="users-title">
     <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200 px-5 py-4 max-lg:border-b-0 max-lg:px-0">
       <h2 id="users-title" class="text-base font-semibold">Tài khoản nhân viên (<%= users.length %>)</h2>

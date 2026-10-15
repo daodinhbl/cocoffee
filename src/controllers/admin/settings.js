@@ -5,6 +5,7 @@ const { render, formBool } = require('./common');
 const printerSettings = require('../../services/printerSettings');
 const userService = require('../../services/userService');
 const { systemConfig } = require('../../services/settingsService');
+const payon = require('./payon');
 
 async function page(req, res) {
   const forced = Boolean(req.session.mustChangePassword);
@@ -15,6 +16,7 @@ async function page(req, res) {
     forced,
     users: forced ? [] : await userModel.list(),
     printer: forced ? null : await printerSettings.get(),
+    payonPanel: forced ? null : await payon.settingsPanel(),
     config: { ...systemConfig(), publicBaseUrl: env.publicBaseUrl || '(chưa đặt)' },
   });
 }

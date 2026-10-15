@@ -88,6 +88,16 @@ module.exports = {
     oauthUrl: 'https://oauth.zaloapp.com/v4/oa/access_token',
   },
 
+  // PayOn (NextPay) QR payments: every value can also be entered in Web Admin > Cài đặt; the environment wins.
+  payon: {
+    env: optional('PAYON_ENV'),                    // 'sandbox' | 'production'
+    appId: optional('PAYON_APP_ID'),
+    merchantId: optional('PAYON_MERCHANT_ID'),
+    authUser: optional('PAYON_AUTH_USER'),
+    authPass: optional('PAYON_AUTH_PASS'),
+    secretKey: optional('PAYON_SECRET_KEY'),
+  },
+
   business: {
     allowNegativeStock: bool('ALLOW_NEGATIVE_STOCK', false),
     shopName: optional('SHOP_NAME', 'CoCoffee'),

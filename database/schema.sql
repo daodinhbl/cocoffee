@@ -6,7 +6,7 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
-DROP TABLE IF EXISTS idempotency_keys, media_files, customer_ledger, customers, app_settings, zalo_tokens, zalo_events, zalo_sessions, payments, inventory_movements,
+DROP TABLE IF EXISTS payon_payments, idempotency_keys, media_files, customer_ledger, customers, app_settings, zalo_tokens, zalo_events, zalo_sessions, payments, inventory_movements,
                      order_items, orders, dining_tables, recipes, product_aliases, products,
                      inventory_items, categories, users;
 
@@ -350,4 +350,33 @@ CREATE TABLE idempotency_keys (
   created_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
   KEY idx_idempotency_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- QR payments through PayOn (NextPay): one row per QR shown to a customer; the notification (IPN) or a status check
+-- settles the order. Also created at startup on older databases (ensureSchemaUpgrades).
+CREATE TABLE payon_payments (
+  id                   INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  merchant_request_id  VARCHAR(64)  NOT NULL,                 -- our unique id sent to PayOn (order code + random suffix)
+  kind                 ENUM('order','debt') NOT NULL DEFAULT 'order',
+  order_id             INT UNSIGNED NULL,
+  customer_id          INT UNSIGNED NULL,
+  amount               DECIMAL(14,2) NOT NULL,                -- what the QR asks for
+  status               ENUM('pending','applying','paid','manual','failed','expired') NOT NULL DEFAULT 'pending',
+  payon_status         TINYINT      NULL,                     -- PayOn's own status (2 = success)
+  payment_id           VARCHAR(40)  NULL,
+  transaction_id       VARCHAR(64)  NULL,
+  received             DECIMAL(14,2) NULL,
+  fee                  DECIMAL(14,2) NULL,
+  qr_pay               TEXT         NULL,                     -- QR content
+  qr_image             MEDIUMTEXT   NULL,                     -- base64 picture, if PayOn sends one
+  expires_at           DATETIME     NOT NULL,
+  paid_at              DATETIME     NULL,
+  note                 VARCHAR(255) NULL,                     -- why a payment needs a person (status manual)
+  created_by           INT UNSIGNED NULL,
+  created_at           TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at           TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_payon_request (merchant_request_id),
+  KEY idx_payon_order (order_id),
+  KEY idx_payon_status (status, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

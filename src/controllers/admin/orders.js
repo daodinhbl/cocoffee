@@ -10,6 +10,7 @@ const { AppError } = require('../../utils/httpError');
 const v = require('../../utils/validate');
 const { parseDay, dayBounds, shopDay } = require('../../utils/shopTime');
 const { render, optional } = require('./common');
+const payon = require('./payon');
 
 const { PAGE_SIZE, STATUSES } = orderQuery;
 const METHODS = ['cash', 'transfer', 'card', 'other'];
@@ -70,10 +71,11 @@ async function detail(req, res) {
   const payments = await orderModel.getPayments(id);
   const canRecordDebt = req.user.role === 'admin' && order.source === 'zalo' && order.status === 'completed' && order.payment_status === 'unpaid' && !order.customer_id;
   const debtCustomers = canRecordDebt ? await customerModel.list({ limit: 500 }).catch(() => []) : [];
+  const payonPanel = await payon.orderPanel(id).catch(() => ({ ready: false, configured: false, payment: null }));
   await render(res, 'order_detail', {
     title: order.order_code || `Đơn #${id}`, activeMenu: 'orders',
     breadcrumbs: [{ label: 'Đơn hàng', href: '/admin/orders' }, { label: order.order_code || `#${id}` }],
-  }, { order, payments, canRecordDebt, debtCustomers });
+  }, { order, payments, canRecordDebt, debtCustomers, payonPanel });
 }
 
 async function cancel(req) {

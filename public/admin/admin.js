@@ -485,6 +485,30 @@
     $('form').forEach(function (f) { f._submitting = false; $('button[aria-busy="true"]', f).forEach(function (b) { b.disabled = false; b.removeAttribute('aria-busy'); }); });
   });
 
+  /* ------------------------------------------------------- PayOn QR polling */
+  // <div data-payon-poll="/admin/payon/:id/status">: every 5 s ask the server (which asks PayOn); the page reloads once the
+  // payment is no longer pending, so the cashier sees "Đã thu" the moment the customer has paid. Stops after 20 minutes.
+  (function () {
+    var box = $('[data-payon-poll]');
+    if (!box || !window.fetch) return;
+    var url = box.getAttribute('data-payon-poll');
+    var state = $('[data-payon-state]', box);
+    var until = Date.now() + 20 * 60 * 1000;
+    var busy = false;
+    var timer = window.setInterval(function () {
+      if (busy || document.hidden) return;
+      if (Date.now() > until) { window.clearInterval(timer); return; }
+      busy = true;
+      window.fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) {
+          if (j && j.status !== 'pending') { if (state) state.textContent = 'đã nhận thanh toán…'; window.location.reload(); }
+        })
+        .catch(function () { /* offline for a moment: try again at the next tick */ })
+        .then(function () { busy = false; });
+    }, 5000);
+  })();
+
   /* --------------------------------------------------------------- keyboard */
   document.addEventListener('keydown', function (e) {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {

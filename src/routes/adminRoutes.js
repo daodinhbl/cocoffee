@@ -19,6 +19,7 @@ const zalo = require('../controllers/admin/zalo');
 const settings = require('../controllers/admin/settings');
 const pos = require('../controllers/admin/pos');
 const customers = require('../controllers/admin/customers');
+const payon = require('../controllers/admin/payon');
 const backup = require('../controllers/admin/backup');
 const backupService = require('../services/backupService');
 
@@ -60,6 +61,9 @@ router.get('/orders/:id', orders.detail);
 router.post('/orders/:id/cancel', act(orders.cancel));
 router.post('/orders/:id/pay', act(orders.pay));
 router.post('/orders/:id/record-debt', act(orders.recordDebt));
+router.post('/orders/:id/payon-qr', act(payon.createOrderQr));
+router.post('/payon/:id/refresh', act(payon.refresh));
+router.get('/payon/:id/status', payon.status);
 router.post('/orders/:id/resend-receipt', act(orders.resendReceipt));
 
 router.get('/customers', customers.list);
@@ -108,6 +112,9 @@ router.get('/settings', settings.page);
 router.get('/settings/password', settings.page);
 router.post('/settings/password', act(auth.changeOwnPassword));
 router.post('/settings/printer', act(settings.savePrinter));
+router.post('/settings/payon', act(payon.saveSettings));
+router.post('/settings/payon/test', act(payon.testConnection));
+router.post('/settings/payon/ip', act(payon.showServerIp));
 router.post('/settings/users', act(settings.createUser));
 router.post('/settings/users/:id/password', act(settings.resetPassword));
 router.post('/settings/users/:id/active', act(settings.setActive));

@@ -155,6 +155,33 @@ UPGRADES.push(
      CONSTRAINT fk_ledger_customer FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE CASCADE,
      CONSTRAINT fk_ledger_order    FOREIGN KEY (order_id)    REFERENCES orders (id)    ON DELETE SET NULL
    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  // QR payments through PayOn (services/payon): one row per QR; created here so existing databases get it.
+  `CREATE TABLE IF NOT EXISTS payon_payments (
+     id                   INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  merchant_request_id  VARCHAR(64)  NOT NULL,                 -- our unique id sent to PayOn (order code + random suffix)
+  kind                 ENUM('order','debt') NOT NULL DEFAULT 'order',
+  order_id             INT UNSIGNED NULL,
+  customer_id          INT UNSIGNED NULL,
+  amount               DECIMAL(14,2) NOT NULL,                -- what the QR asks for
+  status               ENUM('pending','applying','paid','manual','failed','expired') NOT NULL DEFAULT 'pending',
+  payon_status         TINYINT      NULL,                     -- PayOn's own status (2 = success)
+  payment_id           VARCHAR(40)  NULL,
+  transaction_id       VARCHAR(64)  NULL,
+  received             DECIMAL(14,2) NULL,
+  fee                  DECIMAL(14,2) NULL,
+  qr_pay               TEXT         NULL,                     -- QR content
+  qr_image             MEDIUMTEXT   NULL,                     -- base64 picture, if PayOn sends one
+  expires_at           DATETIME     NOT NULL,
+  paid_at              DATETIME     NULL,
+  note                 VARCHAR(255) NULL,                     -- why a payment needs a person (status manual)
+  created_by           INT UNSIGNED NULL,
+  created_at           TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at           TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_payon_request (merchant_request_id),
+  KEY idx_payon_order (order_id),
+  KEY idx_payon_status (status, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   // Answers of the app's idempotent writes (middlewares/idempotency.js): survive a redeploy, shared by every worker.
   `CREATE TABLE IF NOT EXISTS idempotency_keys (
      id            CHAR(64)      NOT NULL,
