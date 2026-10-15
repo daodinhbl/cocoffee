@@ -75,7 +75,7 @@ one-tap download of `/download/cocoffee.apk` (stable URL, `Content-Disposition` 
 Release a new build (Windows, see `mobile/CONVENTIONS.md` for the Flutter toolchain):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scriptsuild-apk.ps1   # flutter build apk --release --flavor direct, then scripts/publish-apk.js
+powershell -ExecutionPolicy Bypass -File scripts\build-apk.ps1   # flutter build apk --release --flavor direct, then scripts/publish-apk.js
 node scripts/package-deploy.js                                   # dist/app.zip with the APK inside; upload + build on Hostinger
 ```
 
