@@ -12,7 +12,9 @@
     <h1 class="text-2xl font-semibold tracking-tight text-navy-darker">Nguyên liệu</h1>
     <p class="mt-1 max-w-2xl text-sm text-milk-500">Tồn kho nguyên liệu và hàng bán lẻ. Kho tự trừ khi đơn hoàn tất; nhập hàng ở <a href="/admin/receiving" class="font-medium text-blue-700 underline hover:text-navy">Nhập kho</a> để giá vốn bình quân được cập nhật.</p>
   </div>
-  <div class="flex gap-2">
+  <div class="flex flex-wrap gap-2">
+    <a href="/admin/inventory/export.xlsx" class="<%= btnSecondary %>" title="Tải toàn bộ danh sách ra file Excel"><%- icon('upload', 'h-4 w-4 rotate-180') %> Xuất Excel</a>
+    <button type="button" data-modal-open="#xlsx-dialog" class="<%= btnSecondary %>" title="Nhập nguyên liệu từ file Excel"><%- icon('upload', 'h-4 w-4') %> Nhập Excel</button>
     <a href="/admin/receiving" class="<%= btnSecondary %>"><%- icon('upload', 'h-4 w-4') %> Nhập kho</a>
     <button type="button" data-modal-open="#item-dialog" data-action="/admin/inventory" data-title="Thêm nguyên liệu" class="<%= btnPrimary %>"><%- icon('plus', 'h-4 w-4') %> Thêm nguyên liệu</button>
   </div>
@@ -65,18 +67,18 @@
   </div>
 </div>
 
-<div class="<%= card %> mt-3 overflow-hidden max-lg:border-0 max-lg:bg-transparent max-lg:shadow-none">
-  <table class="rtable w-full border-collapse text-left text-sm lg:min-w-[900px]" data-filterable>
+<div class="<%= card %> mt-3 overflow-hidden">
+  <table class="w-full table-auto border-collapse text-left text-sm" data-filterable>
     <caption class="sr-only">Tồn kho</caption>
     <thead class="<%= ui.thead %>">
       <tr>
-        <th scope="col" class="px-4 py-3">Mặt hàng</th>
-        <th scope="col" class="px-4 py-3">Tồn kho</th>
-        <th scope="col" class="px-4 py-3 text-right">Tối thiểu</th>
-        <th scope="col" class="px-4 py-3 text-right">Giá vốn BQ</th>
-        <th scope="col" class="px-4 py-3 text-right">Giá trị</th>
-        <th scope="col" class="px-4 py-3">Tình trạng</th>
-        <th scope="col" class="px-4 py-3 text-right"><span class="sr-only">Hành động</span></th>
+        <th scope="col" class="px-2 py-3 sm:px-4">Mặt hàng</th>
+        <th scope="col" class="px-2 py-3 sm:px-4">Tồn kho</th>
+        <th scope="col" class="hidden px-4 py-3 text-right sm:table-cell">Tối thiểu</th>
+        <th scope="col" class="hidden px-4 py-3 text-right md:table-cell">Giá vốn BQ</th>
+        <th scope="col" class="hidden px-4 py-3 text-right lg:table-cell">Giá trị</th>
+        <th scope="col" class="px-2 py-3 sm:px-4">Tình trạng</th>
+        <th scope="col" class="px-2 py-3 text-right sm:px-4"><span class="sr-only">Hành động</span></th>
       </tr>
     </thead>
     <tbody>
@@ -85,47 +87,73 @@
            const fillAdj = { new_quantity: i.quantity_on_hand };
            const lv = stockLevel(i); %>
         <tr data-row class="border-b border-milk-200 last:border-b-0 hover:bg-milk-50 <%= i.is_active ? '' : 'text-milk-500' %>">
-          <td data-label="" class="rt-title px-4 py-3">
+          <td class="px-2 py-3 sm:px-4">
             <div class="flex items-center gap-3">
               <% if (i.image_url) { %>
                 <img src="<%= i.image_url %>" alt="" loading="lazy" width="40" height="40" class="h-10 w-10 shrink-0 rounded-lg object-cover ring-1 ring-milk-200">
               <% } else { %>
                 <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-milk-100 text-sm font-bold text-navy" aria-hidden="true"><%= String(i.name).trim().charAt(0).toUpperCase() %></span>
               <% } %>
-              <div class="min-w-0">
-                <a href="/admin/inventory/<%= i.id %>" class="font-semibold text-blue-700 hover:text-navy hover:underline"><%= i.name %></a>
+              <div class="min-w-0 max-w-[16rem] sm:max-w-none">
+                <a href="/admin/inventory/<%= i.id %>" class="break-words font-semibold text-blue-700 hover:text-navy hover:underline"><%= i.name %></a>
                 <p class="mt-0.5 font-mono text-xs text-milk-500"><%= i.sku %> · <%= i.unit %></p>
               </div>
             </div>
           </td>
-          <td data-label="Tồn kho" class="px-4 py-3">
-            <div class="min-w-[140px] max-lg:min-w-0 max-lg:text-right">
+          <td class="px-2 py-3 sm:px-4">
+            <div class="sm:min-w-[110px]">
               <span class="font-mono font-semibold text-navy-darker tnum"><%= num(i.quantity_on_hand) %></span> <span class="text-milk-500"><%= i.unit %></span>
-              <div class="mt-1.5 h-1.5 w-full rounded-full bg-milk-100 max-lg:hidden" role="img" aria-label="Mức tồn so với tối thiểu"><div class="h-1.5 rounded-full <%= lv.cls %>" style="width: <%= lv.pct %>%"></div></div>
+              <div class="mt-1.5 hidden h-1.5 w-full rounded-full bg-milk-100 sm:block" role="img" aria-label="Mức tồn so với tối thiểu"><div class="h-1.5 rounded-full <%= lv.cls %>" style="width: <%= lv.pct %>%"></div></div>
             </div>
           </td>
-          <td data-label="Tối thiểu" class="px-4 py-3 text-right font-mono text-milk-500 tnum"><%= num(i.min_stock) %></td>
-          <td data-label="Giá vốn BQ" class="px-4 py-3 text-right font-mono tnum"><%= money(i.avg_cost) %></td>
-          <td data-label="Giá trị" class="px-4 py-3 text-right font-mono font-semibold tnum"><%= money(i.stock_value) %></td>
-          <td data-label="Tình trạng" class="px-4 py-3"><%- badge(lv.text, lv.tone) %></td>
-          <td data-label="" class="rt-actions px-4 py-3 text-right">
-            <div class="inline-flex items-center gap-1">
+          <td class="hidden whitespace-nowrap px-4 py-3 text-right font-mono text-milk-500 tnum sm:table-cell"><%= num(i.min_stock) %></td>
+          <td class="hidden whitespace-nowrap px-4 py-3 text-right font-mono tnum md:table-cell"><%= money(i.avg_cost) %></td>
+          <td class="hidden whitespace-nowrap px-4 py-3 text-right font-mono font-semibold tnum lg:table-cell"><%= money(i.stock_value) %></td>
+          <td class="px-2 py-3 sm:px-4"><%- badge(lv.text, lv.tone) %></td>
+          <td class="px-2 py-3 text-right sm:px-4">
+            <div class="inline-flex flex-wrap items-center justify-end gap-1">
               <a href="/admin/receiving?item=<%= i.id %>" class="inline-flex h-9 items-center gap-1 rounded-lg border border-milk-200 px-2.5 text-xs font-semibold text-navy hover:border-navy-accent hover:bg-blue-50" title="Nhập kho"><%- icon('upload', 'h-3.5 w-3.5') %> Nhập</a>
               <button type="button" class="inline-flex h-9 items-center rounded-lg border border-milk-200 px-2.5 text-xs font-semibold text-dark hover:border-navy-accent" title="Kiểm kê / hao hụt"
                 data-modal-open="#adjust-dialog" data-action="/admin/inventory/<%= i.id %>/adjust" data-title="Kiểm kê — <%= i.name %>" data-fill="<%= safeJson(fillAdj) %>">Kiểm kê</button>
               <button type="button" class="<%= btnGhost %>" aria-label="Sửa <%= i.name %>" title="Sửa"
                 data-modal-open="#item-dialog" data-action="/admin/inventory/<%= i.id %>" data-title="Sửa nguyên liệu" data-fill="<%= safeJson(fillEdit) %>">
-                <%- icon('pencil', 'h-4 w-4') %><span class="btn-label">Sửa</span>
+                <%- icon('pencil', 'h-4 w-4') %>
               </button>
             </div>
           </td>
         </tr>
       <% }) %>
       <tr data-empty <%- shown.length ? 'hidden' : '' %>>
-        <td colspan="7" data-label="" class="px-4 py-12 text-center text-sm text-milk-500"><%= shown.length ? 'Không có mặt hàng phù hợp.' : (onlyLow ? 'Không có mặt hàng nào dưới mức tối thiểu.' : 'Chưa có nguyên liệu nào.') %></td>
+        <td colspan="7" class="px-4 py-12 text-center text-sm text-milk-500"><%= shown.length ? 'Không có mặt hàng phù hợp.' : (onlyLow ? 'Không có mặt hàng nào dưới mức tối thiểu.' : 'Chưa có nguyên liệu nào.') %></td>
       </tr>
     </tbody>
   </table>
 </div>
 
 <%- include('../partials/inventory_dialogs') %>
+
+<!-- Dialog: import from Excel (preview first, then apply) -->
+<dialog id="xlsx-dialog" aria-labelledby="xlsx-title" class="max-w-2xl max-sm:h-[94dvh] <%= sheet %>">
+  <form class="flex max-h-[calc(100dvh-2rem)] flex-col max-sm:h-full max-sm:max-h-none" data-xlsx-form>
+    <%- include('../partials/csrf') %>
+    <%- grabber %>
+    <div class="flex items-center justify-between border-b border-milk-200 px-4 py-3 sm:px-6 sm:py-4">
+      <h2 id="xlsx-title" class="text-lg font-semibold text-navy-darker">Nhập nguyên liệu từ Excel</h2>
+      <button type="button" data-modal-close aria-label="Đóng" class="<%= btnGhost %>"><%- icon('x', 'h-5 w-5') %></button>
+    </div>
+    <div class="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+      <p class="text-sm text-milk-500">Chọn file <b>.xlsx</b>. Mỗi dòng là một nguyên liệu theo cột <b>SKU</b>: SKU đã có sẽ được cập nhật, SKU mới sẽ được thêm. Hệ thống cho xem trước trước khi áp dụng.</p>
+      <div class="flex flex-wrap items-center gap-3">
+        <input id="xlsx-file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" class="block w-full max-w-sm text-sm file:mr-3 file:h-10 file:cursor-pointer file:rounded file:border file:border-milk-200 file:bg-white file:px-4 file:text-sm file:font-medium hover:file:bg-milk-50">
+        <a href="/admin/inventory/template.xlsx" class="text-sm font-medium text-blue-700 underline hover:text-navy">Tải file mẫu</a>
+      </div>
+      <p data-xlsx-status class="text-sm text-milk-500" role="status" aria-live="polite"></p>
+      <div data-xlsx-preview class="space-y-3"></div>
+    </div>
+    <div class="flex items-center justify-end gap-3 border-t border-milk-200 px-4 py-3 max-sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
+      <button type="button" data-modal-close class="<%= btnSecondary %>">Đóng</button>
+      <button type="button" data-xlsx-apply disabled class="<%= btnPrimary %> disabled:cursor-not-allowed disabled:opacity-50">Áp dụng nhập</button>
+    </div>
+  </form>
+</dialog>
+<script src="/admin/inventory-import.js?v=1" defer></script>

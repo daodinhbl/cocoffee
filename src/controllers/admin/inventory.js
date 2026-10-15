@@ -6,6 +6,8 @@ const { AppError } = require('../../utils/httpError');
 const v = require('../../utils/validate');
 const { render, formFlag, optional } = require('./common');
 const imageStore = require('../../services/imageStore');
+const inventoryExcel = require('../../services/inventoryExcel');
+const logger = require('../../utils/logger');
 
 async function page(req, res) {
   const { items, stockValue } = await inventoryService.listWithValue();
@@ -108,4 +110,58 @@ async function receive(req) {
   return { message: `Đã nhập kho. Tồn mới: ${result.quantity_on_hand}, giá vốn bình quân: ${Math.round(result.avg_cost)}đ.` };
 }
 
-module.exports = { page, detail, create, update, adjust, receivingPage, receive };
+// ------------------------------------------------------------------ Excel import / export
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const stamp = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date()).replace(/-/g, '');
+
+function sendXlsx(res, filename, buffer) {
+  res.set({ 'Content-Type': XLSX_MIME, 'Content-Disposition': `attachment; filename="${filename}"`, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+  res.send(buffer);
+}
+
+async function exportXlsx(_req, res) {
+  const items = await inventoryModel.listAll();
+  sendXlsx(res, `ton-kho-${stamp()}.xlsx`, await inventoryExcel.exportWorkbook(items));
+}
+
+async function templateXlsx(_req, res) {
+  sendXlsx(res, 'mau-nhap-nguyen-lieu.xlsx', await inventoryExcel.templateWorkbook());
+}
+
+const PREVIEW_LIMIT = 100;
+
+/** POST raw .xlsx. ?dry=1 only reports what would change; without it the import is applied (and only when the file has no errors). */
+async function importXlsx(req, res) {
+  try {
+    const rows = await inventoryExcel.parseSheet(Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0));
+    const p = inventoryExcel.plan(rows, await inventoryModel.listAll());
+    const dry = req.query.dry === '1';
+    const preview = {
+      summary: p.summary,
+      creates: p.creates.slice(0, PREVIEW_LIMIT).map((x) => ({ row: x.row, sku: x.sku, name: x.name, unit: x.unit, quantity: x.quantity })),
+      updates: p.updates.slice(0, PREVIEW_LIMIT).map((x) => ({ row: x.row, sku: x.sku, name: x.name, changes: x.changes })),
+      counts: p.counts.slice(0, PREVIEW_LIMIT).map((x) => ({ row: x.row, sku: x.sku, name: x.name, from: x.from, to: x.to })),
+      errors: p.errors.slice(0, PREVIEW_LIMIT),
+    };
+    if (dry) return res.json({ ok: true, dry: true, ...preview });
+    if (p.errors.length) return res.status(400).json({ ok: false, error: `File còn ${p.errors.length} lỗi, chưa nhập gì. Hãy sửa rồi tải lại.`, ...preview });
+    if (!p.creates.length && !p.updates.length && !p.counts.length) return res.json({ ok: true, applied: false, message: 'Không có thay đổi nào so với dữ liệu hiện tại.', ...preview });
+
+    await withTransaction(async (conn) => {
+      for (const x of p.creates) {
+        const id = await inventoryModel.create({ sku: x.sku, name: x.name, unit: x.unit, quantity_on_hand: 0, avg_cost: 0, min_stock: x.min_stock, is_active: x.is_active }, conn);
+        if (x.quantity > 0) await inventoryService.receive(conn, id, x.quantity, x.cost, { userId: req.user.id, note: 'Tồn đầu kỳ (nhập từ Excel)' });
+      }
+      for (const x of p.updates) await inventoryModel.update(x.id, x.patch, conn);
+      for (const x of p.counts) await inventoryService.adjust(conn, x.id, x.to, { type: 'adjustment', userId: req.user.id, note: 'Kiểm kê (nhập từ Excel)' });
+    });
+    logger.info(`Inventory Excel import by user ${req.user.id}: +${p.creates.length} new, ${p.updates.length} edited, ${p.counts.length} counted`);
+    return res.json({ ok: true, applied: true, message: `Đã nhập: thêm ${p.creates.length}, cập nhật ${p.updates.length}, kiểm kê ${p.counts.length}.`, ...preview });
+  } catch (err) {
+    if (err instanceof AppError) return res.status(err.status || 400).json({ ok: false, error: err.message });
+    logger.error('Inventory Excel import failed', err);
+    return res.status(500).json({ ok: false, error: 'Không nhập được file. Vui lòng thử lại.' });
+  }
+}
+
+module.exports = { page, detail, create, update, adjust, receivingPage, receive, exportXlsx, templateXlsx, importXlsx };

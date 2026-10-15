@@ -47,6 +47,12 @@ router.post('/backup/upload', requireAdmin, requireCsrfHeader, (req, res, next) 
   err ? res.status(err.status === 413 ? 413 : 400).json({ ok: false, error: err.status === 413 ? 'File quá lớn.' : 'Không đọc được file tải lên.' }) : next()
 )), backup.upload);
 
+// Excel import of the ingredient list: raw .xlsx body, CSRF in a header (same scheme as the backup upload).
+const rawXlsx = express.raw({ type: () => true, limit: '5mb' });
+router.post('/inventory/import', requireAdmin, requireCsrfHeader, (req, res, next) => rawXlsx(req, res, (err) => (
+  err ? res.status(err.status === 413 ? 413 : 400).json({ ok: false, error: err.status === 413 ? 'File quá lớn (tối đa 5 MB).' : 'Không đọc được file tải lên.' }) : next()
+)), inventory.importXlsx);
+
 router.use(requireAdmin, requireCsrf);
 
 router.get('/', (_req, res) => res.redirect(302, '/admin/dashboard'));
@@ -90,6 +96,8 @@ router.post('/menu/products/:id', act(menu.updateProduct));
 
 router.get('/inventory', inventory.page);
 router.post('/inventory', act(inventory.create));
+router.get('/inventory/export.xlsx', inventory.exportXlsx);
+router.get('/inventory/template.xlsx', inventory.templateXlsx);
 router.get('/inventory/:id', inventory.detail);
 router.post('/inventory/:id', act(inventory.update));
 router.post('/inventory/:id/adjust', act(inventory.adjust));
