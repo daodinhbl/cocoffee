@@ -29,6 +29,11 @@
 </head>
 <body class="steam min-h-full bg-navy-50 font-sans text-gray-900 antialiased">
   <main class="mx-auto flex min-h-screen w-full max-w-lg flex-col px-4 py-8 sm:py-12">
+    <%# Three states, most direct first: an ad-hoc build published in releases/ios/ (installs over the air on registered
+        devices), a TestFlight / App Store link set in Cài đặt, or neither. `release`/`installUrl` come from
+        services/iosRelease.js, `app` from services/iosApp.js (routes/downloadRoutes.js). %>
+    <% const step = (n) => `<span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-navy-100 text-xs font-semibold text-navy-800">${n}</span>`; %>
+    <% const serverLine = `Khi đăng nhập, kiểm tra địa chỉ máy chủ trong ứng dụng là <code class="font-mono text-navy-700">${host}</code> (đổi được ngay trên màn hình đăng nhập của ứng dụng).`; %>
 
     <header class="flex items-center gap-4">
       <img src="/brand/mark.png" alt="" width="256" height="200" class="h-16 w-auto shrink-0">
@@ -38,7 +43,48 @@
       </div>
     </header>
 
-    <% if (app) { %>
+    <% if (release) { %>
+      <section class="mt-6 rounded-xl border border-navy-200 bg-white p-6 shadow-[0_10px_30px_-12px_rgba(30,58,138,.25)]" aria-labelledby="ota-title">
+        <h2 id="ota-title" class="sr-only">Cài đặt trực tiếp</h2>
+        <dl class="grid grid-cols-3 gap-3 text-center">
+          <div>
+            <dt class="text-xs uppercase tracking-wide text-gray-500">Phiên bản</dt>
+            <dd class="mt-1 text-sm font-semibold text-navy-800"><%= release.version_name %> <span class="text-xs font-normal text-gray-400">(<%= release.version_code %>)</span></dd>
+          </div>
+          <div>
+            <dt class="text-xs uppercase tracking-wide text-gray-500">Dung lượng</dt>
+            <dd class="mt-1 text-sm font-semibold text-navy-800"><%= release.sizeLabel %></dd>
+          </div>
+          <div>
+            <dt class="text-xs uppercase tracking-wide text-gray-500">Yêu cầu</dt>
+            <dd class="mt-1 text-sm font-semibold text-navy-800">iOS <%= release.min_ios %> trở lên</dd>
+          </div>
+        </dl>
+        <a id="ios-install" href="<%= installUrl %>"
+          class="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded bg-navy-700 text-base font-semibold text-white hover:bg-navy-800 active:bg-navy-900">
+          <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12M7 11l5 5 5-5M4 20h16"/></svg>
+          Cài đặt trực tiếp · <%= release.sizeLabel %>
+        </a>
+        <p class="mt-3 text-center text-xs text-gray-500">Bản nội bộ cho máy đã đăng ký · phát hành <%= release.builtAtLabel %> · tệp <code class="font-mono"><%= release.downloadName %></code></p>
+      </section>
+
+      <section class="mt-6 rounded-xl border border-navy-200 bg-white p-6" aria-labelledby="steps-title">
+        <h2 id="steps-title" class="text-base font-semibold text-navy-800">Cách cài đặt</h2>
+        <ol class="mt-3 space-y-3 text-sm text-gray-700">
+          <li class="flex gap-3"><%- step(1) %><span>Mở trang này bằng <b>Safari</b> trên chính chiếc iPhone/iPad cần cài (các trình duyệt khác không cài được).</span></li>
+          <li class="flex gap-3"><%- step(2) %><span>Nhấn <b>Cài đặt trực tiếp</b> rồi chọn <b>Cài đặt</b> trong hộp thoại của iOS. Biểu tượng <b><%= meta.name %></b> xuất hiện ở màn hình chính và tải xong sau vài phút.</span></li>
+          <li class="flex gap-3"><%- step(3) %><span>Mở <b><%= meta.name %></b> và đăng nhập bằng tài khoản dùng trên trang quản trị. <%- serverLine %></span></li>
+        </ol>
+        <p class="mt-4 text-xs text-gray-500">Chỉ cài được trên máy đã đăng ký với quản trị viên (Apple cho tối đa 100 máy mỗi năm). Nếu iOS báo <b>Không thể cài đặt</b>, máy này chưa được đăng ký: gửi UDID cho quản trị viên và chờ bản tiếp theo. Cập nhật: quét lại mã QR và cài đè, dữ liệu đăng nhập giữ nguyên. Bản nội bộ dùng được 1 năm kể từ ngày phát hành.</p>
+      </section>
+
+      <% if (app) { %>
+        <section class="mt-6 rounded-xl border border-navy-200 bg-white p-5 text-sm text-gray-700" aria-labelledby="alt-title">
+          <h2 id="alt-title" class="text-base font-semibold text-navy-800">Máy chưa đăng ký?</h2>
+          <p class="mt-1">Cài qua <%= app.label %>: <a id="ios-link" href="<%= app.url %>" rel="noopener" class="font-semibold text-navy-700 hover:underline"><%= app.action %></a><% if (app.kind === 'testflight') { %> (cần ứng dụng <a href="https://apps.apple.com/app/testflight/id899247664" rel="noopener" class="font-semibold text-navy-700 hover:underline">TestFlight</a> của Apple)<% } %>.</p>
+        </section>
+      <% } %>
+    <% } else if (app) { %>
       <section class="mt-6 rounded-xl border border-navy-200 bg-white p-6 shadow-[0_10px_30px_-12px_rgba(30,58,138,.25)]" aria-labelledby="dl-title">
         <h2 id="dl-title" class="sr-only">Cài đặt</h2>
         <dl class="grid grid-cols-3 gap-3 text-center">
@@ -71,17 +117,12 @@
         <h2 id="steps-title" class="text-base font-semibold text-navy-800">Cách cài đặt</h2>
         <ol class="mt-3 space-y-3 text-sm text-gray-700">
           <% if (app.kind === 'testflight') { %>
-            <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-navy-100 text-xs font-semibold text-navy-800">1</span>
-              <span>Cài ứng dụng <b>TestFlight</b> từ App Store: <a href="https://apps.apple.com/app/testflight/id899247664" rel="noopener" class="font-semibold text-navy-700 hover:underline">Tải TestFlight</a>.</span></li>
-            <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-navy-100 text-xs font-semibold text-navy-800">2</span>
-              <span>Quay lại trang này, nhấn <b>Mở trong TestFlight</b>, rồi chọn <b>Chấp nhận</b> (Accept) và <b>Cài đặt</b> (Install).</span></li>
-            <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-navy-100 text-xs font-semibold text-navy-800">3</span>
-              <span>Mở <b><%= meta.name %></b> và đăng nhập bằng tài khoản dùng trên trang quản trị. Khi đăng nhập, kiểm tra địa chỉ máy chủ trong ứng dụng là <code class="font-mono text-navy-700"><%= host %></code> (đổi được ngay trên màn hình đăng nhập của ứng dụng).</span></li>
+            <li class="flex gap-3"><%- step(1) %><span>Cài ứng dụng <b>TestFlight</b> từ App Store: <a href="https://apps.apple.com/app/testflight/id899247664" rel="noopener" class="font-semibold text-navy-700 hover:underline">Tải TestFlight</a>.</span></li>
+            <li class="flex gap-3"><%- step(2) %><span>Quay lại trang này, nhấn <b>Mở trong TestFlight</b>, rồi chọn <b>Chấp nhận</b> (Accept) và <b>Cài đặt</b> (Install).</span></li>
+            <li class="flex gap-3"><%- step(3) %><span>Mở <b><%= meta.name %></b> và đăng nhập bằng tài khoản dùng trên trang quản trị. <%- serverLine %></span></li>
           <% } else { %>
-            <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-navy-100 text-xs font-semibold text-navy-800">1</span>
-              <span>Nhấn <b>Tải trên App Store</b> rồi chọn <b>Nhận</b> (Get) và xác nhận bằng Face ID / mật khẩu Apple.</span></li>
-            <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-navy-100 text-xs font-semibold text-navy-800">2</span>
-              <span>Mở <b><%= meta.name %></b> và đăng nhập bằng tài khoản dùng trên trang quản trị. Khi đăng nhập, kiểm tra địa chỉ máy chủ trong ứng dụng là <code class="font-mono text-navy-700"><%= host %></code> (đổi được ngay trên màn hình đăng nhập của ứng dụng).</span></li>
+            <li class="flex gap-3"><%- step(1) %><span>Nhấn <b>Tải trên App Store</b> rồi chọn <b>Nhận</b> (Get) và xác nhận bằng Face ID / mật khẩu Apple.</span></li>
+            <li class="flex gap-3"><%- step(2) %><span>Mở <b><%= meta.name %></b> và đăng nhập bằng tài khoản dùng trên trang quản trị. <%- serverLine %></span></li>
           <% } %>
         </ol>
         <p class="mt-4 text-xs text-gray-500"><% if (app.kind === 'testflight') { %>Cập nhật: TestFlight tự báo khi có bản mới; mỗi bản thử nghiệm dùng được 90 ngày, sau đó cài bản mới từ chính TestFlight.<% } else { %>Cập nhật: App Store tự cập nhật ứng dụng như mọi ứng dụng khác.<% } %></p>
@@ -90,7 +131,7 @@
       <section class="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900" role="status">
         <p class="font-semibold">Bản iPhone/iPad đang được phát hành thử nghiệm qua TestFlight.</p>
         <p class="mt-1">Liên kết cài đặt sẽ xuất hiện tại đây ngay khi sẵn sàng; quét lại mã QR trên trang đăng nhập sau nhé.</p>
-        <p class="mt-2 text-xs">Quản trị viên: dán liên kết TestFlight hoặc App Store vào <b>Cài đặt → Ứng dụng iOS</b> (hướng dẫn: <code class="font-mono">docs/ios-testflight.md</code>).</p>
+        <p class="mt-2 text-xs">Quản trị viên: dán liên kết TestFlight hoặc App Store vào <b>Cài đặt → Ứng dụng iOS</b>, hoặc phát hành bản nội bộ bằng <code class="font-mono">scripts/publish-ipa.js</code> (hướng dẫn: <code class="font-mono">docs/ios-testflight.md</code>).</p>
       </section>
     <% } %>
 
@@ -102,6 +143,14 @@
         <p class="mt-1 break-all font-mono text-sm text-navy-700"><%= pageUrl %></p>
       </div>
     </section>
+
+    <% if (release) { %>
+      <details class="mt-6 text-xs text-gray-500">
+        <summary class="cursor-pointer select-none">Kiểm tra toàn vẹn tệp (SHA-256)</summary>
+        <p class="mt-2 break-all font-mono"><%= release.sha256 %></p>
+        <p class="mt-1">Gói ứng dụng: <code class="font-mono"><%= release.bundle_id %></code></p>
+      </details>
+    <% } %>
 
     <p class="mt-6 text-center text-xs text-gray-500">Dùng điện thoại Android? <a href="/download" class="font-semibold text-navy-700 hover:underline">Tải bản Android</a></p>
 

@@ -10,10 +10,14 @@ const path = require('node:path');
 process.env.IOS_APP_URL = '';   // a developer .env must not leak into the "nothing configured" case
 const releaseDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cc-ios-release-'));
 process.env.APP_RELEASE_DIR = releaseDir;   // no Android APK here, whatever releases/android/ holds on this machine
+const iosDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cc-ios-ipa-'));
+process.env.IOS_RELEASE_DIR = iosDir;        // no ad-hoc .ipa until the subtest that publishes one
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { start } = require('./helpers/adminFixture');
+const { publish: publishIpa } = require('../scripts/publish-ipa');
+const crypto = require('node:crypto');
 
 const TF = 'https://testflight.apple.com/join/AbCd1234';
 const STORE = 'https://apps.apple.com/vn/app/pos-tasotek/id123456789';
@@ -23,7 +27,7 @@ test('iOS app download', async (t) => {
   const fx = await start();
   const iosApp = require('../src/services/iosApp');
   const settingsModel = require('../src/models/settingsModel');
-  t.after(() => { fx.stop(); fs.rmSync(releaseDir, { recursive: true, force: true }); });
+  t.after(() => { fx.stop(); for (const d of [releaseDir, iosDir]) fs.rmSync(d, { recursive: true, force: true }); });
   const get = (p) => fetch(fx.base + p, { redirect: 'manual' });
   const text = async (p) => (await get(p)).text();
   const loginPage = async () => (await fx.client().get('/admin/login')).text();
@@ -127,6 +131,71 @@ test('iOS app download', async (t) => {
     assert.deepEqual(saves().at(-1).args[0], { 'ios.app_url': '' });
     assert.match(await (await admin.get('/admin/settings')).text(), /Đã bỏ liên kết tải ứng dụng iOS/);
     assert.doesNotMatch(await text('/download/ios'), /id="ios-link"/);
+    assert.match(await loginPage(), /sắp có/);
+  });
+
+  await t.test('an ad-hoc build published with publish-ipa.js: direct install on the page, manifest.plist, app.ipa, login row', async () => {
+    const iosRelease = require('../src/services/iosRelease');
+    const work = fs.mkdtempSync(path.join(os.tmpdir(), 'cc-ipa-src-'));
+    const bytes = crypto.randomBytes(2 * 1024 * 1024);
+    const sha = crypto.createHash('sha256').update(bytes).digest('hex');
+    fs.writeFileSync(path.join(work, 'POS-Tasotek-1.4.0-12.ipa'), bytes);
+    fs.writeFileSync(path.join(work, 'manifest.json'), JSON.stringify({ file: 'POS-Tasotek-1.4.0-12.ipa', app_name: 'POS Tasotek', bundle_id: 'com.tasotek.fnb', version_name: '1.4.0', version_code: 12, min_ios: '15.0', size: bytes.length, sha256: sha, built_at: '2026-10-20T03:00:00Z', method: 'release-testing' }));
+    assert.throws(() => publishIpa({ src: path.join(work, 'nope'), dir: iosDir }), /Build not found/);
+    fs.writeFileSync(path.join(work, 'manifest.json'), JSON.stringify({ file: 'POS-Tasotek-1.4.0-12.ipa', size: bytes.length + 1 }));
+    assert.throws(() => publishIpa({ src: work, dir: iosDir }), /incomplete/);
+    fs.writeFileSync(path.join(work, 'manifest.json'), JSON.stringify({ file: 'POS-Tasotek-1.4.0-12.ipa', app_name: 'POS Tasotek', bundle_id: 'com.tasotek.fnb', version_name: '1.4.0', version_code: 12, min_ios: '15.0', size: bytes.length, sha256: sha, built_at: '2026-10-20T03:00:00Z', method: 'release-testing' }));
+    const m = publishIpa({ src: work, dir: iosDir });
+    assert.deepEqual(m, { file: 'POS-Tasotek-1.4.0-12.ipa', app_name: 'POS Tasotek', bundle_id: 'com.tasotek.fnb', version_name: '1.4.0', version_code: 12, min_ios: '15.0', size: bytes.length, sha256: sha, built_at: '2026-10-20T03:00:00.000Z', method: 'release-testing' });
+    assert.deepEqual(fs.readdirSync(iosDir).sort(), ['POS-Tasotek-1.4.0-12.ipa', 'manifest.json']);
+    iosRelease.invalidate();
+    assert.deepEqual(iosRelease.loginCard(), { version_name: '1.4.0', version_code: 12, sizeLabel: '2,0 MB' });
+    try {
+    const page = await text('/download/ios');
+    assert.match(page, /id="ios-install" href="itms-services:\/\/\?action=download-manifest&amp;url=https%3A%2F%2Fcafe\.example\.test%2Fdownload%2Fios%2Fmanifest\.plist"/);
+    assert.match(page, /Cài đặt trực tiếp · 2,0 MB/);
+    assert.match(page, /bằng <b>Safari<\/b>/);
+    assert.match(page, /POS-Tasotek-1\.4\.0\.ipa/);
+    assert.doesNotMatch(page, /id="ios-link"/, 'no TestFlight link set: no alternative section');
+
+    const plist = await get('/download/ios/manifest.plist');
+    assert.equal(plist.status, 200);
+    assert.match(plist.headers.get('content-type'), /^application\/xml/);
+    const xml = await plist.text();
+    assert.match(xml, /<key>bundle-identifier<\/key><string>com\.tasotek\.fnb<\/string>/);
+    assert.match(xml, /<key>bundle-version<\/key><string>1\.4\.0<\/string>/);
+    assert.ok(xml.includes(`<string>https://cafe.example.test/download/ios/app.ipa?v=${sha.slice(0, 12)}</string>`), 'the .ipa URL carries the checksum prefix');
+    assert.match(xml, /<string>https:\/\/cafe\.example\.test\/brand\/apple-touch-icon\.png<\/string>/);
+
+    const ipa = await get('/download/ios/app.ipa?v=abc');
+    assert.equal(ipa.status, 200);
+    assert.equal(ipa.headers.get('content-type'), 'application/octet-stream');
+    assert.match(ipa.headers.get('content-disposition'), /^attachment; filename="?POS-Tasotek-1\.4\.0\.ipa"?$/);
+    assert.equal(ipa.headers.get('x-checksum-sha256'), sha);
+    assert.equal(crypto.createHash('sha256').update(Buffer.from(await ipa.arrayBuffer())).digest('hex'), sha);
+    assert.equal((await fetch(`${fx.base}/download/ios/app.ipa`, { method: 'HEAD' })).status, 200);
+
+    assert.match(await loginPage(), /iPhone \/ iPad · POS Tasotek <span[^>]*>v1\.4\.0 nội bộ</);
+
+    // a TestFlight link on top: the page keeps direct install first and offers the link to unregistered devices
+    const { c: admin } = await fx.login('boss');
+    const token = await fx.csrfOf(admin, '/admin/settings');
+    await admin.post('/admin/settings/ios-app', { _csrf: token, _back: '/admin/settings', url: TF });
+    const both = await text('/download/ios');
+    assert.match(both, /id="ios-install"/);
+    assert.match(both, /Máy chưa đăng ký\?/);
+    assert.match(both, new RegExp(`id="ios-link" href="${escapeRe(TF)}"`));
+    assert.match(await loginPage(), /hoặc cài qua TestFlight/);
+    await admin.post('/admin/settings/ios-app', { _csrf: token, _back: '/admin/settings', url: '' });
+
+    } finally {
+      // unpublished again, even after a failed assertion: later subtests expect no iOS build
+      for (const f of fs.readdirSync(iosDir)) fs.rmSync(path.join(iosDir, f));
+      fs.rmSync(work, { recursive: true, force: true });
+      iosRelease.invalidate();
+    }
+    assert.equal((await get('/download/ios/manifest.plist')).status, 404);
+    assert.equal((await get('/download/ios/app.ipa')).status, 404);
     assert.match(await loginPage(), /sắp có/);
   });
 

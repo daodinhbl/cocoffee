@@ -68,3 +68,20 @@ Workflow chỉ chạy khi bấm tay hoặc đẩy tag `ios-v*`; không chạy tr
 - Khai báo liên kết trong Web Admin → **Cài đặt → Ứng dụng iOS** (lưu trong `app_settings`, đổi được ngay không cần deploy). Biến môi trường `IOS_APP_URL` là giá trị mặc định khi ô này để trống. Chỉ nhận địa chỉ https của `testflight.apple.com`, `beta.itunes.apple.com`, `apps.apple.com`. Chưa có liên kết thì trang và thẻ trên trang đăng nhập hiện "sắp có".
 - Lấy liên kết TestFlight: App Store Connect → TestFlight → **External Testing** → tạo nhóm, thêm build, bật **Public Link** → sao chép. Build đầu tiên của mỗi phiên bản (số `version` trong pubspec) phải qua Beta App Review (thường 1–2 ngày); các build sau cùng phiên bản lên nhóm ngoài ngay. Nhóm **Internal Testing** (tối đa 100 người có tài khoản App Store Connect) dùng được ngay, không cần duyệt, nhưng không có public link.
 - Khi app lên App Store, thay bằng `https://apps.apple.com/...`: nút trên trang tự đổi thành "Tải trên App Store".
+
+## Cài nội bộ không qua TestFlight (bản ad-hoc, tải từ máy chủ của quán)
+
+Giống bản Android: máy chủ chứa file cài và trang `/download/ios` có nút **Cài đặt trực tiếp** (mở bằng Safari). Chỉ cài được trên iPhone/iPad đã đăng ký UDID trong tài khoản Apple Developer (tối đa 100 máy mỗi loại mỗi năm), không cần Apple duyệt, không cần TestFlight; bản cài dùng được 1 năm.
+
+1. Lấy UDID của từng máy thử nghiệm: cắm máy vào máy tính, mở Finder (macOS) hoặc iTunes/Apple Devices (Windows), bấm vào dòng số sê-ri đến khi hiện **UDID**, chuột phải → Copy. developer.apple.com → Certificates, Identifiers & Profiles → **Devices** → **+** → nhập tên và UDID.
+2. GitHub → Actions → **iOS TestFlight** → Run workflow, tích **adhoc** (bỏ tích *upload* nếu chỉ cần bản nội bộ). Apple tự tạo/cập nhật hồ sơ ad-hoc với mọi máy đã đăng ký; thêm máy mới thì chạy lại workflow.
+3. Tải artifact `pos-tasotek-ios-adhoc-<version>-<build>` về máy phát triển rồi phát hành:
+   ```bash
+   gh run download <run-id> --repo daodinhbl/cocoffee -n pos-tasotek-ios-adhoc-1.4.0-12 -D dist/ios-adhoc
+   node scripts/publish-ipa.js dist/ios-adhoc
+   ```
+   Script chép `.ipa` + `manifest.json` vào `releases/ios/` (git-ignored, kiểm tra dung lượng và SHA-256).
+4. Deploy như thường lệ (`node scripts/package-deploy.js` tự kèm `releases/ios/`, rồi upload và build trên Hostinger). Trang login hiện "v1.4.0 nội bộ" ở hàng iPhone/iPad; nhân viên quét QR bằng Safari và bấm cài.
+5. Máy chưa đăng ký sẽ thấy "Không thể cài đặt": đăng ký UDID rồi chạy lại từ bước 2. Nếu đã có liên kết TestFlight, trang vẫn hiện nó bên dưới cho máy chưa đăng ký.
+
+Máy chủ phục vụ `GET /download/ios/manifest.plist` (Apple đọc) và `GET /download/ios/app.ipa` (giới hạn 30 lượt/10 phút mỗi IP); cả hai cần HTTPS và `PUBLIC_BASE_URL` đúng tên miền công khai.

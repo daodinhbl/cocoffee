@@ -3,6 +3,7 @@ const { adminSecurity } = require('../middlewares/adminSecurity');
 const rateLimit = require('../middlewares/rateLimit');
 const appRelease = require('../services/appRelease');
 const iosApp = require('../services/iosApp');
+const iosRelease = require('../services/iosRelease');
 const env = require('../config/env');
 const { formatShopTime } = require('../utils/text');
 
@@ -14,15 +15,19 @@ const { formatShopTime } = require('../utils/text');
  *   GET /download/manifest.json  version/size/sha256 for an in-app update check
  *   GET /download/qr.svg         QR code of the landing page URL (printed on the login page)
  *
- * The iOS app cannot be sideloaded, so its page links out instead of serving a file (services/iosApp.js):
- *   GET /download/ios            landing page for iPhone/iPad: the TestFlight / App Store link set in Web Admin
- *   GET /download/ios/qr.svg     QR code of that page (the iOS row of the app card on the login page)
+ * The iOS app cannot be sideloaded by the public, so its page links out (services/iosApp.js) and, for registered test
+ * devices, offers the ad-hoc build in releases/ios/ over the air (services/iosRelease.js):
+ *   GET /download/ios                landing page for iPhone/iPad: direct install when a build is published, else the link
+ *   GET /download/ios/qr.svg         QR code of that page (the iOS row of the app card on the login page)
+ *   GET /download/ios/manifest.plist what Apple's installer reads (itms-services); names the .ipa URL
+ *   GET /download/ios/app.ipa        the ad-hoc build (stable URL; the saved file name carries the version)
  */
 const router = express.Router();
 const APK_PATH = '/download/cocoffee.apk';
 // Public and unauthenticated: the 60 MB file is the expensive one (a download manager resumes with a few Range requests).
 const pageLimit = rateLimit({ windowMs: 60 * 1000, max: 120 });
 const apkLimit = rateLimit({ windowMs: 10 * 60 * 1000, max: 30 });
+const ipaLimit = rateLimit({ windowMs: 10 * 60 * 1000, max: 30 });
 
 const describe = (req, r) => ({
   ...r,
@@ -93,10 +98,13 @@ router.get('/qr.svg', pageLimit, (req, res, next) => sendQr(req, res, next, '/do
 router.get('/ios', pageLimit, adminSecurity, async (req, res, next) => {
   try {
     const base = appRelease.baseUrl(req);
+    const release = iosRelease.current();
     res.render('download-ios', {
       shopName: env.business.shopName,
       app: await iosApp.get(),
       meta: iosApp.APP,
+      release: release ? { ...release, downloadName: iosRelease.downloadName(release), sizeLabel: iosRelease.sizeLabel(release.size), builtAtLabel: formatShopTime(release.built_at) } : null,
+      installUrl: release ? iosRelease.installUrl(base) : null,
       pageUrl: `${base}/download/ios`,
       host: base.replace(/^https?:\/\//, ''),
     });
@@ -104,6 +112,22 @@ router.get('/ios', pageLimit, adminSecurity, async (req, res, next) => {
 });
 
 router.get('/ios/qr.svg', pageLimit, (req, res, next) => sendQr(req, res, next, '/download/ios'));
+
+router.get('/ios/manifest.plist', pageLimit, (req, res) => {
+  const r = iosRelease.current();
+  if (!r) return res.status(404).type('text').send('Chưa có bản cài đặt iOS nào.');
+  res.set({ 'Content-Type': 'application/xml; charset=utf-8', 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff' });
+  return res.send(iosRelease.manifestPlist(r, appRelease.baseUrl(req)));
+});
+
+router.get('/ios/app.ipa', ipaLimit, (req, res, next) => {
+  const r = iosRelease.current();
+  if (!r) return res.status(404).type('text').send('Chưa có bản cài đặt iOS nào.');
+  res.set({ 'Cache-Control': 'no-cache', 'X-Checksum-SHA256': r.sha256, 'X-Content-Type-Options': 'nosniff' });
+  return res.download(r.path, iosRelease.downloadName(r), { headers: { 'Content-Type': iosRelease.IPA_MIME }, cacheControl: false, dotfiles: 'deny' }, (err) => {
+    if (err && !res.headersSent) next(err);
+  });
+});
 
 router.use((_req, res) => res.status(404).type('text').send('Không tìm thấy.'));
 

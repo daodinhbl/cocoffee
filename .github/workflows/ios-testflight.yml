@@ -26,6 +26,10 @@ on:
         description: "Added to the run number to form the build number (raise it if Apple rejects a duplicate build number)"
         type: string
         default: "0"
+      adhoc:
+        description: "Also export an ad-hoc (release-testing) .ipa for direct installs from /download/ios on registered test devices (see docs/ios-testflight.md)"
+        type: boolean
+        default: false
   push:
     tags:
       - "ios-v*"
@@ -158,6 +162,60 @@ jobs:
             -authenticationKeyID "$APPSTORE_KEY_ID" \
             -authenticationKeyIssuerID "$APPSTORE_ISSUER_ID"
           ls -l build/ios/ipa
+
+      - name: Export an ad-hoc .ipa for direct installs (registered test devices only)
+        # release-testing = what Xcode used to call ad-hoc. Apple-managed signing creates/refreshes the ad-hoc profile with every
+        # device registered in the Developer portal; with no device registered this step fails, and that is the right outcome.
+        if: ${{ github.event.inputs.adhoc == 'true' }}
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions-adhoc.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>release-testing</string>
+            <key>teamID</key><string>${APPLE_TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>destination</key><string>export</string>
+            <key>thinning</key><string>&lt;none&gt;</string>
+            <key>uploadSymbols</key><false/>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive \n            -archivePath build/ios/Runner.xcarchive \n            -exportPath build/ios/adhoc \n            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions-adhoc.plist" \n            -allowProvisioningUpdates \n            -authenticationKeyPath "$KEY_FILE" \n            -authenticationKeyID "$APPSTORE_KEY_ID" \n            -authenticationKeyIssuerID "$APPSTORE_ISSUER_ID"
+          IPA="$(ls build/ios/adhoc/*.ipa | head -n 1)"
+          FILE="POS-Tasotek-${VERSION_NAME}-${BUILD_NUMBER}.ipa"
+          mv "$IPA" "build/ios/adhoc/$FILE"
+          SIZE="$(stat -f%z "build/ios/adhoc/$FILE")"
+          SHA="$(shasum -a 256 "build/ios/adhoc/$FILE" | cut -d' ' -f1)"
+          # Read by scripts/publish-ipa.js on the developer's machine, then served by /download/ios (src/services/iosRelease.js).
+          cat > build/ios/adhoc/manifest.json <<EOF
+          {
+            "file": "$FILE",
+            "app_name": "POS Tasotek",
+            "bundle_id": "$BUNDLE_ID",
+            "version_name": "$VERSION_NAME",
+            "version_code": $BUILD_NUMBER,
+            "min_ios": "15.0",
+            "size": $SIZE,
+            "sha256": "$SHA",
+            "built_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "method": "release-testing"
+          }
+          EOF
+          cat build/ios/adhoc/manifest.json
+
+      - name: Keep the ad-hoc .ipa as a build artifact
+        if: ${{ github.event.inputs.adhoc == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: pos-tasotek-ios-adhoc-${{ env.VERSION_NAME }}-${{ env.BUILD_NUMBER }}
+          path: |
+            mobile/build/ios/adhoc/*.ipa
+            mobile/build/ios/adhoc/manifest.json
+          retention-days: 14
+          if-no-files-found: error
 
       - name: Keep the .ipa as a build artifact
         uses: actions/upload-artifact@v4

@@ -4,6 +4,7 @@ const { AppError } = require('../../utils/httpError');
 const env = require('../../config/env');
 const appRelease = require('../../services/appRelease');
 const iosApp = require('../../services/iosApp');
+const iosRelease = require('../../services/iosRelease');
 const { startSession, endSession, safeBack } = require('../../middlewares/adminAuth');
 
 // Constant-time-ish: always run bcrypt, even for unknown users.
@@ -18,7 +19,7 @@ const demoCredentials = () => (env.demo.enabled ? { username: env.demo.username,
 const renderLogin = async (res, { status = 200, error = null, username = '', next = '' } = {}) =>
   res.status(status).render('login', {
     shopName: env.business.shopName, error, username, next: safeBack(next, ''), demo: demoCredentials(),
-    appDownload: appRelease.loginCard(), iosApp: await iosApp.get(), iosMeta: iosApp.APP,
+    appDownload: appRelease.loginCard(), iosApp: await iosApp.get(), iosMeta: iosApp.APP, iosRelease: iosRelease.loginCard(),
   });
 
 function loginForm(req, res) {

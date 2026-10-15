@@ -2,10 +2,11 @@
 /**
  * Builds the archive uploaded to Hostinger (Node.js app, source "archive"): the committed tree at HEAD minus the
  * paths marked export-ignore in .gitattributes (tests, docs, the Flutter sources), plus the git-ignored Android
- * release in releases/android/ (APK + manifest.json). The APK has to travel with every deploy because a deploy
- * replaces every file on the host.
+ * release in releases/android/ (APK + manifest.json) and, when one is published, the iOS ad-hoc build in
+ * releases/ios/ (.ipa + manifest.json, scripts/publish-ipa.js). They have to travel with every deploy because a
+ * deploy replaces every file on the host.
  *
- *   node scripts/package-deploy.js [--out dist/app.zip] [--no-apk]
+ *   node scripts/package-deploy.js [--out dist/app.zip] [--no-apk] [--no-ipa]
  *
  * Uncommitted changes are NOT in the archive (it is `git archive HEAD`): commit first.
  */
@@ -15,6 +16,7 @@ const { execFileSync } = require('child_process');
 
 const ROOT = path.resolve(__dirname, '..');
 const RELEASE_DIR = path.join(ROOT, 'releases', 'android');
+const IOS_RELEASE_DIR = path.join(ROOT, 'releases', 'ios');
 
 function main() {
   const args = process.argv.slice(2);
@@ -39,6 +41,19 @@ function main() {
     console.log(`Android app: ${manifest.app_name} ${manifest.version_name} (${manifest.version_code}), ${(size / 1048576).toFixed(1)} MB`);
   } else {
     console.log('Android app: not included (--no-apk); /download will say there is no release.');
+  }
+
+  const iosManifestPath = path.join(IOS_RELEASE_DIR, 'manifest.json');
+  if (!args.includes('--no-ipa') && fs.existsSync(iosManifestPath)) {
+    const m = JSON.parse(fs.readFileSync(iosManifestPath, 'utf8'));
+    const ipa = path.join(IOS_RELEASE_DIR, String(m.file || ''));
+    if (!m.file || !fs.existsSync(ipa)) throw new Error(`releases/ios/manifest.json names "${m.file}" but it is not in ${IOS_RELEASE_DIR}`);
+    const size = fs.statSync(ipa).size;
+    if (size !== m.size) throw new Error(`${m.file} is ${size} bytes but releases/ios/manifest.json says ${m.size}: re-run scripts/publish-ipa.js`);
+    extra.push('--prefix=releases/ios/', `--add-file=${ipa}`, `--add-file=${iosManifestPath}`, '--prefix=');
+    console.log(`iOS app: ${m.app_name} ${m.version_name} (${m.version_code}), ${(size / 1048576).toFixed(1)} MB (ad-hoc, registered devices)`);
+  } else {
+    console.log('iOS app: no ad-hoc build in releases/ios/; /download/ios offers the TestFlight / App Store link only.');
   }
 
   fs.mkdirSync(path.dirname(out), { recursive: true });
