@@ -120,7 +120,7 @@
             <div class="min-w-0">
               <p class="text-sm font-semibold text-navy-800">iPhone / iPad · <%= iosName %> <span class="font-normal text-gray-400"><%= iosBuild ? `v${iosBuild.version_name} nội bộ` : (iosLink ? iosLink.label : 'sắp có') %></span></p>
               <p class="mt-0.5 text-xs text-gray-500"><% if (iosBuild) { %>Quét mã QR bằng camera iPhone/iPad (mở bằng Safari) để cài bản nội bộ (<%= iosBuild.sizeLabel %>) trên máy đã đăng ký<%= iosLink ? `, hoặc cài qua ${iosLink.label}` : '' %>.<% } else if (iosLink) { %>Quét mã QR bằng camera iPhone/iPad để mở trang cài đặt qua <%= iosLink.label %>, hoặc mở liên kết này trên máy.<% } else { %>Bản iOS đang phát hành thử nghiệm qua TestFlight; liên kết cài đặt sẽ có ở trang này.<% } %></p>
-              <a href="/download/ios" class="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-navy-700 hover:underline"><%= (iosBuild || iosLink) ? 'Tải bản iOS' : 'Xem trang iOS' %>
+              <a href="/download/ios" class="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-navy-700 hover:underline">Tải bản iOS
                 <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
             </div>
           </div>

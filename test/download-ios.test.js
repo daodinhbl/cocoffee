@@ -64,8 +64,10 @@ test('iOS app download', async (t) => {
     assert.equal(page.status, 200);
     const html = await page.text();
     assert.match(html, /POS Tasotek/);
-    assert.match(html, /đang được phát hành thử nghiệm qua TestFlight/);
-    assert.doesNotMatch(html, /id="ios-link"/);
+    assert.match(html, /id="ios-install-pending"[^>]*aria-disabled="true"/, 'the install button is there, inactive');
+    assert.match(html, /id="ios-download-pending"[^>]*aria-disabled="true"/, 'the download button is there, inactive');
+    assert.match(html, /đang được chuẩn bị/);
+    assert.doesNotMatch(html, /id="ios-link"|id="ios-install"|id="ios-download"/);
     assert.match(html, /https:\/\/cafe\.example\.test\/download\/ios/, 'PUBLIC_BASE_URL wins over the Host header');
     assert.match(html, /src="\/download\/ios\/qr\.svg"/);
     assert.match(page.headers.get('content-security-policy'), /script-src 'self' 'nonce-/);
@@ -109,7 +111,7 @@ test('iOS app download', async (t) => {
     assert.match(html, /apps\.apple\.com\/app\/testflight\/id899247664/, 'step 1 installs TestFlight');
     assert.match(html, /iOS 15\.0 trở lên/);
     assert.match(html, /cafe\.example\.test/);
-    assert.doesNotMatch(html, /đang được phát hành thử nghiệm/);
+    assert.doesNotMatch(html, /đang được chuẩn bị|ios-install-pending/);
 
     const login = await loginPage();
     assert.match(login, /iPhone \/ iPad · POS Tasotek <span[^>]*>TestFlight</);
@@ -154,6 +156,9 @@ test('iOS app download', async (t) => {
     const page = await text('/download/ios');
     assert.match(page, /id="ios-install" href="itms-services:\/\/\?action=download-manifest&amp;url=https%3A%2F%2Fcafe\.example\.test%2Fdownload%2Fios%2Fmanifest\.plist"/);
     assert.match(page, /Cài đặt trực tiếp · 2,0 MB/);
+    assert.ok(page.includes(`id="ios-download" href="/download/ios/app.ipa?v=${sha.slice(0, 12)}" download="POS-Tasotek-1.4.0.ipa"`), 'the .ipa download button');
+    assert.match(page, /Tải tệp \.ipa · 2,0 MB/);
+    assert.doesNotMatch(page, /ios-install-pending/);
     assert.match(page, /bằng <b>Safari<\/b>/);
     assert.match(page, /POS-Tasotek-1\.4\.0\.ipa/);
     assert.doesNotMatch(page, /id="ios-link"/, 'no TestFlight link set: no alternative section');
