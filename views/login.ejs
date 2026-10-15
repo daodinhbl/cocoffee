@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light">
   <meta name="robots" content="noindex, nofollow">
-  <meta name="theme-color" content="#603813">
+  <meta name="theme-color" content="#1E3A8A">
   <title>Đăng nhập · <%= shopName %> Admin</title>
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="icon" type="image/png" href="/brand/favicon-32.png">
@@ -16,8 +16,8 @@
       theme: { extend: {
         colors: {
           ink: { 950: '#16181A', 900: '#1B1D1F', 800: '#25282B', 700: '#2F3337', 600: '#3D4247', 500: '#6B737A', 400: '#8A9097', 300: '#B9BEC3' },
-          // Brand: "Cò Coffee" roast brown + cream (from the logo)
-          roast: { 50: '#FBF6EF', 100: '#F5EADB', 200: '#E9D3B6', 300: '#D2AE82', 600: '#7A4A1F', 700: '#603813', 800: '#4C2C0E', 900: '#341E09' },
+          // Brand: navy blue + milk white (same family as the admin theme)
+          navy: { 50: '#FAF8F5', 100: '#F1EEE8', 200: '#D9E0F0', 300: '#93A8D8', 600: '#1D4ED8', 700: '#1E3A8A', 800: '#172554', 900: '#0F172A' },
         },
         fontFamily: { sans: ['"Times New Roman"', 'Times', '"Liberation Serif"', 'Tinos', 'serif'] },
         borderRadius: { DEFAULT: '4px', sm: '2px', md: '4px', lg: '6px', xl: '10px' },
@@ -25,19 +25,19 @@
     };
   </script>
   <style>
-    :focus-visible { outline: 2px solid #603813; outline-offset: 2px; }
+    :focus-visible { outline: 2px solid #1E3A8A; outline-offset: 2px; }
     @media (max-width: 767px) { input { font-size: 16px !important; } }
-    .steam { background-image: radial-gradient(circle at 20% 15%, rgba(96,56,19,.08) 0, transparent 45%), radial-gradient(circle at 85% 80%, rgba(96,56,19,.10) 0, transparent 50%); }
+    .steam { background-image: radial-gradient(circle at 20% 15%, rgba(30,58,138,.08) 0, transparent 45%), radial-gradient(circle at 85% 80%, rgba(30,58,138,.10) 0, transparent 50%); }
   </style>
 </head>
-<body class="min-h-full bg-roast-50 font-sans text-gray-900 antialiased">
+<body class="min-h-full bg-navy-50 font-sans text-gray-900 antialiased">
   <main class="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
 
     <!-- Brand panel (laptop/desktop) -->
-    <section class="steam relative hidden flex-col items-center justify-center overflow-hidden bg-roast-100 px-12 lg:flex" aria-hidden="true">
+    <section class="steam relative hidden flex-col items-center justify-center overflow-hidden bg-navy-100 px-12 lg:flex" aria-hidden="true">
       <img src="/brand/logo.png" alt="" width="480" height="472" class="w-full max-w-md drop-shadow-sm">
-      <p class="mt-10 max-w-sm text-center text-lg italic text-roast-700">Quản lý quán — đơn hàng, thực đơn, kho và báo cáo — ở một nơi.</p>
-      <div class="absolute inset-x-0 bottom-0 h-1.5 bg-roast-700"></div>
+      <p class="mt-10 max-w-sm text-center text-lg italic text-navy-700">Quản lý quán — đơn hàng, thực đơn, kho và báo cáo — ở một nơi.</p>
+      <div class="absolute inset-x-0 bottom-0 h-1.5 bg-navy-700"></div>
     </section>
 
     <!-- Form -->
@@ -45,11 +45,11 @@
       <div class="w-full max-w-sm">
         <div class="mb-8 flex flex-col items-center text-center lg:items-start lg:text-left">
           <img src="/brand/mark.png" alt="<%= shopName %>" width="256" height="200" class="h-20 w-auto lg:hidden">
-          <h1 class="mt-4 text-3xl font-semibold text-roast-800 lg:mt-0"><%= shopName %></h1>
+          <h1 class="mt-4 text-3xl font-semibold text-navy-800 lg:mt-0"><%= shopName %></h1>
           <p class="mt-1 text-sm text-gray-500">Đăng nhập trang quản trị</p>
         </div>
 
-        <div class="rounded-xl border border-roast-200 bg-white p-6 shadow-[0_10px_30px_-12px_rgba(96,56,19,.25)] sm:p-8">
+        <div class="rounded-xl border border-navy-200 bg-white p-6 shadow-[0_10px_30px_-12px_rgba(30,58,138,.25)] sm:p-8">
           <% if (error) { %>
             <div role="alert" class="mb-5 flex gap-2 rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
               <svg class="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>
@@ -58,10 +58,10 @@
           <% } %>
 
           <% if (locals.demo) { %>
-            <div class="mb-5 rounded border border-roast-200 bg-roast-50 px-3 py-3 text-sm text-roast-800">
+            <div class="mb-5 rounded border border-navy-200 bg-navy-50 px-3 py-3 text-sm text-navy-800">
               <div class="flex items-center justify-between gap-3">
                 <p class="font-semibold">Tài khoản demo</p>
-                <button type="button" id="demo-fill" class="rounded border border-roast-300 bg-white px-2.5 py-1 text-xs font-semibold text-roast-700 hover:bg-roast-100">Dùng tài khoản này</button>
+                <button type="button" id="demo-fill" class="rounded border border-navy-300 bg-white px-2.5 py-1 text-xs font-semibold text-navy-700 hover:bg-navy-100">Dùng tài khoản này</button>
               </div>
               <p class="mt-1.5">Tên đăng nhập: <code class="font-mono font-semibold"><%= demo.username %></code> · Mật khẩu: <code class="font-mono font-semibold"><%= demo.password %></code></p>
             </div>
@@ -74,7 +74,7 @@
               <div class="relative">
                 <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
                 <input id="username" name="username" value="<%= username %>" required maxlength="50" autocomplete="username" autocapitalize="none" spellcheck="false" autofocus
-                  class="h-11 w-full rounded border border-gray-300 pl-9 pr-3 text-sm focus:border-roast-600 focus:outline-none focus:ring-1 focus:ring-roast-600">
+                  class="h-11 w-full rounded border border-gray-300 pl-9 pr-3 text-sm focus:border-navy-600 focus:outline-none focus:ring-1 focus:ring-navy-600">
               </div>
             </div>
             <div>
@@ -82,36 +82,36 @@
               <div class="relative">
                 <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
                 <input id="password" name="password" type="password" required maxlength="200" autocomplete="current-password"
-                  class="h-11 w-full rounded border border-gray-300 pl-9 pr-11 text-sm focus:border-roast-600 focus:outline-none focus:ring-1 focus:ring-roast-600">
+                  class="h-11 w-full rounded border border-gray-300 pl-9 pr-11 text-sm focus:border-navy-600 focus:outline-none focus:ring-1 focus:ring-navy-600">
                 <button type="button" id="pw-toggle" aria-label="Hiện mật khẩu" aria-pressed="false"
-                  class="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded text-gray-400 hover:text-roast-700">
+                  class="absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded text-gray-400 hover:text-navy-700">
                   <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
                 </button>
               </div>
             </div>
             <button type="submit" id="login-submit"
-              class="inline-flex h-11 w-full items-center justify-center gap-2 rounded bg-roast-700 text-sm font-semibold text-white hover:bg-roast-800 active:bg-roast-900 disabled:opacity-70">Đăng nhập</button>
+              class="inline-flex h-11 w-full items-center justify-center gap-2 rounded bg-navy-700 text-sm font-semibold text-white hover:bg-navy-800 active:bg-navy-900 disabled:opacity-70">Đăng nhập</button>
           </form>
         </div>
 
         <% if (locals.appDownload) { %>
-          <aside class="mt-5 flex items-center gap-4 rounded-xl border border-roast-200 bg-white p-4" aria-labelledby="app-dl-title">
+          <aside class="mt-5 flex items-center gap-4 rounded-xl border border-navy-200 bg-white p-4" aria-labelledby="app-dl-title">
             <a href="/download" class="hidden shrink-0 sm:block" aria-hidden="true" tabindex="-1">
-              <img src="/download/qr.svg" alt="" width="96" height="96" class="h-24 w-24 rounded border border-roast-100 bg-white p-1">
+              <img src="/download/qr.svg" alt="" width="96" height="96" class="h-24 w-24 rounded border border-navy-100 bg-white p-1">
             </a>
             <div class="min-w-0">
-              <p id="app-dl-title" class="text-sm font-semibold text-roast-800">Ứng dụng Android · <%= appDownload.app_name %> <span class="font-normal text-gray-400">v<%= appDownload.version_name %></span></p>
+              <p id="app-dl-title" class="text-sm font-semibold text-navy-800">Ứng dụng Android · <%= appDownload.app_name %> <span class="font-normal text-gray-400">v<%= appDownload.version_name %></span></p>
               <p class="mt-0.5 text-xs text-gray-500">Quét mã QR bằng camera điện thoại để tải bản cài đặt (<%= appDownload.sizeLabel %>), hoặc mở liên kết này trên điện thoại.</p>
-              <a href="/download" class="mt-1.5 inline-flex items-center gap-1 text-sm font-semibold text-roast-700 hover:underline">Tải ứng dụng
+              <a href="/download" class="mt-1.5 inline-flex items-center gap-1 text-sm font-semibold text-navy-700 hover:underline">Tải ứng dụng
                 <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
             </div>
           </aside>
         <% } %>
 
-        <aside class="mt-5 rounded-xl border border-roast-200 bg-white p-4" aria-labelledby="intro-title">
-          <p id="intro-title" class="text-sm font-semibold text-roast-800">Tìm hiểu <%= shopName %></p>
+        <aside class="mt-5 rounded-xl border border-navy-200 bg-white p-4" aria-labelledby="intro-title">
+          <p id="intro-title" class="text-sm font-semibold text-navy-800">Tìm hiểu <%= shopName %></p>
           <p class="mt-0.5 text-xs text-gray-500">POS, thực đơn, kho, công nợ, báo cáo, chatbot Zalo và ứng dụng Android trong một hệ thống.</p>
-          <a href="/gioi-thieu" class="mt-2 inline-flex h-9 items-center gap-1 rounded border border-roast-300 px-3 text-sm font-semibold text-roast-700 hover:bg-roast-100">Xem thêm
+          <a href="/gioi-thieu" class="mt-2 inline-flex h-9 items-center gap-1 rounded border border-navy-300 px-3 text-sm font-semibold text-navy-700 hover:bg-navy-100">Xem thêm
             <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
         </aside>
 

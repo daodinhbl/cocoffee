@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="light">
   <meta name="robots" content="noindex, nofollow">
-  <meta name="theme-color" content="#603813">
+  <meta name="theme-color" content="#1E3A8A">
   <title>Tải ứng dụng <%= release ? release.app_name : 'Tasotek FnB' %> · <%= shopName %></title>
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="icon" type="image/png" href="/brand/favicon-32.png">
@@ -15,7 +15,7 @@
     tailwind.config = {
       theme: { extend: {
         colors: {
-          roast: { 50: '#FBF6EF', 100: '#F5EADB', 200: '#E9D3B6', 300: '#D2AE82', 600: '#7A4A1F', 700: '#603813', 800: '#4C2C0E', 900: '#341E09' },
+          navy: { 50: '#FAF8F5', 100: '#F1EEE8', 200: '#D9E0F0', 300: '#93A8D8', 600: '#1D4ED8', 700: '#1E3A8A', 800: '#172554', 900: '#0F172A' },
         },
         fontFamily: { sans: ['"Times New Roman"', 'Times', '"Liberation Serif"', 'Tinos', 'serif'] },
         borderRadius: { DEFAULT: '4px', sm: '2px', md: '4px', lg: '6px', xl: '10px' },
@@ -23,65 +23,65 @@
     };
   </script>
   <style>
-    :focus-visible { outline: 2px solid #603813; outline-offset: 2px; }
-    .steam { background-image: radial-gradient(circle at 20% 15%, rgba(96,56,19,.08) 0, transparent 45%), radial-gradient(circle at 85% 80%, rgba(96,56,19,.10) 0, transparent 50%); }
+    :focus-visible { outline: 2px solid #1E3A8A; outline-offset: 2px; }
+    .steam { background-image: radial-gradient(circle at 20% 15%, rgba(30,58,138,.08) 0, transparent 45%), radial-gradient(circle at 85% 80%, rgba(30,58,138,.10) 0, transparent 50%); }
   </style>
 </head>
-<body class="steam min-h-full bg-roast-50 font-sans text-gray-900 antialiased">
+<body class="steam min-h-full bg-navy-50 font-sans text-gray-900 antialiased">
   <main class="mx-auto flex min-h-screen w-full max-w-lg flex-col px-4 py-8 sm:py-12">
 
     <header class="flex items-center gap-4">
       <img src="/brand/mark.png" alt="" width="256" height="200" class="h-16 w-auto shrink-0">
       <div class="min-w-0">
-        <h1 class="text-2xl font-semibold text-roast-800"><%= release ? release.app_name : 'Tasotek FnB' %></h1>
+        <h1 class="text-2xl font-semibold text-navy-800"><%= release ? release.app_name : 'Tasotek FnB' %></h1>
         <p class="text-sm text-gray-500">Ứng dụng Android quản lý quán · <%= shopName %></p>
       </div>
     </header>
 
     <% if (release) { %>
-      <section class="mt-6 rounded-xl border border-roast-200 bg-white p-6 shadow-[0_10px_30px_-12px_rgba(96,56,19,.25)]" aria-labelledby="dl-title">
+      <section class="mt-6 rounded-xl border border-navy-200 bg-white p-6 shadow-[0_10px_30px_-12px_rgba(30,58,138,.25)]" aria-labelledby="dl-title">
         <h2 id="dl-title" class="sr-only">Tải xuống</h2>
         <dl class="grid grid-cols-3 gap-3 text-center">
           <div>
             <dt class="text-xs uppercase tracking-wide text-gray-500">Phiên bản</dt>
-            <dd class="mt-1 text-sm font-semibold text-roast-800"><%= release.version_name %> <span class="text-xs font-normal text-gray-400">(<%= release.version_code %>)</span></dd>
+            <dd class="mt-1 text-sm font-semibold text-navy-800"><%= release.version_name %> <span class="text-xs font-normal text-gray-400">(<%= release.version_code %>)</span></dd>
           </div>
           <div>
             <dt class="text-xs uppercase tracking-wide text-gray-500">Dung lượng</dt>
-            <dd class="mt-1 text-sm font-semibold text-roast-800"><%= release.sizeLabel %></dd>
+            <dd class="mt-1 text-sm font-semibold text-navy-800"><%= release.sizeLabel %></dd>
           </div>
           <div>
             <dt class="text-xs uppercase tracking-wide text-gray-500">Yêu cầu</dt>
-            <dd class="mt-1 text-sm font-semibold text-roast-800"><%= release.android %></dd>
+            <dd class="mt-1 text-sm font-semibold text-navy-800"><%= release.android %></dd>
           </div>
         </dl>
         <a id="apk-link" href="<%= release.apkUrl %>" download="<%= release.downloadName %>"
-          class="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded bg-roast-700 text-base font-semibold text-white hover:bg-roast-800 active:bg-roast-900">
+          class="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded bg-navy-700 text-base font-semibold text-white hover:bg-navy-800 active:bg-navy-900">
           <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12M7 11l5 5 5-5M4 20h16"/></svg>
           Tải xuống APK · <%= release.sizeLabel %>
         </a>
         <p class="mt-3 text-center text-xs text-gray-500">Bản phát hành <%= release.builtAtLabel %> · tệp <code class="font-mono"><%= release.downloadName %></code></p>
       </section>
 
-      <section class="mt-6 rounded-xl border border-roast-200 bg-white p-6" aria-labelledby="steps-title">
-        <h2 id="steps-title" class="text-base font-semibold text-roast-800">Cách cài đặt</h2>
+      <section class="mt-6 rounded-xl border border-navy-200 bg-white p-6" aria-labelledby="steps-title">
+        <h2 id="steps-title" class="text-base font-semibold text-navy-800">Cách cài đặt</h2>
         <ol class="mt-3 space-y-3 text-sm text-gray-700">
-          <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-roast-100 text-xs font-semibold text-roast-800">1</span>
+          <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-navy-100 text-xs font-semibold text-navy-800">1</span>
             <span>Nhấn <b>Tải xuống APK</b>. Nếu trình duyệt cảnh báo "tệp có thể gây hại", chọn <b>Vẫn tải xuống</b>.</span></li>
-          <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-roast-100 text-xs font-semibold text-roast-800">2</span>
+          <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-navy-100 text-xs font-semibold text-navy-800">2</span>
             <span>Mở tệp vừa tải (thanh thông báo hoặc mục <b>Tải xuống</b>). Lần đầu Android hỏi quyền <b>cài đặt ứng dụng không xác định</b> cho trình duyệt: bật rồi quay lại và chọn <b>Cài đặt</b>.</span></li>
-          <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-roast-100 text-xs font-semibold text-roast-800">3</span>
-            <span>Mở <b><%= release.app_name %></b> và đăng nhập bằng tài khoản dùng trên trang quản trị. Ứng dụng đã trỏ sẵn về máy chủ <code class="font-mono text-roast-700"><%= host %></code>.</span></li>
+          <li class="flex gap-3"><span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-navy-100 text-xs font-semibold text-navy-800">3</span>
+            <span>Mở <b><%= release.app_name %></b> và đăng nhập bằng tài khoản dùng trên trang quản trị. Ứng dụng đã trỏ sẵn về máy chủ <code class="font-mono text-navy-700"><%= host %></code>.</span></li>
         </ol>
         <p class="mt-4 text-xs text-gray-500">Cập nhật: tải bản mới từ trang này và cài đè lên bản cũ; dữ liệu đăng nhập được giữ nguyên.</p>
       </section>
 
-      <section class="mt-6 grid items-center gap-5 rounded-xl border border-roast-200 bg-white p-6 sm:grid-cols-[auto_1fr]" aria-labelledby="share-title">
-        <img src="/download/qr.svg" alt="Mã QR dẫn tới trang này" width="144" height="144" class="mx-auto h-36 w-36 rounded border border-roast-100 bg-white p-1">
+      <section class="mt-6 grid items-center gap-5 rounded-xl border border-navy-200 bg-white p-6 sm:grid-cols-[auto_1fr]" aria-labelledby="share-title">
+        <img src="/download/qr.svg" alt="Mã QR dẫn tới trang này" width="144" height="144" class="mx-auto h-36 w-36 rounded border border-navy-100 bg-white p-1">
         <div class="min-w-0 text-center sm:text-left">
-          <h2 id="share-title" class="text-base font-semibold text-roast-800">Chia sẻ cho nhân viên</h2>
+          <h2 id="share-title" class="text-base font-semibold text-navy-800">Chia sẻ cho nhân viên</h2>
           <p class="mt-1 text-sm text-gray-600">Quét mã bằng camera điện thoại để mở trang này, hoặc gửi liên kết:</p>
-          <p class="mt-1 break-all font-mono text-sm text-roast-700"><%= pageUrl %></p>
+          <p class="mt-1 break-all font-mono text-sm text-navy-700"><%= pageUrl %></p>
         </div>
       </section>
 
@@ -95,11 +95,11 @@
         <p class="font-semibold">Chưa có bản cài đặt nào được phát hành.</p>
         <p class="mt-1">Quản trị viên: chạy <code class="font-mono">scripts\build-apk.ps1</code> trên máy phát triển rồi deploy lại để đưa tệp APK lên máy chủ.</p>
       </section>
-      <section class="mt-6 grid items-center gap-5 rounded-xl border border-roast-200 bg-white p-6 sm:grid-cols-[auto_1fr]">
-        <img src="/download/qr.svg" alt="Mã QR dẫn tới trang này" width="144" height="144" class="mx-auto h-36 w-36 rounded border border-roast-100 bg-white p-1">
+      <section class="mt-6 grid items-center gap-5 rounded-xl border border-navy-200 bg-white p-6 sm:grid-cols-[auto_1fr]">
+        <img src="/download/qr.svg" alt="Mã QR dẫn tới trang này" width="144" height="144" class="mx-auto h-36 w-36 rounded border border-navy-100 bg-white p-1">
         <div class="min-w-0 text-center sm:text-left">
-          <h2 class="text-base font-semibold text-roast-800">Liên kết trang này</h2>
-          <p class="mt-1 break-all font-mono text-sm text-roast-700"><%= pageUrl %></p>
+          <h2 class="text-base font-semibold text-navy-800">Liên kết trang này</h2>
+          <p class="mt-1 break-all font-mono text-sm text-navy-700"><%= pageUrl %></p>
         </div>
       </section>
     <% } %>
