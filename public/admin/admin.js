@@ -486,25 +486,35 @@
   });
 
   /* ------------------------------------------------------- PayOn QR polling */
-  // <div data-payon-poll="/admin/payon/:id/status">: every 5 s ask the server (which asks PayOn); the page reloads once the
-  // payment is no longer pending, so the cashier sees "Đã thu" the moment the customer has paid. Stops after 20 minutes.
+  // <div data-payon-poll="/admin/payon/:id/status" data-payon-until="<epoch ms>">: every 5 s ask the server (which asks PayOn);
+  // the page reloads once the payment reaches a final state, so the cashier sees "Đã thu" the moment the customer has paid.
+  // Polling continues while the payment is pending or being applied, stops when the QR window (expiry + grace) is over or the
+  // session ended, and slows down when PayOn itself cannot be reached.
   (function () {
     var box = $('[data-payon-poll]');
     if (!box || !window.fetch) return;
     var url = box.getAttribute('data-payon-poll');
     var state = $('[data-payon-state]', box);
-    var until = Date.now() + 20 * 60 * 1000;
+    var until = parseInt(box.getAttribute('data-payon-until'), 10) || (Date.now() + 20 * 60 * 1000);
+    var FINAL = { paid: 1, manual: 1, resolved: 1, failed: 1, expired: 1 };
     var busy = false;
+    var skip = 0;
     var timer = window.setInterval(function () {
       if (busy || document.hidden) return;
       if (Date.now() > until) { window.clearInterval(timer); return; }
+      if (skip > 0) { skip -= 1; return; }
       busy = true;
       window.fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } })
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (j) {
-          if (j && j.status !== 'pending') { if (state) state.textContent = 'đã nhận thanh toán…'; window.location.reload(); }
+        .then(function (r) {
+          if (r.redirected || !r.ok) { if (r.redirected || r.status === 401 || r.status === 403) window.clearInterval(timer); return null; }
+          return r.json();
         })
-        .catch(function () { /* offline for a moment: try again at the next tick */ })
+        .then(function (j) {
+          if (!j) return;
+          if (FINAL[j.status]) { if (state) state.textContent = 'đã nhận thanh toán…'; window.location.reload(); return; }
+          if (j.checkError) { skip = 5; if (state) state.textContent = 'chưa kiểm tra được với PayOn, sẽ thử lại…'; }
+        })
+        .catch(function () { skip = 2; /* offline for a moment: try again a little later */ })
         .then(function () { busy = false; });
     }, 5000);
   })();

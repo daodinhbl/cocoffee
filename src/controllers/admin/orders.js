@@ -71,7 +71,7 @@ async function detail(req, res) {
   const payments = await orderModel.getPayments(id);
   const canRecordDebt = req.user.role === 'admin' && order.source === 'zalo' && order.status === 'completed' && order.payment_status === 'unpaid' && !order.customer_id;
   const debtCustomers = canRecordDebt ? await customerModel.list({ limit: 500 }).catch(() => []) : [];
-  const payonPanel = await payon.orderPanel(id).catch(() => ({ ready: false, configured: false, payment: null }));
+  const payonPanel = await payon.orderPanel(id).catch(() => ({ ready: false, configured: false, payment: null, manual: [] }));
   await render(res, 'order_detail', {
     title: order.order_code || `Đơn #${id}`, activeMenu: 'orders',
     breadcrumbs: [{ label: 'Đơn hàng', href: '/admin/orders' }, { label: order.order_code || `#${id}` }],

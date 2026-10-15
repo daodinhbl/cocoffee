@@ -144,13 +144,13 @@ test('PayOn: notification endpoint and admin screens', async (t) => {
 
     w.check = null;                                              // PayOn answered with nothing usable: still pending, no crash
     let st = await admin.get(`/admin/payon/${id}/status`);
-    assert.deepEqual(await st.json(), { status: 'pending', open: true });
+    assert.deepEqual(await st.json(), { status: 'pending', open: true, checkError: false });
     w.check = paidAnswer({ status: 1 });
     st = await admin.get(`/admin/payon/${id}/status`);
-    assert.deepEqual(await st.json(), { status: 'pending', open: true });
+    assert.deepEqual(await st.json(), { status: 'pending', open: true, checkError: false });
     w.check = paidAnswer();
     st = await admin.get(`/admin/payon/${id}/status`);
-    assert.deepEqual(await st.json(), { status: 'paid', open: false });
+    assert.deepEqual(await st.json(), { status: 'paid', open: false, checkError: false });
     assert.equal(w.paid.length, 1);
 
     const check = await admin.post(`/admin/payon/${id}/refresh`, { _csrf: tok, _back: '/admin/orders/42' });

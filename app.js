@@ -14,6 +14,7 @@ const { ensureMenuPhotos } = require('./src/config/menuPhotos');
 const productModel = require('./src/models/productModel');
 const backupService = require('./src/services/backupService');
 const webhookGuard = require('./src/services/zalo/webhookGuard');
+const payonService = require('./src/services/payon/payonService');
 const logger = require('./src/utils/logger');
 const routes = require('./src/routes');
 const adminRoutes = require('./src/routes/adminRoutes');
@@ -88,6 +89,7 @@ async function start() {
   await ensureDemoAccount();                            // DEMO_MODE only; never throws
   backupService.startScheduler();                       // automatic database backups (Admin > Sao lưu); never throws
   webhookGuard.ensure().catch(() => {});                // Zalo Bot Platform: re-register the webhook when its URL / secret changed; never throws, not awaited
+  payonService.startRecovery();                         // PayOn: finishes claims a dead process left half-applied; never throws
 
   const isPassenger = typeof PhusionPassenger !== 'undefined'; // eslint-disable-line no-undef
   const port = process.env.PORT || 3000;

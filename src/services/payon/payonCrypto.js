@@ -52,33 +52,74 @@ function phpJsonEncode(value) {
     .replace(/[\u0080-￿]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, '0')}`);
 }
 
-/** The raw text of the top-level "data" member of a JSON body, exactly as received (null when absent/unparsable). */
+/**
+ * The raw text of the top-level "data" member of a JSON object, exactly as received. Strings and nested values are skipped
+ * properly (a "data" key inside a string or a nested object is not the member), and a body with the member TWICE yields
+ * null: JSON.parse would keep the last one while a naive search finds the first, which would let a signed payload be
+ * swapped for another one under the same checksum.
+ * @returns {string|null} null when absent, malformed, or duplicated
+ */
 function rawDataMember(rawBody) {
   const text = String(rawBody || '');
-  const m = /"data"\s*:\s*/.exec(text);
-  if (!m) return null;
-  let i = m.index + m[0].length;
-  const start = i;
-  const open = text[i];
-  if (open !== '[' && open !== '{' && open !== '"') return null;
-  let depth = 0;
-  let inString = false;
-  for (; i < text.length; i += 1) {
-    const c = text[i];
-    if (inString) {
-      if (c === '\\') i += 1;
-      else if (c === '"') {
-        inString = false;
-        if (open === '"' && depth === 0) return text.slice(start, i + 1);
+  let i = 0;
+  const skipWs = () => { while (i < text.length && ' \t\r\n'.includes(text[i])) i += 1; };
+  const readString = () => { // at the opening quote: moves past the closing quote, returns the decoded value
+    const start = i;
+    i += 1;
+    while (i < text.length && text[i] !== '"') i += text[i] === '\\' ? 2 : 1;
+    if (i >= text.length) throw new Error('unterminated string');
+    i += 1;
+    return JSON.parse(text.slice(start, i));
+  };
+  const skipValue = () => { // moves past one JSON value and returns its raw text
+    skipWs();
+    const start = i;
+    if (text[i] === '"') {
+      readString();
+    } else if (text[i] === '{' || text[i] === '[') {
+      let depth = 0;
+      while (i < text.length) {
+        const c = text[i];
+        if (c === '"') { readString(); continue; }
+        if (c === '{' || c === '[') depth += 1;
+        else if (c === '}' || c === ']') depth -= 1;
+        i += 1;
+        if (depth === 0) break;
       }
-    } else if (c === '"') inString = true;
-    else if (c === '[' || c === '{') depth += 1;
-    else if (c === ']' || c === '}') {
-      depth -= 1;
-      if (depth === 0) return text.slice(start, i + 1);
+      if (depth !== 0) throw new Error('unbalanced');
+    } else {
+      while (i < text.length && !',}] \t\r\n'.includes(text[i])) i += 1;
     }
+    return text.slice(start, i);
+  };
+  try {
+    skipWs();
+    if (text[i] !== '{') return null;
+    i += 1;
+    skipWs();
+    if (text[i] === '}') return null;
+    let found = null;
+    for (;;) {
+      skipWs();
+      if (text[i] !== '"') return null;
+      const key = readString();
+      skipWs();
+      if (text[i] !== ':') return null;
+      i += 1;
+      const value = skipValue();
+      if (key === 'data') {
+        if (found !== null) return null; // twice: ambiguous, refuse
+        found = value;
+      }
+      skipWs();
+      if (text[i] === ',') { i += 1; continue; }
+      if (text[i] === '}') break;
+      return null;
+    }
+    return found;
+  } catch (_) {
+    return null;
   }
-  return null;
 }
 
 const safeEqual = (a, b) => {
@@ -92,21 +133,31 @@ const safeEqual = (a, b) => {
  * the JSON is spelled, so the spellings a sender can plausibly use are all accepted: the member exactly as received,
  * PHP's json_encode (escaped) and the unescaped / JS forms. Each one still needs the secret to be produced.
  * `data` given as an encrypted string (like the request format) is checked as md5(app_id + data + secret).
- * @returns {{ok:boolean, how?:string}}
+ * @returns {{ok:boolean, how?:string, data?:any}} `data` is what was signed — the caller must act on this, not on `body.data`
  */
 function verifyNotification({ appId, secret, body, rawBody }) {
   if (!body || typeof body !== 'object' || typeof body.checksum !== 'string' || body.data === undefined) return { ok: false };
-  const candidates = [];
-  if (typeof body.data === 'string') {
-    candidates.push(['encrypted-string', body.data]);
-  } else {
-    const raw = rawDataMember(rawBody);
-    if (raw) candidates.push(['raw', raw]);
-    candidates.push(['php', phpJsonEncode(body.data)], ['js', JSON.stringify(body.data)],
-      ['php-unescaped', JSON.stringify(body.data).replace(/\//g, '\\/')]);
-  }
-  for (const [how, text] of candidates) {
-    if (safeEqual(checksum(appId, text, secret), body.checksum)) return { ok: true, how };
+  try {
+    const candidates = [];
+    let rawItems = null;
+    if (typeof body.data === 'string') {
+      candidates.push(['encrypted-string', body.data]);
+    } else {
+      const raw = rawDataMember(rawBody);
+      if (raw) {
+        candidates.push(['raw', raw]);
+        try { rawItems = JSON.parse(raw); } catch (_) { rawItems = null; }
+      }
+      candidates.push(['php', phpJsonEncode(body.data)], ['js', JSON.stringify(body.data)],
+        ['php-unescaped', JSON.stringify(body.data).replace(/\//g, '\\/')]);
+    }
+    for (const [how, text] of candidates) {
+      if (safeEqual(checksum(appId, text, secret), body.checksum)) {
+        return { ok: true, how, data: how === 'raw' && rawItems !== null ? rawItems : body.data };
+      }
+    }
+  } catch (_) {
+    return { ok: false }; // e.g. absurdly nested JSON that cannot be re-encoded
   }
   return { ok: false };
 }

@@ -1,9 +1,35 @@
 <%
-  // QR payment through PayOn on the order page. `panel` = controllers/admin/payon.js orderPanel().
+  // PayOn QR payment on the order page. `panel` = controllers/admin/payon.js orderPanel(); `canPay` = the order still waits for money.
   const p = panel.payment;
-  const open = p && p.open;
+  const open = canPay && p && p.open;
+  const applying = p && p.status === 'applying';
+  const manual = panel.manual || [];
+  const mismatch = open && Math.round(Number(order.total)) !== Math.round(p.amount);
+  const untilMs = p && p.expiresAt ? new Date(p.expiresAt).getTime() + 6 * 60 * 1000 : 0;
 %>
-<% if (panel.ready) { %>
+<% manual.forEach((m) => { %>
+<section class="overflow-hidden rounded-xl border border-red-200 bg-red-50 shadow-[0_1px_2px_rgba(15,23,42,.04)]" aria-label="Giao dịch PayOn cần xử lý">
+  <div class="px-5 py-4 text-sm text-red-900">
+    <p class="font-semibold">Đã nhận <%= money(m.received == null ? m.amount : m.received) %> qua PayOn nhưng chưa ghi nhận được vào đơn</p>
+    <p class="mt-1"><%= m.note || 'Cần xử lý tay.' %></p>
+    <div class="mt-3 flex flex-wrap gap-2">
+      <form method="post" action="/admin/payon/<%= m.id %>/apply">
+        <%- include('csrf') %><input type="hidden" name="_back" value="/admin/orders/<%= order.id %>">
+        <button type="submit" class="<%= ui.btnSecondary %>">Thử ghi nhận lại</button>
+      </form>
+      <a href="/admin/payon" class="<%= ui.btnSecondary %>">Xem danh sách &amp; đánh dấu đã xử lý</a>
+    </div>
+  </div>
+</section>
+<% }) %>
+
+<% if (applying) { %>
+<section class="overflow-hidden rounded-xl border border-sky-200 bg-sky-50" aria-label="PayOn đang ghi nhận" data-payon-poll="/admin/payon/<%= p.id %>/status" data-payon-until="<%= untilMs %>">
+  <p class="px-5 py-4 text-sm text-sky-900">Đã nhận <%= money(p.received == null ? p.amount : p.received) %> qua PayOn — <span data-payon-state>đang ghi nhận vào đơn…</span></p>
+</section>
+<% } %>
+
+<% if (canPay && panel.ready) { %>
 <section class="overflow-hidden rounded-xl border border-sky-200 bg-sky-50 shadow-[0_1px_2px_rgba(15,23,42,.04)]" aria-labelledby="payon-title">
   <h2 id="payon-title" class="border-b border-sky-200 px-5 py-3.5 text-sm font-semibold uppercase tracking-wide text-sky-800">
     <%- icon('receipt', 'h-4 w-4 inline-block mr-1.5 -mt-0.5') %>Thanh toán QR (PayOn)
@@ -11,7 +37,7 @@
   <div class="px-5 py-4 text-sm">
     <% if (open) { %>
       <div class="flex flex-col items-center gap-3 sm:flex-row sm:items-start"
-           data-payon-poll="/admin/payon/<%= p.id %>/status">
+           data-payon-poll="/admin/payon/<%= p.id %>/status" data-payon-until="<%= untilMs %>">
         <div class="h-[240px] w-[240px] shrink-0 rounded bg-white p-1">
           <% if (panel.qrSrc) { %>
             <img src="<%= panel.qrSrc %>" alt="Mã QR thanh toán <%= money(p.amount) %>" class="h-full w-full object-contain">
@@ -23,18 +49,28 @@
           <p class="text-lg font-semibold"><%= money(p.amount) %></p>
           <p>Khách mở app ngân hàng và quét mã. Đơn tự được thu khi tiền về.</p>
           <p class="text-xs text-sky-700">Hết hạn lúc <%= new Date(p.expiresAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' }) %> · <span data-payon-state>đang chờ khách thanh toán…</span></p>
-          <form method="post" action="/admin/payon/<%= p.id %>/refresh" class="pt-2">
-            <%- include('csrf') %>
-            <input type="hidden" name="_back" value="/admin/orders/<%= order.id %>">
-            <button type="submit" class="<%= ui.btnSecondary %>">Kiểm tra thanh toán</button>
-          </form>
+          <% if (mismatch) { %>
+            <p class="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">Đơn hiện là <%= money(order.total) %> nhưng QR này đòi <%= money(p.amount) %>. Tạo QR mới theo số tiền hiện tại trước khi khách quét.</p>
+          <% } %>
+          <div class="flex flex-wrap gap-2 pt-2">
+            <form method="post" action="/admin/payon/<%= p.id %>/refresh">
+              <%- include('csrf') %>
+              <input type="hidden" name="_back" value="/admin/orders/<%= order.id %>">
+              <button type="submit" class="<%= ui.btnSecondary %>">Kiểm tra thanh toán</button>
+            </form>
+            <% if (mismatch) { %>
+            <form method="post" action="/admin/orders/<%= order.id %>/payon-qr">
+              <%- include('csrf') %>
+              <input type="hidden" name="_back" value="/admin/orders/<%= order.id %>">
+              <button type="submit" class="<%= ui.btnPrimary %>">Tạo QR mới (<%= money(order.total) %>)</button>
+            </form>
+            <% } %>
+          </div>
         </div>
       </div>
     <% } else { %>
-      <% if (p && p.status === 'manual') { %>
-        <p class="mb-3 rounded border border-red-200 bg-red-50 px-3 py-2 text-red-800">Đã nhận tiền nhưng chưa ghi nhận được vào đơn: <%= p.note || 'cần xử lý tay.' %></p>
-      <% } else if (p && p.status === 'expired') { %>
-        <p class="mb-3 text-sky-800">QR trước đã hết hạn.</p>
+      <% if (p && p.status === 'expired') { %>
+        <p class="mb-3 text-sky-800">QR trước đã hết hạn. Nếu khách đã chuyển khoản, đơn vẫn tự được thu khi PayOn báo về.</p>
       <% } else if (p && p.status === 'failed') { %>
         <p class="mb-3 text-sky-800">QR trước không thành công<%= p.note ? `: ${p.note}` : '.' %></p>
       <% } %>
@@ -47,6 +83,6 @@
     <% } %>
   </div>
 </section>
-<% } else if (panel.configured) { %>
+<% } else if (canPay && panel.configured) { %>
 <p class="text-xs text-gray-500">Thanh toán QR PayOn đã cấu hình nhưng chưa bật hoặc chưa chọn ngân hàng: xem <a class="underline" href="/admin/settings">Cài đặt</a>.</p>
 <% } %>

@@ -163,7 +163,7 @@ UPGRADES.push(
   order_id             INT UNSIGNED NULL,
   customer_id          INT UNSIGNED NULL,
   amount               DECIMAL(14,2) NOT NULL,                -- what the QR asks for
-  status               ENUM('pending','applying','paid','manual','failed','expired') NOT NULL DEFAULT 'pending',
+  status               ENUM('pending','applying','paid','manual','resolved','failed','expired') NOT NULL DEFAULT 'pending',
   payon_status         TINYINT      NULL,                     -- PayOn's own status (2 = success)
   payment_id           VARCHAR(40)  NULL,
   transaction_id       VARCHAR(64)  NULL,

@@ -18,20 +18,24 @@ const URLS = {
 const SECRET_FIELDS = ['authPass', 'secretKey'];
 let cache = null;
 
+/** @returns {Promise<{values:object, ok:boolean}>} ok=false when the database could not be read */
 async function readStored() {
   try {
-    return await settingsModel.getByPrefix(PREFIX);
+    return { values: await settingsModel.getByPrefix(PREFIX), ok: true };
   } catch (err) {
     logger.warn('PayOn settings unavailable, using environment only', err);
-    return {};
+    return { values: {}, ok: false };
   }
 }
 
 const hint = (v) => (v ? `…${String(v).slice(-4)}` : '');
 
-async function get() {
-  if (cache && cache.until > Date.now()) return cache.value;
-  const stored = await readStored();
+/**
+ * @param {{fresh?: boolean}} [opts] fresh: skip the cache (another worker may have saved new settings meanwhile)
+ */
+async function get({ fresh = false } = {}) {
+  if (!fresh && cache && cache.until > Date.now()) return cache.value;
+  const { values: stored, ok } = await readStored();
   const pick = (envValue, key) => envValue || stored[PREFIX + key] || '';
   const mode = ['sandbox', 'production'].includes(env.payon.env) ? env.payon.env : (stored[`${PREFIX}env`] === 'production' ? 'production' : 'sandbox');
   const value = {
@@ -49,7 +53,7 @@ async function get() {
   };
   value.complete = Boolean(value.appId && /^\d+$/.test(value.merchantId) && value.authUser && value.authPass && value.secretKey);
   value.ready = value.enabled && value.complete && Boolean(value.bankCode);
-  cache = { value, until: Date.now() + TTL_MS };
+  cache = ok ? { value, until: Date.now() + TTL_MS } : null;      // a failed read is never kept: the next call asks the database again
   return value;
 }
 
@@ -57,7 +61,7 @@ const invalidate = () => { cache = null; };
 
 /** What the admin page may show: no secret values. */
 async function view() {
-  const c = await get();
+  const c = await get({ fresh: true });
   return {
     enabled: c.enabled, env: c.env, baseUrl: c.baseUrl, complete: c.complete, ready: c.ready,
     appId: c.appId, merchantId: c.merchantId, authUser: c.authUser, bankCode: c.bankCode, bankName: c.bankName, expireMinutes: c.expireMinutes,
@@ -80,15 +84,21 @@ const text = (v, name, max) => {
  * Switching on needs the full connection set and a QR bank.
  */
 async function save(body, userId) {
-  const stored = await readStored();
+  const { values: stored } = await readStored();
   const values = {};
+  // A value that comes from the environment is locked in the form (its field is not even submitted): never copy it
+  // into the database, or removing the environment variable later would silently switch to a stale stored value.
+  const locked = {
+    env: ['sandbox', 'production'].includes(env.payon.env), appId: Boolean(env.payon.appId), merchantId: Boolean(env.payon.merchantId),
+    authUser: Boolean(env.payon.authUser),
+  };
   const mode = body.env === 'production' ? 'production' : 'sandbox';
-  values[`${PREFIX}env`] = mode;
-  values[`${PREFIX}appId`] = text(body.appId, 'APP_ID', 60);
-  const merchantId = text(body.merchantId, 'Mã merchant (MC_ID)', 20);
+  if (!locked.env) values[`${PREFIX}env`] = mode;
+  if (!locked.appId) values[`${PREFIX}appId`] = text(body.appId, 'APP_ID', 60);
+  const merchantId = locked.merchantId ? '' : text(body.merchantId, 'Mã merchant (MC_ID)', 20);
   if (merchantId && !/^\d+$/.test(merchantId)) throw new AppError(400, 'VALIDATION', 'Mã merchant (MC_ID) phải là số.');
-  values[`${PREFIX}merchantId`] = merchantId;
-  values[`${PREFIX}authUser`] = text(body.authUser, 'MC_AUTH_USER', 100);
+  if (!locked.merchantId) values[`${PREFIX}merchantId`] = merchantId;
+  if (!locked.authUser) values[`${PREFIX}authUser`] = text(body.authUser, 'MC_AUTH_USER', 100);
   for (const f of SECRET_FIELDS) {
     const v = text(body[f], f, 200);
     if (v) values[PREFIX + f] = v;                                  // blank = keep
@@ -106,7 +116,7 @@ async function save(body, userId) {
   values[`${PREFIX}enabled`] = wantOn ? '1' : '0';
   await settingsModel.setMany(values, userId);
   invalidate();
-  return get();
+  return get({ fresh: true });
 }
 
 module.exports = { get, view, save, invalidate, URLS };

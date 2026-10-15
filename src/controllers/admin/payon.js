@@ -7,6 +7,7 @@ const payonConfig = require('../../services/payon/payonConfig');
 const payonClient = require('../../services/payon/payonClient');
 const payonService = require('../../services/payon/payonService');
 const logger = require('../../utils/logger');
+const { render } = require('./common');
 const { AppError } = require('../../utils/httpError');
 const v = require('../../utils/validate');
 
@@ -74,16 +75,25 @@ function imageSrc(b64) {
 /** The QR block of an order page: null when PayOn is off, else the latest payment and the QR to draw. */
 async function orderPanel(orderId) {
   const cfg = await payonConfig.get();
-  if (!cfg.ready) return { ready: false, configured: cfg.complete || cfg.enabled, payment: null };
-  const rows = await payonModel.listForOrder(orderId, 1);
+  const rows = await payonModel.listForOrder(orderId, 10);
+  // money PayOn received that no one has dealt with: shown whether or not PayOn is still switched on
+  const manual = rows.filter((r) => r.status === 'manual').map((r) => payonService.publicView(r));
+  if (!cfg.ready) return { ready: false, configured: cfg.complete || cfg.enabled, payment: null, manual };
   const payment = payonService.publicView(rows[0] || null);
   let qrSvg = '';
   let qrSrc = '';
   if (payment && payment.open) {
     qrSrc = imageSrc(payment.qrImage);
-    if (!qrSrc && payment.qrPay) qrSvg = await QRCode.toString(payment.qrPay, { type: 'svg', margin: 1, width: 240, errorCorrectionLevel: 'M' });
+    if (!qrSrc && payment.qrPay) {
+      try {
+        qrSvg = await QRCode.toString(payment.qrPay, { type: 'svg', margin: 1, width: 240, errorCorrectionLevel: 'M' });
+      } catch (err) {
+        logger.warn('PayOn QR content could not be drawn', err);   // too long / odd content: offer a new QR instead of a blank box
+      }
+    }
+    if (!qrSrc && !qrSvg) payment.open = false;
   }
-  return { ready: true, configured: true, payment, qrSvg, qrSrc };
+  return { ready: true, configured: true, payment, qrSvg, qrSrc, manual };
 }
 
 async function createOrderQr(req) {
@@ -97,7 +107,8 @@ async function refresh(req) {
   const payment = await payonService.refresh(v.id(req.params.id));
   const row = await payonModel.getById(v.id(req.params.id));
   const to = row && row.order_id ? `/admin/orders/${row.order_id}` : '/admin/orders';
-  const text = { paid: 'Đã nhận tiền và ghi nhận vào đơn.', pending: 'Chưa thấy khách thanh toán.', manual: 'Đã nhận tiền nhưng cần xử lý tay (xem ghi chú).', expired: 'QR đã hết hạn.', failed: 'Giao dịch thất bại.' };
+  if (payment.checkError) throw new AppError(502, 'PAYON_CHECK', `Chưa kiểm tra được với PayOn: ${payment.checkError} Khi khách thanh toán, PayOn vẫn báo về và đơn tự được thu.`);
+  const text = { paid: 'Đã nhận tiền và ghi nhận vào đơn.', pending: 'Chưa thấy khách thanh toán.', manual: 'Đã nhận tiền nhưng cần xử lý tay (xem ghi chú).', applying: 'Đang ghi nhận khoản tiền…', expired: 'QR đã hết hạn.', failed: 'Giao dịch thất bại.' };
   return { message: text[payment.status] || 'Đã kiểm tra.', to };
 }
 
@@ -105,7 +116,31 @@ async function refresh(req) {
 async function status(req, res) {
   const payment = await payonService.refresh(v.id(req.params.id));
   res.set('Cache-Control', 'no-store');
-  res.json({ status: payment.status, open: payment.open });
+  res.json({ status: payment.status, open: payment.open, checkError: Boolean(payment.checkError) });
 }
 
-module.exports = { settingsPanel, saveSettings, testConnection, showServerIp, orderPanel, createOrderQr, refresh, status, imageSrc };
+// ------------------------------------------------------------------------------- payments that need a person
+
+/** GET /admin/payon: money received but not applied, and the latest payments. */
+async function listPage(req, res) {
+  const [attention, recent] = await Promise.all([payonModel.listNeedingAttention(50), payonModel.listRecent(30)]);
+  await render(res, 'payon_list', {
+    title: 'Giao dịch PayOn', activeMenu: 'orders',
+    breadcrumbs: [{ label: 'Đơn hàng', href: '/admin/orders' }, { label: 'Giao dịch PayOn' }],
+  }, { attention, recent });
+}
+
+/** "Thử ghi nhận lại": ask PayOn again and apply from "manual". */
+async function applyAgain(req) {
+  const id = v.id(req.params.id);
+  const payment = await payonService.retryApply(id);
+  return { message: payment.status === 'paid' ? 'Đã ghi nhận khoản tiền vào đơn.' : 'Vẫn chưa ghi nhận được: xem ghi chú của giao dịch.', to: '/admin/payon' };
+}
+
+/** "Đã xử lý": a person dealt with the money (usually refunded the customer); the note is kept. */
+async function resolveManual(req) {
+  await payonService.resolve(v.id(req.params.id), { note: req.body.note, userId: req.user.id });
+  return { message: 'Đã đánh dấu giao dịch là đã xử lý.', to: '/admin/payon' };
+}
+
+module.exports = { settingsPanel, saveSettings, testConnection, showServerIp, orderPanel, createOrderQr, refresh, status, imageSrc, listPage, applyAgain, resolveManual };

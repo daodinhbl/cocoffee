@@ -39,8 +39,8 @@ async function listForOrder(orderId, limit = 5, conn) {
   return rows;
 }
 
-/** Payments that need a person: money arrived but could not be applied. */
-async function listNeedingAttention(limit = 20, conn) {
+/** Payments that need a person: money arrived but could not be applied. Newest first, with the order code. */
+async function listNeedingAttention(limit = 50, conn) {
   const [rows] = await db(conn).query(
     `SELECT ${COLUMNS}, o.order_code FROM payon_payments p LEFT JOIN orders o ON o.id = p.order_id
       WHERE p.status = 'manual' ORDER BY p.id DESC LIMIT ?`, [limit]
@@ -48,9 +48,24 @@ async function listNeedingAttention(limit = 20, conn) {
   return rows;
 }
 
+async function countNeedingAttention(conn) {
+  const [rows] = await db(conn).query("SELECT COUNT(*) AS n FROM payon_payments WHERE status = 'manual'");
+  return Number(rows[0].n);
+}
+
+/** Latest payments of every status (the admin list's history part), with the order code. */
+async function listRecent(limit = 30, conn) {
+  const [rows] = await db(conn).query(
+    `SELECT ${COLUMNS}, o.order_code FROM payon_payments p LEFT JOIN orders o ON o.id = p.order_id
+      WHERE p.status <> 'failed' ORDER BY p.id DESC LIMIT ?`, [limit]
+  );
+  return rows;
+}
+
 /**
- * Atomically takes a payment for applying: pending (or manual, for a retry) -> applying, recording what PayOn reported.
- * False when somebody else already took it, so a notification and a status check arriving together apply it once.
+ * Atomically takes a payment for applying (pending / manual for a retry / expired or failed when the money arrived late)
+ * -> applying, recording what PayOn reported. False when somebody else already took it, so a notification and a status
+ * check arriving together apply it once.
  */
 async function claim(id, fromStatuses, { payonStatus, paymentId, transactionId, received, fee, paidAt }, conn) {
   const [res] = await db(conn).query(
@@ -63,15 +78,34 @@ async function claim(id, fromStatuses, { payonStatus, paymentId, transactionId, 
   return res.affectedRows === 1;
 }
 
-async function finish(id, status, note, conn) {
-  await db(conn).query('UPDATE payon_payments SET status = ?, note = ? WHERE id = ?', [status, note ? String(note).slice(0, 255) : null, id]);
-}
-
-/** A claim that never finished (process died between claim and finish) goes back to pending. */
-async function releaseStale(minutes, conn) {
-  await db(conn).query(
-    "UPDATE payon_payments SET status = 'pending' WHERE status = 'applying' AND updated_at < NOW() - INTERVAL ? MINUTE", [minutes]
+/**
+ * Sets the final state, but only from the state the caller saw (default: still being applied), so a settled payment is never
+ * overwritten by a stale "failed" / "expired" decision. @returns {Promise<boolean>} whether the row changed
+ */
+async function finish(id, status, note, fromStatuses = ['applying'], conn) {
+  const [res] = await db(conn).query(
+    'UPDATE payon_payments SET status = ?, note = ? WHERE id = ? AND status IN (?)',
+    [status, note ? String(note).slice(0, 255) : null, id, fromStatuses]
   );
+  return res.affectedRows === 1;
 }
 
-module.exports = { create, setQr, getById, getByRequestId, listForOrder, listNeedingAttention, claim, finish, releaseStale };
+/** Claims that never finished (the process died between claim and finish), oldest first. */
+async function listStaleApplying(minutes, limit = 20, conn) {
+  const [rows] = await db(conn).query(
+    `SELECT ${COLUMNS} FROM payon_payments p WHERE p.status = 'applying' AND p.updated_at < NOW() - INTERVAL ? MINUTE ORDER BY p.id LIMIT ?`,
+    [minutes, limit]
+  );
+  return rows;
+}
+
+/** Back to pending (a stale claim with nothing applied): the next notification or check applies it. */
+async function release(id, conn) {
+  const [res] = await db(conn).query("UPDATE payon_payments SET status = 'pending' WHERE id = ? AND status = 'applying'", [id]);
+  return res.affectedRows === 1;
+}
+
+module.exports = {
+  create, setQr, getById, getByRequestId, listForOrder, listNeedingAttention, countNeedingAttention, listRecent,
+  claim, finish, listStaleApplying, release,
+};

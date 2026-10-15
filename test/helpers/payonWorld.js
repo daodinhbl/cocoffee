@@ -24,7 +24,14 @@ function world(t, { cfg = CFG, order = {} } = {}) {
   t.mock.method(payonModel, 'getByRequestId', async (rid) => { const r = [...rows.values()].find((x) => x.merchant_request_id === rid); return r ? { ...r } : null; });
   t.mock.method(payonModel, 'listForOrder', async (oid) => [...rows.values()].filter((r) => r.order_id === oid).sort((a, b) => b.id - a.id).map((r) => ({ ...r })));
   t.mock.method(payonModel, 'claim', async (id, from, f) => { const r = rows.get(id); if (!r || !from.includes(r.status)) return false; Object.assign(r, { status: 'applying', payon_status: f.payonStatus, payment_id: f.paymentId ?? r.payment_id, received: f.received, fee: f.fee, paid_at: f.paidAt }); return true; });
-  t.mock.method(payonModel, 'finish', async (id, status, note) => { Object.assign(rows.get(id), { status, note: note || null }); });
+  t.mock.method(payonModel, 'finish', async (id, status, note, from = ['applying']) => { const r = rows.get(id); if (!r || !from.includes(r.status)) return false; Object.assign(r, { status, note: note || null }); return true; });
+  w.stale = [];
+  t.mock.method(payonModel, 'listStaleApplying', async () => w.stale.map((id) => ({ ...rows.get(id) })));
+  t.mock.method(payonModel, 'release', async (id) => { const r = rows.get(id); if (!r || r.status !== 'applying') return false; r.status = 'pending'; return true; });
+  t.mock.method(payonModel, 'listNeedingAttention', async () => [...rows.values()].filter((r) => r.status === 'manual').map((r) => ({ ...r, order_code: w.order.order_code })));
+  t.mock.method(payonModel, 'countNeedingAttention', async () => [...rows.values()].filter((r) => r.status === 'manual').length);
+  t.mock.method(payonModel, 'listRecent', async () => [...rows.values()].map((r) => ({ ...r, order_code: w.order.order_code })));
+  t.mock.method(orderModel, 'getPayments', async () => w.payments || []);
   t.mock.method(orderModel, 'getById', async () => (w.order ? { ...w.order } : null));
   t.mock.method(orderService, 'payOrder', async (id, opts) => { w.paid.push({ id, ...opts }); w.order.payment_status = 'paid'; return { order: w.order }; });
   t.mock.method(ownerNotice, 'notifyOwner', async (text) => { w.notices.push(text); return 'sent'; });

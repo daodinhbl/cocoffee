@@ -62,7 +62,10 @@ router.post('/orders/:id/cancel', act(orders.cancel));
 router.post('/orders/:id/pay', act(orders.pay));
 router.post('/orders/:id/record-debt', act(orders.recordDebt));
 router.post('/orders/:id/payon-qr', act(payon.createOrderQr));
+router.get('/payon', payon.listPage);
 router.post('/payon/:id/refresh', act(payon.refresh));
+router.post('/payon/:id/apply', act(payon.applyAgain));
+router.post('/payon/:id/resolve', act(payon.resolveManual));
 router.get('/payon/:id/status', payon.status);
 router.post('/orders/:id/resend-receipt', act(orders.resendReceipt));
 

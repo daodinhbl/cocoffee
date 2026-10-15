@@ -56,7 +56,10 @@ test('a notification signed by PHP verifies in all the spellings a sender can us
     const rawBody = raw.replace('"checksum":"x"', `"checksum":"${checksum}"`);
     return c.verifyNotification({ appId: APP, secret, body: JSON.parse(rawBody), rawBody });
   };
-  assert.deepEqual(check(IPN_CHECKSUM), { ok: true, how: 'php' });
+  const verdict = check(IPN_CHECKSUM);
+  assert.equal(verdict.ok, true);
+  assert.equal(verdict.how, 'php', 'PayOn signs PHP\'s json_encode, which differs from the spelling on the wire');
+  assert.deepEqual(verdict.data, body.data, 'the caller gets what was signed');
   // a Java/Node sender that does not escape (JSON as it is written in the body)
   const unescapedRaw = '{"data":' + JSON.stringify(body.data) + ',"checksum":"x"}';
   assert.equal(check(IPN_CHECKSUM_UNESCAPED, unescapedRaw).ok, true);
@@ -69,5 +72,41 @@ test('a notification signed by PHP verifies in all the spellings a sender can us
 
 test('a notification whose data is an encrypted string is checked like a request: md5(app_id + data + secret)', () => {
   const res = c.verifyNotification({ appId: APP, secret: SECRET, body: { data: REQ_DATA, checksum: REQ_CHECKSUM }, rawBody: '' });
-  assert.deepEqual(res, { ok: true, how: 'encrypted-string' });
+  assert.equal(res.ok, true);
+  assert.equal(res.how, 'encrypted-string');
+});
+
+test('a signed body cannot be extended with a second "data" member: the forged one is never acted on', () => {
+  const legit = JSON.parse(IPN_RAW).data;
+  const forged = [{ ...legit[0], merchant_request_id: 'OTHER-123456', amount: 9999999 }];
+  const sig = c.checksum(APP, c.phpJsonEncode(legit), SECRET);
+  const verify = (rawBody) => c.verifyNotification({ appId: APP, secret: SECRET, body: JSON.parse(rawBody), rawBody });
+  // the signed member first, a forged one last: JSON.parse keeps the last one
+  assert.equal(verify(`{"data":${JSON.stringify(legit)},"checksum":"${sig}","data":${JSON.stringify(forged)}}`).ok, false);
+  // a "data" nested earlier, the forged one at the top level
+  assert.equal(verify(`{"x":{"data":${JSON.stringify(legit)}},"data":${JSON.stringify(forged)},"checksum":"${sig}"}`).ok, false);
+  // the genuine body still passes, and the data returned is the signed one
+  const ok = verify(`{"data":${JSON.stringify(legit)},"checksum":"${sig}"}`);
+  assert.equal(ok.ok, true);
+  assert.deepEqual(ok.data, legit);
+});
+
+test('rawDataMember: duplicates, keys inside strings and nested objects, and malformed bodies', () => {
+  assert.equal(c.rawDataMember('{"data":[1],"data":[2]}'), null, 'twice: refused');
+  assert.equal(c.rawDataMember('{"note":"\\"data\\":[9]","data":[1]}'), '[1]', 'a data key inside a string is not the member');
+  assert.equal(c.rawDataMember('{"x":{"data":[9]},"data":[1]}'), '[1]', 'nor is one nested in another object');
+  assert.equal(c.rawDataMember('{"data":null,"checksum":"x"}'), 'null');
+  assert.equal(c.rawDataMember('{"data":12.50 ,"checksum":"x"}'), '12.50');
+  assert.equal(c.rawDataMember('[1,2]'), null);
+  assert.equal(c.rawDataMember('{"data":[1,{"a":"]"}'), null, 'unbalanced');
+  assert.equal(c.rawDataMember('{"data"'), null);
+  assert.equal(c.rawDataMember(''), null);
+});
+
+test('absurdly nested JSON is refused (ok:false), not a crash', () => {
+  const deep = `${'['.repeat(20000)}${']'.repeat(20000)}`;
+  const rawBody = `{"data":${deep},"checksum":"abc"}`;
+  let body;
+  try { body = JSON.parse(rawBody); } catch (_) { body = { data: [[[]]], checksum: 'abc' }; }
+  assert.deepEqual(c.verifyNotification({ appId: APP, secret: SECRET, body, rawBody }), { ok: false });
 });

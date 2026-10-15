@@ -179,6 +179,11 @@ async function start() {
   mock.method(mediaModel, 'create', rec('media.create', ({ folder, mime, bytes }) => { const id = ++mediaSeq; MEDIA.set(id, { id, folder, mime, bytes }); return id; }));
   mock.method(mediaModel, 'get', async (id) => MEDIA.get(Number(id)) || null);
   mock.method(mediaModel, 'remove', rec('media.remove', (id) => { MEDIA.delete(Number(id)); }));
+  const payonModel = require('../../src/models/payonModel');
+  mock.method(payonModel, 'countNeedingAttention', async () => 0);
+  mock.method(payonModel, 'listForOrder', async () => []);
+  mock.method(payonModel, 'listNeedingAttention', async () => []);
+  mock.method(payonModel, 'listRecent', async () => []);
   const IDEMPOTENCY = new Map();   // idempotency_keys, in memory (scope -> row)
   mock.method(idempotencyModel, 'find', async (scope) => IDEMPOTENCY.get(scope) || null);
   mock.method(idempotencyModel, 'claim', async (scope, hash) => { if (IDEMPOTENCY.has(scope)) return false; IDEMPOTENCY.set(scope, { request_hash: hash, status: null, body: null }); return true; });

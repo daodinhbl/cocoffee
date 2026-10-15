@@ -68,6 +68,7 @@ test('a signed notification pays the order once (transfer, PayOn reference), tel
   assert.equal(w.paid.length, 1);
   assert.equal(w.paid[0].id, 42);
   assert.equal(w.paid[0].method, 'transfer');
+  assert.equal(w.paid[0].tendered, 79000, 'payOrder re-checks the amount under its row lock');
   assert.match(w.paid[0].reference, /^PayOn 987654$/);
   assert.equal(w.paid[0].userId, 7);
   assert.equal(w.paid[0].allowDebtSettlement, true);

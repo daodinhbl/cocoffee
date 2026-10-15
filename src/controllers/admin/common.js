@@ -17,6 +17,8 @@ async function notifications() {
     if (counts.drafts > 0) out.push({ text: `${counts.drafts} đơn Zalo chờ khách xác nhận`, time: '', tone: 'info', href: '/admin/orders?status=draft' });
     if (counts.unpaid > 0) out.push({ text: `${counts.unpaid} đơn chờ thu tiền`, time: '', tone: 'warn', href: '/admin/orders?status=completed&payment=unpaid' });
     for (const i of low.slice(0, 5)) out.push({ text: `${i.name} dưới mức tồn tối thiểu`, time: '', tone: 'warn', href: '/admin/inventory?low=1' });
+    const manual = await require('../../models/payonModel').countNeedingAttention().catch(() => 0);   // PayOn money nobody applied yet
+    if (manual > 0) out.unshift({ text: `${manual} giao dịch PayOn đã nhận tiền cần xử lý`, time: '', tone: 'bad', href: '/admin/payon' });
     return out;
   } catch (err) {
     logger.warn('Admin header: could not load notifications', err);

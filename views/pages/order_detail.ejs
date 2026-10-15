@@ -295,8 +295,8 @@
         </form>
       </div>
     </section>
-    <%- include('../partials/payon_qr', { panel: payonPanel, order }) %>
     <% } %>
+    <%- include('../partials/payon_qr', { panel: payonPanel, order, canPay }) %>
 
     <!-- Other actions -->
     <% if (canResend || canCancel || canRecordDebt) { %>
