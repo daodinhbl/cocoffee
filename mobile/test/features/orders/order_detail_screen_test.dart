@@ -169,7 +169,7 @@ void main() {
   });
 
   testWidgets('cancel: confirm sheet then POST /orders/:id/cancel', (tester) async {
-    when(() => api.post('/orders/42/cancel', any())).thenAnswer(
+    when(() => api.post('/orders/42/cancel', any(), any())).thenAnswer(
         (_) async => {'order': {...openOrderResponse()['order'] as Map<String, dynamic>, 'status': 'cancelled'}});
     await setSurface(tester, phone);
     await tester.pumpWidget(await testApp(const OrderDetailScreen(id: 42), api: api));
@@ -185,7 +185,7 @@ void main() {
     await tester.tap(find.byKey(const Key('confirm-yes')));
     await tester.pumpAndSettle();
 
-    verify(() => api.post('/orders/42/cancel', any())).called(1);
+    verify(() => api.post('/orders/42/cancel', any(), any())).called(1);
     expect(find.text('Đã hủy đơn CF261014-00042.'), findsOneWidget);
   });
 

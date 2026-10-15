@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import '../../core/offline/offline_labels.dart';
+import '../../core/offline/offline_writer.dart';
+import '../../core/offline/offline_effects.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/format.dart';
-import '../../core/session.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common.dart';
 import 'customer_form_screen.dart';
@@ -37,7 +39,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
     final res = await showFormSheet<Map<String, dynamic>>(context, builder: (_) => _CollectSheet(customer: c));
     if (res == null || !mounted) return;
     // Same sentence as the web flash: 'Đã thu {amount}đ. Còn nợ {balance}đ. Đã tất toán N đơn: codes.'
-    setState(() => _flash = _Flash('Đã thu ${money(parseNum(res['amount']))}. Còn nợ ${money(parseNum(res['balance']))}.',
+    setState(() => _flash = _Flash('Đã thu ${money(parseNum(res['amount']))}. Còn nợ ${money(parseNum(res['balance']))}.${res['queued'] == true ? queuedNote : ''}',
         parseStrings(res['settled'])));
     invalidateCustomerData(ref, id: widget.id);
   }
@@ -45,7 +47,7 @@ class _CustomerDetailScreenState extends ConsumerState<CustomerDetailScreen> {
   Future<void> _adjust(Customer c) async {
     final res = await showFormSheet<Map<String, dynamic>>(context, builder: (_) => AdjustSheet(customer: c));
     if (res == null || !mounted) return;
-    setState(() => _flash = _Flash(adjustMessage(parseNum(res['balance']), res['notify'])));
+    setState(() => _flash = _Flash('${adjustMessage(parseNum(res['balance']), res['notify'])}${res['queued'] == true ? queuedNote : ''}'));
     invalidateCustomerData(ref, id: widget.id);
   }
 
@@ -441,12 +443,19 @@ class _CollectSheetState extends ConsumerState<_CollectSheet> {
     });
     try {
       final note = _note.text.trim();
-      final res = await ref.read(apiProvider).post('/admin/customers/${c.id}/collect', {
-        'amount': _jsonNumber(num.parse(_amount.text.trim())),
-        'method': _method,
-        if (note.isNotEmpty) 'note': note,
-      });
-      if (mounted) Navigator.of(context).pop(res);
+      final amount = num.parse(_amount.text.trim());
+      final out = await ref.read(offlineWriterProvider).submit(
+        kind: 'customer.collect',
+        path: '/admin/customers/${c.id}/collect',
+        body: {
+          'amount': _jsonNumber(amount),
+          'method': _method,
+          if (note.isNotEmpty) 'note': note,
+        },
+        local: {'customer': c.name, 'total': amount},
+        effect: (db) async => {'amount': amount, 'balance': await db.addCustomerBalance(c.id, -amount), 'settled': <String>[]},
+      );
+      if (mounted) Navigator.of(context).pop(out.body);
     } catch (e) {
       if (mounted) setState(() => _error = toApiException(e).message);
     } finally {
@@ -562,12 +571,19 @@ class _AdjustSheetState extends ConsumerState<AdjustSheet> {
       _error = null;
     });
     try {
-      final res = await ref.read(apiProvider).post('/admin/customers/${c.id}/adjust', {
-        'amount': _jsonNumber(num.parse(_amount.text.trim())),
-        'direction': _direction,
-        'note': _note.text.trim(),
-      });
-      if (mounted) Navigator.of(context).pop(res);
+      final amount = num.parse(_amount.text.trim());
+      final out = await ref.read(offlineWriterProvider).submit(
+        kind: 'customer.adjust',
+        path: '/admin/customers/${c.id}/adjust',
+        body: {
+          'amount': _jsonNumber(amount),
+          'direction': _direction,
+          'note': _note.text.trim(),
+        },
+        local: {'customer': c.name, 'total': amount},
+        effect: (db) async => {'balance': await db.addCustomerBalance(c.id, _direction == 'decrease' ? -amount : amount)},
+      );
+      if (mounted) Navigator.of(context).pop(out.body);
     } catch (e) {
       if (mounted) setState(() => _error = toApiException(e).message);
     } finally {

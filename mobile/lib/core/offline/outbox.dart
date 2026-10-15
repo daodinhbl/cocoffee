@@ -11,6 +11,21 @@ import '../session.dart';
 /// [id] doubles as the Idempotency-Key, so a request that did reach the server (answer lost on the way back) is
 /// replayed as the same request and not executed twice. [local] holds what the screens show meanwhile (code,
 /// table, lines, total...). [error] is set when the server refused the replay (a business error, in Vietnamese).
+/// Vietnamese name of a queued write.
+String kindLabel(String kind) => switch (kind) {
+      'checkout' => 'Thanh toán',
+      'hold' => 'Giữ đơn',
+      'pay' => 'Thu tiền',
+      'customer.create' => 'Thêm khách hàng',
+      'customer.update' => 'Sửa khách hàng',
+      'customer.collect' => 'Thu nợ',
+      'customer.adjust' => 'Điều chỉnh công nợ',
+      'inventory.receive' => 'Nhập kho',
+      'inventory.adjust' => 'Kiểm kê kho',
+      'order.cancel' => 'Hủy đơn',
+      _ => kind,
+    };
+
 class OutboxItem {
   const OutboxItem({
     required this.id,
@@ -19,6 +34,7 @@ class OutboxItem {
     required this.body,
     required this.local,
     required this.createdAt,
+    this.method = 'POST',
     this.attempts = 0,
     this.error,
     this.errorCode,
@@ -31,6 +47,7 @@ class OutboxItem {
         body: Map<String, dynamic>.from(j['body'] as Map? ?? const {}),
         local: Map<String, dynamic>.from(j['local'] as Map? ?? const {}),
         createdAt: DateTime.tryParse('${j['created_at']}') ?? DateTime.fromMillisecondsSinceEpoch(0),
+        method: '${j['method'] ?? 'POST'}',
         attempts: (j['attempts'] as num?)?.toInt() ?? 0,
         error: j['error'] as String?,
         errorCode: j['error_code'] as String?,
@@ -38,12 +55,17 @@ class OutboxItem {
 
   final String id;
 
-  /// 'checkout' (POST /pos/checkout), 'hold' (POST /pos/hold) or 'pay' (POST /orders/:id/pay).
+  /// 'checkout' (POST /pos/checkout), 'hold' (POST /pos/hold), 'pay' (POST /orders/:id/pay), or an offline write of
+  /// the management screens: 'customer.create', 'customer.update', 'customer.collect', 'customer.adjust',
+  /// 'inventory.receive', 'inventory.adjust', 'order.cancel' (see offline_writer.dart).
   final String kind;
   final String path;
   final Map<String, dynamic> body;
   final Map<String, dynamic> local;
   final DateTime createdAt;
+
+  /// HTTP verb of the replay: POST (default) or PUT.
+  final String method;
   final int attempts;
   final String? error;
   final String? errorCode;
@@ -54,7 +76,7 @@ class OutboxItem {
   String get code => '${local['code'] ?? ''}';
   num get total => local['total'] is num ? local['total'] as num : num.tryParse('${local['total'] ?? ''}') ?? 0;
   int? get tableId => (body['table_id'] as num?)?.toInt();
-  String get title => switch (kind) { 'checkout' => 'Thanh toán', 'hold' => 'Giữ đơn', 'pay' => 'Thu tiền', _ => kind };
+  String get title => kindLabel(kind);
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -63,6 +85,7 @@ class OutboxItem {
         'body': body,
         'local': local,
         'created_at': createdAt.toIso8601String(),
+        'method': method,
         'attempts': attempts,
         if (error != null) 'error': error,
         if (errorCode != null) 'error_code': errorCode,
@@ -84,7 +107,7 @@ class OutboxItem {
 
 /// An item the server accepted: what it became there.
 class SyncedItem {
-  const SyncedItem({required this.id, required this.kind, required this.localCode, required this.serverCode, this.serverOrderId, required this.at});
+  const SyncedItem({required this.id, required this.kind, required this.localCode, required this.serverCode, this.serverOrderId, this.serverId, required this.at});
 
   factory SyncedItem.fromJson(Map<String, dynamic> j) => SyncedItem(
         id: '${j['id']}',
@@ -92,6 +115,7 @@ class SyncedItem {
         localCode: '${j['local_code'] ?? ''}',
         serverCode: '${j['server_code'] ?? ''}',
         serverOrderId: (j['server_order_id'] as num?)?.toInt(),
+        serverId: (j['server_id'] as num?)?.toInt(),
         at: DateTime.tryParse('${j['at']}') ?? DateTime.fromMillisecondsSinceEpoch(0),
       );
 
@@ -100,17 +124,23 @@ class SyncedItem {
   final String localCode;
   final String serverCode;
   final int? serverOrderId;
+
+  /// Id of the record a 'customer.create' became on the server.
+  final int? serverId;
   final DateTime at;
 
   Map<String, dynamic> toJson() =>
-      {'id': id, 'kind': kind, 'local_code': localCode, 'server_code': serverCode, 'server_order_id': serverOrderId, 'at': at.toIso8601String()};
+      {'id': id, 'kind': kind, 'local_code': localCode, 'server_code': serverCode, 'server_order_id': serverOrderId, 'server_id': serverId, 'at': at.toIso8601String()};
 }
 
 class OutboxState {
-  const OutboxState({this.items = const [], this.synced = const [], this.syncing = false, this.loaded = false});
+  const OutboxState({this.items = const [], this.synced = const [], this.refs = const {}, this.syncing = false, this.loaded = false});
 
   final List<OutboxItem> items;
   final List<SyncedItem> synced;
+
+  /// Temporary id (negative) given to a record created offline -> its id on the server, once replayed.
+  final Map<int, int> refs;
   final bool syncing;
   final bool loaded;
 
@@ -118,8 +148,8 @@ class OutboxState {
   int get failedCount => items.where((i) => i.failed).length;
   bool get isEmpty => items.isEmpty;
 
-  OutboxState copyWith({List<OutboxItem>? items, List<SyncedItem>? synced, bool? syncing, bool? loaded}) =>
-      OutboxState(items: items ?? this.items, synced: synced ?? this.synced, syncing: syncing ?? this.syncing, loaded: loaded ?? this.loaded);
+  OutboxState copyWith({List<OutboxItem>? items, List<SyncedItem>? synced, Map<int, int>? refs, bool? syncing, bool? loaded}) => OutboxState(
+      items: items ?? this.items, synced: synced ?? this.synced, refs: refs ?? this.refs, syncing: syncing ?? this.syncing, loaded: loaded ?? this.loaded);
 }
 
 const _alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -135,6 +165,21 @@ String newLocalId({Random? random, DateTime? now}) {
 String localCodeOf(String id) => 'OFF-${id.substring(id.length - 6).toUpperCase()}';
 
 const kSyncedKept = 30;
+
+/// Replaces the temporary (negative) ids in a queued path (`/admin/customers/-4821/collect`) with the ids the
+/// server gave once the record was created. Null when one of them is not known yet.
+String? resolveRefs(String path, Map<int, int> refs) {
+  var ok = true;
+  final out = path.replaceAllMapped(RegExp(r'/(-\d+)(?=/|$)'), (m) {
+    final real = refs[int.parse(m.group(1)!)];
+    if (real == null) {
+      ok = false;
+      return m.group(0)!;
+    }
+    return '/$real';
+  });
+  return ok ? out : null;
+}
 
 final outboxProvider = NotifierProvider<OutboxNotifier, OutboxState>(OutboxNotifier.new);
 
@@ -161,6 +206,7 @@ class OutboxNotifier extends Notifier<OutboxState> {
           loaded: true,
           items: [for (final i in (j['items'] as List? ?? const [])) if (i is Map) OutboxItem.fromJson(Map<String, dynamic>.from(i))],
           synced: [for (final s in (j['synced'] as List? ?? const [])) if (s is Map) SyncedItem.fromJson(Map<String, dynamic>.from(s))],
+          refs: {for (final e in ((j['refs'] as Map?) ?? const {}).entries) int.parse('${e.key}'): (e.value as num).toInt()},
         );
       }
     } catch (_) {
@@ -173,7 +219,11 @@ class OutboxNotifier extends Notifier<OutboxState> {
 
   Future<void> _persist() => ref.read(localStoreProvider).write(
         _key,
-        jsonEncode({'items': [for (final i in state.items) i.toJson()], 'synced': [for (final s in state.synced.take(kSyncedKept)) s.toJson()]}),
+        jsonEncode({
+          'items': [for (final i in state.items) i.toJson()],
+          'synced': [for (final s in state.synced.take(kSyncedKept)) s.toJson()],
+          'refs': {for (final e in state.refs.entries) '${e.key}': e.value},
+        }),
       );
 
   OutboxItem? byId(String id) {
@@ -191,10 +241,17 @@ class OutboxNotifier extends Notifier<OutboxState> {
     return null;
   }
 
-  Future<OutboxItem> enqueue({required String kind, required String path, required Map<String, dynamic> body, required Map<String, dynamic> local, String? id}) async {
+  Future<OutboxItem> enqueue({
+    required String kind,
+    required String path,
+    required Map<String, dynamic> body,
+    required Map<String, dynamic> local,
+    String? id,
+    String method = 'POST',
+  }) async {
     await ready;
     final itemId = id ?? newLocalId();
-    final item = OutboxItem(id: itemId, kind: kind, path: path, body: body, local: {'code': localCodeOf(itemId), ...local}, createdAt: DateTime.now());
+    final item = OutboxItem(id: itemId, kind: kind, path: path, body: body, local: {'code': localCodeOf(itemId), ...local}, createdAt: DateTime.now(), method: method);
     state = state.copyWith(items: [...state.items, item]);
     await _persist();
     return item;
@@ -235,18 +292,37 @@ class OutboxNotifier extends Notifier<OutboxState> {
         if (!ref.mounted) return;
         if (byId(item.id) == null) continue; // discarded meanwhile
         try {
-          final res = await ref.read(apiProvider).post(item.path, item.body, {'Idempotency-Key': item.id});
+          final path = resolveRefs(item.path, state.refs);
+          if (path == null) {
+            // It points at a record created offline whose own creation was refused: nothing to attach it to.
+            state = state.copyWith(items: [
+              for (final i in state.items)
+                if (i.id == item.id) i.copyWith(attempts: i.attempts + 1, error: 'Khách hàng tạo ngoại tuyến chưa được gửi lên máy chủ.', errorCode: 'DEPENDENCY') else i,
+            ]);
+            continue;
+          }
+          final api = ref.read(apiProvider);
+          final key = {'Idempotency-Key': item.id};
+          final res = item.method == 'PUT' ? await api.put(path, item.body, key) : await api.post(path, item.body, key);
           final order = res['order'] is Map ? Map<String, dynamic>.from(res['order'] as Map) : const <String, dynamic>{};
+          final created = item.kind == 'customer.create' && res['customer'] is Map ? Map<String, dynamic>.from(res['customer'] as Map) : null;
+          final tempId = (item.local['temp_id'] as num?)?.toInt();
           final done = SyncedItem(
             id: item.id,
             kind: item.kind,
             localCode: item.code,
             serverCode: '${order['order_code'] ?? ''}',
             serverOrderId: (order['id'] as num?)?.toInt(),
+            serverId: (created?['id'] as num?)?.toInt(),
             at: DateTime.now(),
           );
           if (!ref.mounted) return;
-          state = state.copyWith(items: [for (final i in state.items) if (i.id != item.id) i], synced: [done, ...state.synced].take(kSyncedKept).toList());
+          final refs = created != null && tempId != null ? {...state.refs, tempId: (created['id'] as num).toInt()} : state.refs;
+          state = state.copyWith(
+            items: [for (final i in state.items) if (i.id != item.id) i],
+            synced: [done, ...state.synced].take(kSyncedKept).toList(),
+            refs: refs,
+          );
         } catch (e) {
           final x = toApiException(e);
           if (x.isNetwork) break; // offline again: the rest waits

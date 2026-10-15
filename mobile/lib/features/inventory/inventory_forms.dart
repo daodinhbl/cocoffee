@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../core/offline/offline_labels.dart';
+import '../../core/offline/offline_writer.dart';
+import '../../core/offline/offline_effects.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -270,15 +273,23 @@ class _AdjustSheetState extends ConsumerState<AdjustSheet> {
     });
     try {
       final note = _note.text.trim();
-      final res = await ref.read(apiProvider).post('/inventory/${widget.item.id}/adjust', {
-        'new_quantity': parseAmount(_qty.text) ?? 0,
-        'type': _type,
-        if (note.isNotEmpty) 'note': note,
-      });
+      final newQuantity = parseAmount(_qty.text) ?? 0;
+      final out = await ref.read(offlineWriterProvider).submit(
+        kind: 'inventory.adjust',
+        path: '/inventory/${widget.item.id}/adjust',
+        body: {
+          'new_quantity': newQuantity,
+          'type': _type,
+          if (note.isNotEmpty) 'note': note,
+        },
+        local: {'item': widget.item.name},
+        effect: (db) => db.moveStock(widget.item.id, newQuantity: newQuantity),
+      );
+      final res = out.body;
       final delta = asDouble(res['delta']);
       invalidateInventory(ref);
       if (!mounted) return;
-      showToast(context, delta == 0 ? 'Số lượng không đổi.' : 'Đã điều chỉnh tồn kho (${signed(delta)}).');
+      showToast(context, delta == 0 ? 'Số lượng không đổi.' : 'Đã điều chỉnh tồn kho (${signed(delta)}).${res['queued'] == true ? queuedNote : ''}');
       Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {

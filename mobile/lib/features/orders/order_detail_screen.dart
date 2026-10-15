@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../core/offline/offline_writer.dart';
+import '../../core/offline/offline_effects.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -75,10 +77,15 @@ class _DetailBody extends ConsumerWidget {
       ),
     );
     if (ok != true || !context.mounted) return;
-    final api = ref.read(apiProvider);
     final done = await runWithToast(context, () async {
       try {
-        await api.post('/orders/${order.id}/cancel');
+        await ref.read(offlineWriterProvider).submit(
+              kind: 'order.cancel',
+              path: '/orders/${order.id}/cancel',
+              body: const {},
+              local: {'code': order.orderCode},
+              effect: (db) async => {'order': await db.cancelOrderLocally(order.id)},
+            );
       } catch (e) {
         throw orderError(e);
       }

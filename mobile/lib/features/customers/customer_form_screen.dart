@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import '../../core/offline/offline_writer.dart';
+import '../../core/offline/offline_effects.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_client.dart';
-import '../../core/session.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common.dart';
 import 'customer_models.dart';
@@ -54,28 +55,47 @@ class _CustomerFormScreenState extends ConsumerState<CustomerFormScreen> {
       _busy = true;
       _error = null;
     });
-    final api = ref.read(apiProvider);
     final name = _name.text.trim();
     final phone = _phone.text.trim();
     final zalo = _zalo.text.trim();
     final note = _note.text.trim();
     try {
       final Map<String, dynamic> res;
+      final writer = ref.read(offlineWriterProvider);
       if (_isNew) {
-        res = await api.post('/admin/customers', {
-          'name': name,
-          if (phone.isNotEmpty) 'phone': phone,
-          if (zalo.isNotEmpty) 'zalo_user_id': zalo,
-          if (note.isNotEmpty) 'note': note,
-        });
+        final tempId = newTempId();
+        final out = await writer.submit(
+          kind: 'customer.create',
+          path: '/admin/customers',
+          body: {
+            'name': name,
+            if (phone.isNotEmpty) 'phone': phone,
+            if (zalo.isNotEmpty) 'zalo_user_id': zalo,
+            if (note.isNotEmpty) 'note': note,
+          },
+          local: {'customer': name, 'temp_id': tempId},
+          effect: (db) async => {
+            'customer': await db.insertCustomer(tempId, name: name, phone: phone.isEmpty ? null : phone, zaloUserId: zalo.isEmpty ? null : zalo, note: note.isEmpty ? null : note),
+          },
+        );
+        res = out.body;
       } else {
         // An empty phone, Zalo ID or note clears it (null), like the web update.
-        res = await api.put('/admin/customers/${widget.customer!.id}', {
+        final fields = {
           'name': name,
           'phone': phone.isEmpty ? null : phone,
           'zalo_user_id': zalo.isEmpty ? null : zalo,
           'note': note.isEmpty ? null : note,
-        });
+        };
+        final out = await writer.submit(
+          kind: 'customer.update',
+          method: 'PUT',
+          path: '/admin/customers/${widget.customer!.id}',
+          body: fields,
+          local: {'customer': name},
+          effect: (db) async => {'customer': await db.patchCustomer(widget.customer!.id, fields)},
+        );
+        res = out.body;
       }
       final raw = res['customer'];
       final saved = raw is Map

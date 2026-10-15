@@ -37,7 +37,7 @@ void main() {
   setUp(() => api = MockApi());
 
   testWidgets('phone: new customer — required name, POST /admin/customers, pops with the new customer', (tester) async {
-    when(() => api.post('/admin/customers', any())).thenAnswer((_) async => {
+    when(() => api.post('/admin/customers', any(), any())).thenAnswer((_) async => {
           'customer': customerJson(id: 15, name: 'Phạm Thu Hà', phone: '0912345678', zalo: null, note: null, balance: 0, orders: 0),
         });
     Customer? result;
@@ -66,13 +66,13 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Thêm khách hàng'));
     await tester.pumpAndSettle();
 
-    verify(() => api.post('/admin/customers', {'name': 'Phạm Thu Hà', 'phone': '0912345678'})).called(1);
+    verify(() => api.post('/admin/customers', {'name': 'Phạm Thu Hà', 'phone': '0912345678'}, any())).called(1);
     expect(result?.id, 15);
     expect(find.text('Đã thêm khách hàng "Phạm Thu Hà".'), findsOneWidget);
   });
 
   testWidgets('tablet: edit — prefilled, cleared phone sent as null, PUT /admin/customers/7', (tester) async {
-    when(() => api.put('/admin/customers/7', any())).thenAnswer((_) async => {'customer': customerJson(phone: null, note: 'Ghi sổ cuối tuần')});
+    when(() => api.put('/admin/customers/7', any(), any())).thenAnswer((_) async => {'customer': customerJson(phone: null, note: 'Ghi sổ cuối tuần')});
     Customer? result;
     final c = Customer.fromJson(customerJson());
     await setSurface(tester, tablet);
@@ -97,13 +97,13 @@ void main() {
           'phone': null,
           'zalo_user_id': 'zl_123456',
           'note': 'Ghi sổ cuối tuần',
-        })).called(1);
+        }, any())).called(1);
     expect(result?.note, 'Ghi sổ cuối tuần');
     expect(find.text('Đã cập nhật thông tin khách hàng.'), findsOneWidget);
   });
 
   testWidgets('duplicate Zalo ID shows the web message on the field', (tester) async {
-    when(() => api.put('/admin/customers/7', any())).thenThrow(ApiException(
+    when(() => api.put('/admin/customers/7', any(), any())).thenThrow(ApiException(
         code: 'DUPLICATE', status: 409, message: 'Giá trị này đã tồn tại.', details: {'field': 'zalo_user_id'}));
     await setSurface(tester, phone);
     await tester.pumpWidget(await testApp(CustomerFormScreen(customer: Customer.fromJson(customerJson())), api: api));
@@ -117,7 +117,7 @@ void main() {
 
   testWidgets('list FAB -> form -> created customer opens its detail (like the web redirect)', (tester) async {
     when(() => api.get('/admin/customers', query: any(named: 'query'))).thenAnswer((_) async => customersPage());
-    when(() => api.post('/admin/customers', any())).thenAnswer((_) async => {
+    when(() => api.post('/admin/customers', any(), any())).thenAnswer((_) async => {
           'customer': customerJson(id: 15, name: 'Phạm Thu Hà', phone: null, zalo: null, note: null, balance: 0, orders: 0),
         });
     when(() => api.get('/admin/customers/15')).thenAnswer((_) async => {
@@ -135,7 +135,7 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Thêm khách hàng'));
     await tester.pumpAndSettle();
 
-    verify(() => api.post('/admin/customers', {'name': 'Phạm Thu Hà'})).called(1);
+    verify(() => api.post('/admin/customers', {'name': 'Phạm Thu Hà'}, any())).called(1);
     verify(() => api.get('/admin/customers/15')).called(1);
     expect(find.text('SỐ DƯ CÔNG NỢ'), findsOneWidget);
     expect(find.text('Không còn nợ'), findsOneWidget);

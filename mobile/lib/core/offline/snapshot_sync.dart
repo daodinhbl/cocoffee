@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/api_client.dart';
 import '../session.dart';
 import 'connectivity.dart';
+import 'outbox.dart';
 
 /// Minimum time between two automatic copies (a forced one — the "Đồng bộ ngay" button — ignores it).
 const kSnapshotMinInterval = Duration(minutes: 2);
@@ -58,6 +59,8 @@ class SnapshotSyncNotifier extends Notifier<SnapshotState> {
     if (!db.enabled || auth is! SignedIn || auth.user.mustChangePassword || state.syncing) return false;
     if (!force) {
       if (!ref.read(netProvider).online) return false;
+      // Writes still waiting would be wiped from the local copy: it is refreshed once they were replayed.
+      if (ref.read(outboxProvider).pending.isNotEmpty) return false;
       final last = _lastTry;
       if (last != null && DateTime.now().difference(last) < kSnapshotMinInterval) return false;
     }

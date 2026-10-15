@@ -159,7 +159,7 @@ void main() {
 
   testWidgets('phone: "Ghi nợ" on a card adds debt only (no direction choice), one POST, the list reloads', (tester) async {
     await setSurface(tester, phone);
-    when(() => api.post('/admin/customers/7/adjust', any())).thenAnswer((_) async => {
+    when(() => api.post('/admin/customers/7/adjust', any(), any())).thenAnswer((_) async => {
           'balance': 270000,
           'amount': 120000,
           'note': 'lấy hàng chưa trả',
@@ -191,7 +191,7 @@ void main() {
     await tester.tap(find.text('Đồng ý'));
     await tester.pumpAndSettle();
 
-    final body = verify(() => api.post('/admin/customers/7/adjust', captureAny())).captured.single;
+    final body = verify(() => api.post('/admin/customers/7/adjust', captureAny(), any())).captured.single;
     expect(body, {'amount': 120000, 'direction': 'increase', 'note': 'lấy hàng chưa trả'});
     expect(find.textContaining('Đã điều chỉnh công nợ. Số dư mới 270.000đ. Đã gửi Zalo cho khách.'), findsOneWidget);
     expect(queries.length, greaterThan(before), reason: 'the list was reloaded');

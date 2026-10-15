@@ -74,7 +74,7 @@ void main() {
   });
 
   testWidgets('phone: Thu nợ sheet — "Thu hết", method, note, confirm -> POST collect, settled orders shown', (tester) async {
-    when(() => api.post('/admin/customers/7/collect', any())).thenAnswer((_) async {
+    when(() => api.post('/admin/customers/7/collect', any(), any())).thenAnswer((_) async {
       paidOff = true;
       return {'amount': 150000, 'balance': 0, 'settled': ['CF261012-00042']};
     });
@@ -105,7 +105,7 @@ void main() {
     await tester.tap(find.text('Đồng ý'));
     await tester.pumpAndSettle();
 
-    verify(() => api.post('/admin/customers/7/collect', {'amount': 150000, 'method': 'transfer', 'note': 'CK Vietcombank'})).called(1);
+    verify(() => api.post('/admin/customers/7/collect', {'amount': 150000, 'method': 'transfer', 'note': 'CK Vietcombank'}, any())).called(1);
     expect(find.text('Đã thu 150.000đ. Còn nợ 0đ.'), findsOneWidget);
     expect(find.text('Đã tất toán 1 đơn:'), findsOneWidget);
     expect(detailCalls, 2); // detail reloaded after the write
@@ -114,7 +114,7 @@ void main() {
   });
 
   testWidgets('phone: collect error from the server stays inside the sheet', (tester) async {
-    when(() => api.post('/admin/customers/7/collect', any()))
+    when(() => api.post('/admin/customers/7/collect', any(), any()))
         .thenThrow(ApiException(code: 'NO_DEBT', status: 409, message: 'Khách hàng này không còn nợ.'));
     await setSurface(tester, phone);
     await tester.pumpWidget(await testApp(const CustomerDetailScreen(id: 7), api: api));
@@ -131,7 +131,7 @@ void main() {
   });
 
   testWidgets('tablet: two columns; Điều chỉnh dialog validates, then POST adjust (decrease)', (tester) async {
-    when(() => api.post('/admin/customers/7/adjust', any()))
+    when(() => api.post('/admin/customers/7/adjust', any(), any()))
         .thenAnswer((_) async => {'balance': 130000, 'amount': -20000, 'note': 'xóa nợ lẻ', 'notify': null});
     await setSurface(tester, tablet);
     await tester.pumpWidget(await testApp(const CustomerDetailScreen(id: 7), api: api));
@@ -163,13 +163,13 @@ void main() {
     await tester.tap(find.text('Đồng ý'));
     await tester.pumpAndSettle();
 
-    verify(() => api.post('/admin/customers/7/adjust', {'amount': 20000, 'direction': 'decrease', 'note': 'xóa nợ lẻ'})).called(1);
+    verify(() => api.post('/admin/customers/7/adjust', {'amount': 20000, 'direction': 'decrease', 'note': 'xóa nợ lẻ'}, any())).called(1);
     expect(find.text('Đã điều chỉnh công nợ. Số dư mới 130.000đ.'), findsOneWidget);
     expect(detailCalls, 2);
   });
 
   testWidgets('phone: Sửa opens the form; saving PUTs and reloads the customer', (tester) async {
-    when(() => api.put('/admin/customers/7', any())).thenAnswer((_) async => {'customer': customerJson(note: 'Ghi sổ cuối tuần')});
+    when(() => api.put('/admin/customers/7', any(), any())).thenAnswer((_) async => {'customer': customerJson(note: 'Ghi sổ cuối tuần')});
     await setSurface(tester, phone);
     await tester.pumpWidget(await testApp(const CustomerDetailScreen(id: 7), api: api));
     await tester.pumpAndSettle();
@@ -186,7 +186,7 @@ void main() {
           'phone': '0901234567',
           'zalo_user_id': 'zl_123456',
           'note': 'Ghi sổ cuối tuần',
-        })).called(1);
+        }, any())).called(1);
     expect(find.text('SỐ DƯ CÔNG NỢ'), findsOneWidget); // back on the detail
     expect(detailCalls, 2);
   });

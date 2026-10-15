@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import '../../core/offline/offline_labels.dart';
+import '../../core/offline/offline_writer.dart';
+import '../../core/offline/offline_effects.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/format.dart';
-import '../../core/session.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common.dart';
 import 'inventory_data.dart';
@@ -149,17 +151,24 @@ class _ReceiveFormState extends ConsumerState<_ReceiveForm> {
     setState(() => _busy = true);
     Map<String, dynamic> res = const {};
     final ok = await runWithToast(context, () async {
-      res = await ref.read(apiProvider).post('/inventory/${item.id}/receive', {
-        'quantity': quantity,
-        'unit_cost': unitCost,
-        if (note.isNotEmpty) 'note': note,
-      });
+      final out = await ref.read(offlineWriterProvider).submit(
+        kind: 'inventory.receive',
+        path: '/inventory/${item.id}/receive',
+        body: {
+          'quantity': quantity,
+          'unit_cost': unitCost,
+          if (note.isNotEmpty) 'note': note,
+        },
+        local: {'item': item.name, 'total': quantity * unitCost},
+        effect: (db) => db.moveStock(item.id, receiveQuantity: quantity, unitCost: unitCost),
+      );
+      res = out.body;
     });
     if (!mounted) return;
     setState(() => _busy = false);
     if (!ok) return;
     showToast(context,
-        'Đã nhập kho. Tồn mới: ${qty(res['quantity_on_hand'])}, giá vốn bình quân: ${money(res['avg_cost'])}.');
+        'Đã nhập kho. Tồn mới: ${qty(res['quantity_on_hand'])}, giá vốn bình quân: ${money(res['avg_cost'])}.${res['queued'] == true ? queuedNote : ''}');
     _qty.clear();
     _cost.clear();
     _note.clear();

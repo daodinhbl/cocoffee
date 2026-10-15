@@ -66,7 +66,7 @@ final offlineCoordinatorProvider = Provider<void>((ref) {
   });
   // Queued writes were replayed: take a fresh copy so the offline database matches the server again.
   ref.listen<OutboxState>(outboxProvider, (prev, next) {
-    if (prev != null && prev.syncing && !next.syncing) ref.read(snapshotSyncProvider.notifier).sync();
+    if (prev != null && prev.syncing && !next.syncing) ref.read(snapshotSyncProvider.notifier).sync(force: true);
   });
   // Signed in (at start, or just logged in): first copy of the shop's data.
   ref.listen<AuthState>(authProvider, (prev, next) {

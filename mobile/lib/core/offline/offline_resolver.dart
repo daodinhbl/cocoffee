@@ -19,7 +19,7 @@ class OfflineResolver {
   static const _shopOffset = Duration(hours: 7);
 
   static final _orderId = RegExp(r'^/orders/(\d+)$');
-  static final _customerId = RegExp(r'^/admin/customers/(\d+)$');
+  static final _customerId = RegExp(r'^/admin/customers/(-?\d+)$');
 
   /// [detail] true also answers single-record pages from whatever the copy holds (used after the response cache
   /// missed, because the copy has no ledger or movements).

@@ -17,7 +17,7 @@ void main() {
 
   testWidgets('phone: ?item preselects; line total is turned into the unit cost; POST /inventory/:id/receive', (tester) async {
     await setSurface(tester, phone);
-    when(() => api.post('/inventory/1/receive', any())).thenAnswer((_) async => {'quantity_on_hand': 5525, 'avg_cost': 280.86});
+    when(() => api.post('/inventory/1/receive', any(), any())).thenAnswer((_) async => {'quantity_on_hand': 5525, 'avg_cost': 280.86});
     await tester.pumpWidget(await testApp(const ReceivingScreen(itemId: 1), api: api));
     await tester.pumpAndSettle();
 
@@ -41,7 +41,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('receive-submit')));
     await tester.pumpAndSettle();
 
-    final body = verify(() => api.post('/inventory/1/receive', captureAny())).captured.single as Map;
+    final body = verify(() => api.post('/inventory/1/receive', captureAny(), any())).captured.single as Map;
     expect(body, {'quantity': 2000, 'unit_cost': 285, 'note': 'NCC Thành Phát · HĐ 0013'});
     expect(find.text('Đã nhập kho. Tồn mới: 5.525, giá vốn bình quân: 281đ.'), findsOneWidget);
     // Form cleared, item and purchases reloaded.
@@ -90,10 +90,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Sữa đặc Ông Thọ (tồn 4 lon)').last);
     await tester.pumpAndSettle();
-    when(() => api.post('/inventory/2/receive', any())).thenAnswer((_) async => {'quantity_on_hand': 14, 'avg_cost': 26000});
+    when(() => api.post('/inventory/2/receive', any(), any())).thenAnswer((_) async => {'quantity_on_hand': 14, 'avg_cost': 26000});
     await tester.tap(find.byKey(const ValueKey('receive-submit')));
     await tester.pumpAndSettle();
-    final body = verify(() => api.post('/inventory/2/receive', captureAny())).captured.single as Map;
+    final body = verify(() => api.post('/inventory/2/receive', captureAny(), any())).captured.single as Map;
     expect(body, {'quantity': 10, 'unit_cost': 26000});
   });
 }

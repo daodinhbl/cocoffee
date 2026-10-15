@@ -112,7 +112,7 @@ void main() {
 
   testWidgets('tablet: table with level bars; Kiểm kê dialog POSTs /inventory/:id/adjust as waste', (tester) async {
     await setSurface(tester, tablet);
-    when(() => api.post('/inventory/2/adjust', any())).thenAnswer((_) async => {'quantity_on_hand': 3, 'delta': -1});
+    when(() => api.post('/inventory/2/adjust', any(), any())).thenAnswer((_) async => {'quantity_on_hand': 3, 'delta': -1});
     await tester.pumpWidget(await testApp(const InventoryScreen(), api: api));
     await tester.pumpAndSettle();
 
@@ -137,7 +137,7 @@ void main() {
     await tester.tap(find.text('Ghi nhận'));
     await tester.pumpAndSettle();
 
-    final body = verify(() => api.post('/inventory/2/adjust', captureAny())).captured.single as Map;
+    final body = verify(() => api.post('/inventory/2/adjust', captureAny(), any())).captured.single as Map;
     expect(body, {'new_quantity': 3, 'type': 'waste', 'note': 'Móp 1 lon'});
     expect(find.text('Đã điều chỉnh tồn kho (−1).'), findsOneWidget);
     expect(find.text('Kiểm kê — Sữa đặc Ông Thọ'), findsNothing);

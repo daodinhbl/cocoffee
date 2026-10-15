@@ -5,6 +5,7 @@ import '../../core/format.dart';
 import '../../core/offline/connectivity.dart';
 import '../../core/offline/offline_coordinator.dart';
 import '../../core/offline/outbox.dart';
+import '../../core/offline/snapshot_sync.dart';
 import '../../core/session.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common.dart';
@@ -128,8 +129,10 @@ class SyncScreen extends ConsumerWidget {
                 ]),
         ),
         const SizedBox(height: 16),
+        const _OfflineDataCard(),
+        const SizedBox(height: 16),
         SectionCard(
-          title: 'Dữ liệu đã lưu trên máy',
+          title: 'Bộ nhớ đệm màn hình',
           child: Row(children: [
             Expanded(
               child: cache == null
@@ -150,7 +153,7 @@ class SyncScreen extends ConsumerWidget {
   }
 }
 
-String _kindLabel(String kind) => switch (kind) { 'checkout' => 'Thanh toán', 'hold' => 'Giữ đơn', 'pay' => 'Thu tiền', _ => kind };
+String _kindLabel(String kind) => kindLabel(kind);
 
 class _ItemTile extends StatelessWidget {
   const _ItemTile({required this.item, required this.onRetry, required this.onDiscard});
@@ -160,9 +163,18 @@ class _ItemTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final where = '${item.local['table'] ?? 'Mang đi'}';
+    final isOrderWrite = const {'checkout', 'hold', 'pay'}.contains(item.kind);
+    final where = isOrderWrite ? '${item.local['table'] ?? 'Mang đi'}' : '${item.local['customer'] ?? item.local['item'] ?? item.local['code'] ?? ''}';
     final summary = '${item.local['summary'] ?? ''}';
-    final icon = switch (item.kind) { 'checkout' => Icons.payments_outlined, 'hold' => Icons.table_restaurant_outlined, _ => Icons.point_of_sale_rounded };
+    final icon = switch (item.kind) {
+      'checkout' => Icons.payments_outlined,
+      'hold' => Icons.table_restaurant_outlined,
+      'customer.create' || 'customer.update' => Icons.person_outline_rounded,
+      'customer.collect' || 'customer.adjust' => Icons.account_balance_wallet_outlined,
+      'inventory.receive' || 'inventory.adjust' => Icons.inventory_2_outlined,
+      'order.cancel' => Icons.cancel_outlined,
+      _ => Icons.point_of_sale_rounded,
+    };
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: CircleAvatar(
@@ -188,6 +200,50 @@ class _ItemTile extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// The SQLite copy of the shop's data: when it was taken, what it holds, refresh / forget.
+class _OfflineDataCard extends ConsumerWidget {
+  const _OfflineDataCard();
+
+  static const _labels = {
+    'products': 'món',
+    'tables': 'bàn',
+    'inventory': 'nguyên liệu',
+    'customers': 'khách hàng',
+    'orders': 'đơn gần đây',
+  };
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final snap = ref.watch(snapshotSyncProvider);
+    final enabled = ref.watch(offlineDbProvider).enabled;
+    final counts = [for (final e in _labels.entries) if ((snap.counts[e.key] ?? 0) > 0) '${snap.counts[e.key]} ${e.value}'];
+    return SectionCard(
+      title: 'Cơ sở dữ liệu ngoại tuyến',
+      trailing: snap.syncing ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : null,
+      child: !enabled
+          ? const Text('Thiết bị này không lưu được dữ liệu ngoại tuyến.')
+          : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(snap.at == null
+                  ? 'Chưa có bản sao dữ liệu. Hãy kết nối mạng để tải về — sau đó có thể xem, tìm kiếm và ghi sổ khi mất mạng.'
+                  : 'Bản sao lúc ${shopTime(snap.at)}: ${counts.isEmpty ? 'chưa có dữ liệu' : counts.join(' · ')}.'),
+              if (snap.error != null) ...[const SizedBox(height: 6), Text(snap.error!, style: TextStyle(color: context.co.bad))],
+              const SizedBox(height: 10),
+              Row(children: [
+                FilledButton.tonal(
+                  onPressed: snap.syncing ? null : () => ref.read(snapshotSyncProvider.notifier).sync(force: true),
+                  child: Text(snap.syncing ? 'Đang tải…' : 'Cập nhật dữ liệu ngay'),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton(
+                  onPressed: snap.syncing || snap.at == null ? null : () => ref.read(snapshotSyncProvider.notifier).clear(),
+                  child: const Text('Xóa bản sao'),
+                ),
+              ]),
+            ]),
     );
   }
 }
