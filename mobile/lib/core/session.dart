@@ -141,7 +141,7 @@ final localStoreProvider = Provider<LocalStore>((ref) {
 /// (tests, memory-only runs) or nobody signed in: a disabled database that answers nothing.
 final offlineDbProvider = Provider<OfflineDb>((ref) {
   final dir = ref.watch(appDirProvider);
-  final user = ref.watch(currentUserProvider.select((u) => u?.id));
+  final user = ref.watch(accountIdProvider);
   if (dir == null || user == null) return OfflineDb.disabled();
   final server = ref.watch(serverUrlProvider);
   final tag = server.codeUnits.fold<int>(7, (h, c) => (h * 31 + c) & 0x7fffffff).toRadixString(36);
@@ -153,7 +153,7 @@ final apiProvider = Provider<ApiClient>((ref) {
   final store = ref.watch(sessionStoreProvider);
   final server = ref.watch(serverUrlProvider);
   // Cached answers are per account (a cashier and an admin do not see the same screens); rebuilt on sign-in/out.
-  final userId = ref.watch(authProvider.select((a) => a is SignedIn ? a.user.id : null));
+  final userId = ref.watch(accountIdProvider);
   return ApiClient(
     serverUrl: server,
     token: () => store.token,
@@ -169,6 +169,22 @@ final apiProvider = Provider<ApiClient>((ref) {
     ),
   );
 });
+
+/// Id of the signed-in account (null = nobody), mirrored from [authProvider] by the notifier. The API client and
+/// the offline database are scoped per account but must not watch [authProvider]: AuthNotifier itself reads them
+/// (login, logout), and a provider that depends on its own reader is a cycle Riverpod rejects in debug builds.
+final accountIdProvider = NotifierProvider<AccountIdNotifier, int?>(AccountIdNotifier.new);
+
+class AccountIdNotifier extends Notifier<int?> {
+  @override
+  int? build() {
+    final store = ref.read(sessionStoreProvider);
+    final user = store.cachedUser;
+    return store.token != null && user != null ? user.id : null;
+  }
+
+  void set(int? id) => state = id;
+}
 
 sealed class AuthState {
   const AuthState();
@@ -194,13 +210,18 @@ class AuthNotifier extends Notifier<AuthState> {
     return store.token != null && user != null ? SignedIn(user) : const SignedOut();
   }
 
+  void _emit(AuthState next) {
+    ref.read(accountIdProvider.notifier).set(next is SignedIn ? next.user.id : null);
+    state = next;
+  }
+
   /// POST /api/auth/login -> { token, must_change_password, user }
   Future<void> login(String username, String password) async {
     final res = await ref.read(apiProvider).post('/auth/login', {'username': username.trim(), 'password': password});
     var user = AppUser.fromJson(res['user'] as Map<String, dynamic>);
     if (_truthy(res['must_change_password'])) user = user.copyWith(mustChangePassword: true);
     await ref.read(sessionStoreProvider).save('${res['token']}', user);
-    state = SignedIn(user);
+    _emit(SignedIn(user));
   }
 
   /// After POST /api/auth/change-password -> { ok, token }: every older token is revoked, so the fresh one replaces
@@ -223,7 +244,7 @@ class AuthNotifier extends Notifier<AuthState> {
     final updated = current.user.copyWith(mustChangePassword: true);
     final store = ref.read(sessionStoreProvider);
     if (store.token != null) await store.save(store.token!, updated);
-    state = SignedIn(updated);
+    _emit(SignedIn(updated));
   }
 
   /// Re-reads the account (role or name may have changed in the Web Admin).
@@ -233,7 +254,7 @@ class AuthNotifier extends Notifier<AuthState> {
     final store = ref.read(sessionStoreProvider);
     final user = AppUser.fromJson(Map<String, dynamic>.from(res['user'] as Map));
     if (store.token != null) await store.save(store.token!, user);
-    state = SignedIn(user);
+    _emit(SignedIn(user));
   }
 
   /// Signing out on purpose also forgets the shop's data kept on the phone for this account (the SQLite copy and the
@@ -246,14 +267,14 @@ class AuthNotifier extends Notifier<AuthState> {
       // storage trouble must not keep the user signed in
     }
     await ref.read(sessionStoreProvider).clear();
-    state = const SignedOut();
+    _emit(const SignedOut());
   }
 
   /// Called by the API client on any 401.
   Future<void> expired() async {
     if (state is SignedOut) return;
     await ref.read(sessionStoreProvider).clear();
-    state = const SignedOut('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    _emit(const SignedOut('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'));
   }
 }
 
