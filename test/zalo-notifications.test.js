@@ -244,7 +244,7 @@ test('menu aliases top-up', async (t) => {
       inserted, log,
       query: async (sql, params) => {
         log.push(sql.split(/\s+/).slice(0, 3).join(' '));
-        if (/FROM products/.test(sql)) return [[{ id: 1, name: 'Cà Phê Đen' }, { id: 2, name: 'Cà Phê Sữa' }, { id: 3, name: 'Nước Ép Cam' }, { id: 4, name: 'Nước Ngọt Các Loại' }]];
+        if (/FROM products/.test(sql)) return [[{ id: 1, name: 'Cà Phê Đen Pha Máy' }, { id: 2, name: 'Cà Phê Sữa Pha Máy' }, { id: 3, name: 'Nước Ép Cam' }, { id: 4, name: 'Bò Cụng (RedBull)' }]];
         if (/SELECT alias_norm FROM product_aliases/.test(sql)) return [aliases.map((alias_norm) => ({ alias_norm }))];
         if (/INSERT INTO product_aliases/.test(sql)) { inserted.push([params[0], params[1]]); return [{}]; }
         if (/GET_LOCK/.test(sql)) return [[{ ok: 1 }]];
@@ -261,8 +261,8 @@ test('menu aliases top-up', async (t) => {
     const names = conn.inserted.map(([id, alias]) => `${id}:${normalize(alias)}`);
     assert.ok(names.includes('1:den nong'));
     assert.ok(!names.includes('1:den da'), 'an existing alias is never moved');
-    assert.ok(names.includes('2:cf nau') && names.includes('3:ep cam') && names.includes('4:coca'));
-    for (const bare of ['1:den', '2:nau', '4:nuoc ngot', '2:sua da']) assert.ok(!names.includes(bare), `${bare}: a bare common word is never an alias`);
+    assert.ok(names.includes('2:cf nau') && names.includes('3:ep cam') && names.includes('4:bo cung') && names.includes('4:redbull'));
+    for (const bare of ['1:den', '2:nau', '2:sua', '2:sua da', '4:nuoc ngot']) assert.ok(!names.includes(bare), `${bare}: a bare common word is never an alias`);
     assert.equal(added, conn.inserted.length);
     assert.ok(conn.inserted.every(([id]) => [1, 2, 3, 4].includes(id)), 'products missing from the database are skipped');
     assert.ok(Object.keys(EXTRA_ALIASES).length > 10);
@@ -277,7 +277,7 @@ test('menu aliases top-up', async (t) => {
     const first = await run();
     assert.equal(first.state, 'applied');
     assert.ok(first.conn.inserted.length > 0);
-    assert.equal((await run({ settings: [{ setting_key: 'seed.menu_v1', setting_value: '{}' }, { setting_key: 'seed.aliases_v2', setting_value: '{"added":42}' }] })).state, 'done-before');
+    assert.equal((await run({ settings: [{ setting_key: 'seed.menu_v1', setting_value: '{}' }, { setting_key: 'seed.aliases_v3', setting_value: '{"added":42}' }] })).state, 'done-before');
     assert.equal((await run({ settings: [{ setting_key: 'seed.menu_v1', setting_value: '"skipped-empty"' }] })).state, 'no-printed-menu');
     assert.equal((await run({ settings: [] })).state, 'no-printed-menu');
     const m = mock.method(pool, 'getConnection', async () => { throw new Error('db down'); });
