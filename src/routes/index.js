@@ -30,6 +30,7 @@ router.post('/auth/change-password', rateLimit({ windowMs: 15 * 60 * 1000, max: 
 router.get('/zalo/status', shell.status);
 router.get('/zalo/drafts', shell.drafts);
 router.get('/pos/bootstrap', pos.bootstrap);
+router.get('/sync/snapshot', shell.snapshot);
 router.post('/pos/checkout', idempotency(), pos.checkout);
 router.post('/pos/hold', idempotency(), pos.hold);
 router.get('/settings/printer', pos.printer);

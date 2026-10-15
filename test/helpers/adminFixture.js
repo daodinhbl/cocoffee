@@ -78,6 +78,7 @@ async function start() {
   mock.method(orderModel, 'list', async () => [{ ...ORDER, items: undefined }]);
   mock.method(orderModel, 'count', async () => 60);
   mock.method(orderModel, 'breakdown', async () => ({ all: 60, draft: 2, open: 1, completed: 50, cancelled: 7, unpaid: 3, revenue: 4000000, unpaidAmount: 237000, openAmount: 79000 }));
+  mock.method(orderModel, 'getItems', async () => ORDER.items);
   mock.method(orderModel, 'getPayments', async () => [{ id: 1, method: 'cash', amount: 79000, reference: null, paid_at: NOW, received_by_name: 'Thu Ngân' }]);
   mock.method(orderModel, 'getById', async () => ORDER);
   mock.method(orderService, 'getWithItems', async (id) => { if (id === 404) { const { AppError } = require('../../src/utils/httpError'); throw new AppError(404, 'NOT_FOUND', 'Order not found'); } return ORDER; });

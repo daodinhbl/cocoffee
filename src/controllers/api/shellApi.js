@@ -1,5 +1,6 @@
 const adminModel = require('../../models/adminModel');
 const notificationService = require('../../services/notificationService');
+const syncSnapshot = require('../../services/syncSnapshotService');
 const { zaloStatus } = require('../../services/zalo/zaloStatus');
 
 /** App shell: Zalo status dot (any staff), live Zalo drafts (any staff), notification bell (admin). */
@@ -43,4 +44,10 @@ async function newOrders(req, res) {
 }
 const lastIdSentinel = Number.MAX_SAFE_INTEGER;   // no after_id: match nothing, just report last_id
 
-module.exports = { status, drafts, notifications, newOrders };
+/** GET /api/sync/snapshot: everything the app mirrors into its offline database (see services/syncSnapshotService.js). */
+async function snapshot(req, res) {
+  res.set('Cache-Control', 'no-store');
+  res.json(await syncSnapshot.build(req.user));
+}
+
+module.exports = { status, drafts, notifications, newOrders, snapshot };

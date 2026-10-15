@@ -51,6 +51,26 @@ test('API endpoints for the app', async (t) => {
     assert.equal(lastArgs(adminModel.zaloPendingDrafts)[0], 5);
   });
 
+  await t.test('GET /api/sync/snapshot: POS data for staff, + inventory and customers for admins', async () => {
+    const c = await get('/api/sync/snapshot', cashier);
+    assert.equal(c.status, 200);
+    assert.deepEqual(Object.keys(c.body).sort(), ['categories', 'drafts', 'generated_at', 'inventory', 'orders', 'printer', 'products', 'role', 'tables']);
+    assert.equal(c.body.role, 'cashier');
+    assert.equal(c.body.orders[0].items.length, 2, 'orders carry their lines');
+    assert.ok(Array.isArray(c.body.orders[0].payments));
+    assert.equal(c.body.customers, undefined, 'a cashier gets no customer list');
+    assert.equal(c.body.inventory.stock_value, undefined);
+
+    const a = await get('/api/sync/snapshot', admin);
+    assert.equal(a.status, 200);
+    assert.equal(a.body.role, 'admin');
+    assert.equal(a.body.customers[0].name, 'Chị Lan');
+    assert.equal(a.body.customer_stats.total_debt, 120000);
+    assert.ok(a.body.inventory.items.length > 0);
+    assert.equal(typeof a.body.inventory.stock_value, 'number');
+    assert.equal((await api('GET', '/api/sync/snapshot')).status, 401);
+  });
+
   await t.test('GET /api/pos/bootstrap (cashier)', async () => {
     const r = await get('/api/pos/bootstrap', cashier);
     assert.equal(r.status, 200);
