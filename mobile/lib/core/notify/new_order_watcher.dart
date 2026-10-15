@@ -58,7 +58,7 @@ class LocalNotifier {
           ?.requestNotificationsPermission(); // Android 13+: asks once
       _ready = true;
     } catch (e) {
-      debugPrint('Notifications unavailable: $e');
+      if (kDebugMode) debugPrint('Notifications unavailable: $e');
     }
   }
 
@@ -67,7 +67,7 @@ class LocalNotifier {
     try {
       await _plugin.show(id: id, title: title, body: body, notificationDetails: const NotificationDetails(android: _channel));
     } catch (e) {
-      debugPrint('Notification not shown: $e');
+      if (kDebugMode) debugPrint('Notification not shown: $e');
     }
   }
 }

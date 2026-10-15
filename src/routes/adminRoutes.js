@@ -30,7 +30,7 @@ const router = express.Router();
 router.use(adminSecurity, pageRenderer, express.urlencoded({ extended: false, limit: '1mb' }), flash, loadSession);
 
 router.get('/login', auth.loginForm);
-router.post('/login', rateLimit({ windowMs: 15 * 60 * 1000, max: 20 }), auth.login);
+router.post('/login', rateLimit({ windowMs: 15 * 60 * 1000, max: 60 }), rateLimit({ windowMs: 15 * 60 * 1000, max: 8, key: rateLimit.accountKey }), auth.login);
 
 // POS screen: admins and cashiers. JSON endpoints echo the session CSRF token in the body (_csrf).
 router.post('/logout', requireStaff, requireCsrf, auth.logout);

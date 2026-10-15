@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import '../../core/update/app_update.dart';
 import 'package:flutter/services.dart';
@@ -474,8 +475,8 @@ class AppInfoCard extends ConsumerWidget {
     );
     if (url == null || !context.mounted) return;
     final clean = url.trim().replaceAll(RegExp(r'/+$'), '');
-    if (!clean.startsWith('http')) {
-      showToast(context, 'Địa chỉ máy chủ phải bắt đầu bằng http:// hoặc https://', error: true);
+    if (!isServerUrlAllowed(clean)) {
+      showToast(context, kReleaseMode ? 'Địa chỉ máy chủ phải bắt đầu bằng https://' : 'Địa chỉ máy chủ phải bắt đầu bằng http:// hoặc https://', error: true);
       return;
     }
     if (clean == current) return;

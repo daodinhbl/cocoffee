@@ -15,4 +15,8 @@ function rateLimit({ windowMs, max, key = (req) => req.ip }) {
   };
 }
 
+/** Key for login limiters: one account from one address, so a guesser is stopped without locking out everyone behind the shop's shared Wi-Fi IP. */
+const accountKey = (req) => `login:${req.ip}:${String(req.body?.username ?? '').trim().toLowerCase().slice(0, 50)}`;
+
 module.exports = rateLimit;
+module.exports.accountKey = accountKey;

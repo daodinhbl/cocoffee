@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -17,6 +18,13 @@ import 'offline/response_cache.dart';
 /// Production server; the login screen lets staff point the app at another one (e.g. http://10.0.2.2:3000
 /// for the Android emulator talking to `npm run dev` on the same PC).
 const kDefaultServer = 'https://cocoffee.tasotek-giaiphapso.com';
+
+/// HTTPS only in release builds (the OS refuses cleartext too: network_security_config.xml). Debug builds may also use
+/// http:// so the emulator can reach `npm run dev` on the PC.
+bool isServerUrlAllowed(String url) {
+  final u = url.trim().toLowerCase();
+  return u.startsWith('https://') || (!kReleaseMode && u.startsWith('http://'));
+}
 
 class AppUser {
   const AppUser({required this.id, required this.username, required this.fullName, required this.role, this.mustChangePassword = false});
@@ -65,8 +73,11 @@ class SessionStore {
   static const _kServer = 'server_url';
   static const _kUser = 'auth_user';
 
-  String get serverUrl => _prefs.getString(_kServer) ?? kDefaultServer;
-  Future<void> setServerUrl(String url) => _prefs.setString(_kServer, url.trim().replaceAll(RegExp(r'/+$'), ''));
+  String get serverUrl {
+    final saved = _prefs.getString(_kServer);
+    return saved != null && isServerUrlAllowed(saved) ? saved : kDefaultServer;
+  }
+  Future<void> setServerUrl(String url) => !isServerUrlAllowed(url) ? Future<void>.value() : _prefs.setString(_kServer, url.trim().replaceAll(RegExp(r'/+$'), ''));
 
   String? get token => _token;
 

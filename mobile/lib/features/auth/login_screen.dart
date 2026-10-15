@@ -61,7 +61,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         ],
       ),
     );
-    if (url != null && url.trim().startsWith('http')) await ref.read(serverUrlProvider.notifier).set(url);
+    if (url != null && isServerUrlAllowed(url)) await ref.read(serverUrlProvider.notifier).set(url);
   }
 
   @override
