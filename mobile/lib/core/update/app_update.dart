@@ -12,6 +12,10 @@ import '../../features/settings/settings_models.dart';
 import '../notify/new_order_watcher.dart';
 import '../session.dart';
 
+/// True in the Google Play build (`--dart-define=PLAY_STORE=true`): Play updates the app itself, so the in-app
+/// updater is off and the Settings row is hidden.
+const kPlayStore = bool.fromEnvironment('PLAY_STORE');
+
 /// The build the server offers (GET /download/manifest.json, written by scripts/publish-apk.js).
 class AppRelease {
   const AppRelease({required this.versionName, required this.versionCode, required this.size, required this.sha256, required this.url});
@@ -44,7 +48,7 @@ class AppRelease {
 }
 
 /// Off under `flutter test` (no network, no native installer); tests may override it.
-final updateCheckEnabledProvider = Provider<bool>((_) => !Platform.environment.containsKey('FLUTTER_TEST'));
+final updateCheckEnabledProvider = Provider<bool>((_) => !kPlayStore && !Platform.environment.containsKey('FLUTTER_TEST'));
 
 /// Asks the server for the newest build; resolves to it only when it is newer than the installed one.
 /// Any failure (offline, no release published) resolves to null: a missing update is never an error screen.

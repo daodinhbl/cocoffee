@@ -75,7 +75,7 @@ one-tap download of `/download/cocoffee.apk` (stable URL, `Content-Disposition` 
 Release a new build (Windows, see `mobile/CONVENTIONS.md` for the Flutter toolchain):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scriptsuild-apk.ps1   # flutter build apk --release, then scripts/publish-apk.js
+powershell -ExecutionPolicy Bypass -File scriptsuild-apk.ps1   # flutter build apk --release --flavor direct, then scripts/publish-apk.js
 node scripts/package-deploy.js                                   # dist/app.zip with the APK inside; upload + build on Hostinger
 ```
 
@@ -86,6 +86,13 @@ before each release: Android only installs an update with a higher version code.
 Signing: `mobile/android/key.properties` + the keystore it names (both git-ignored) sign release builds; without them the
 APK is signed with the debug key. The keystore is the app's identity on every phone: **back up both files**. A build signed
 with a different key cannot update an installed app (uninstall + reinstall, losing the saved login).
+
+### Google Play (POS Tasotek)
+
+The same app is also published on Google Play as **POS Tasotek**, package `com.tasotek.pos` (flavor `play`): no in-app
+updater and no installer permission, since Play forbids an app from updating itself. `scriptsuild-aab.ps1` builds the
+signed bundle into `dist/play/`; the Play Console steps, store text and the data-safety answers are in
+[docs/chplay-submission.md](docs/chplay-submission.md). The Play build and the sideloaded build install side by side.
 
 ## Security checklist
 

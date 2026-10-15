@@ -506,6 +506,7 @@ class AppInfoCard extends ConsumerWidget {
           title: Text('Phiên bản ứng dụng'),
           trailing: Text(kAppVersion, style: TextStyle(fontFeatures: tabular)),
         ),
+        if (!kPlayStore) ...[
         const Divider(),
         ListTile(
           contentPadding: EdgeInsets.zero,
@@ -518,6 +519,7 @@ class AppInfoCard extends ConsumerWidget {
             onPressed: () => found == null ? ref.invalidate(updateCheckProvider) : showUpdateDialog(context, found),
           ),
         ),
+        ],
       ]),
     );
   }

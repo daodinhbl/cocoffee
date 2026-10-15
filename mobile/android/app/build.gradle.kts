@@ -43,6 +43,22 @@ android {
         versionName = flutter.versionName
     }
 
+    // Two channels of the same app. "direct": the APK offered at /download on the shop's server, which updates itself
+    // (OTA). "play": the Google Play build; Play forbids an app from installing or updating itself by any other means,
+    // so it carries no installer permission, provider or receiver (see src/play/AndroidManifest.xml).
+    flavorDimensions += "channel"
+    productFlavors {
+        create("direct") {
+            dimension = "channel"
+            manifestPlaceholders["appName"] = "Tasotek FnB"
+        }
+        create("play") {
+            dimension = "channel"
+            applicationId = "com.tasotek.pos"      // its own Play listing: the package name cannot change once published
+            manifestPlaceholders["appName"] = "POS Tasotek"
+        }
+    }
+
     signingConfigs {
         if (hasReleaseKey) {
             create("release") {
@@ -56,6 +72,8 @@ android {
 
     buildTypes {
         release {
+            // Native debug symbols (.sym) travel in the bundle's metadata, so Play can symbolicate native crashes.
+            ndk { debugSymbolLevel = "SYMBOL_TABLE" }
             signingConfig = if (hasReleaseKey) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
         }
     }

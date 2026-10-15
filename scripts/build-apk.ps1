@@ -20,7 +20,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $mobile = Join-Path $root 'mobile'
-$apk = Join-Path $mobile 'build\app\outputs\flutter-apk\app-release.apk'
+$apk = Join-Path $mobile 'build\app\outputs\flutter-apk\app-direct-release.apk'   # flavor "direct" = the APK offered at /download (the Google Play build is scripts\build-aab.ps1)
 
 if (-not $SkipBuild) {
   if (-not (Test-Path (Join-Path $mobile 'android\key.properties'))) {
@@ -30,7 +30,7 @@ if (-not $SkipBuild) {
   $env:JAVA_TOOL_OPTIONS = "-Djdk.net.unixdomain.tmpdir=$GradleTmp\uds -Djava.io.tmpdir=$GradleTmp"
   Push-Location $mobile
   try {
-    & $Flutter build apk --release
+    & $Flutter build apk --release --flavor direct
     if ($LASTEXITCODE -ne 0) { throw "flutter build apk failed (exit $LASTEXITCODE)" }
   } finally { Pop-Location }
 }
