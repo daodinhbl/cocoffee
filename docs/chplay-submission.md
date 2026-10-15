@@ -1,6 +1,6 @@
 # Đăng POS Tasotek lên Google Play
 
-Ứng dụng trên Google Play là **POS Tasotek**, tên gói **`com.tasotek.pos`** — một bản riêng (flavor `play`) của app
+Ứng dụng trên Google Play là **POS Tasotek**, tên gói **`com.tasotek.fnb`** — một bản riêng (flavor `play`) của app
 trong `mobile/`. Bản tải trực tiếp từ `/download` của máy chủ (flavor `direct`, gói `com.tasotek.cocoffee_mobile`,
 tự cập nhật OTA) vẫn giữ nguyên. Hai bản cài song song được trên cùng điện thoại và không cập nhật lẫn nhau:
 Google ký lại bản Play bằng khóa riêng của Google, nên chữ ký khác bản direct.

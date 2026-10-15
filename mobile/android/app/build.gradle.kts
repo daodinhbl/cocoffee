@@ -54,7 +54,7 @@ android {
         }
         create("play") {
             dimension = "channel"
-            applicationId = "com.tasotek.pos"      // its own Play listing: the package name cannot change once published
+            applicationId = "com.tasotek.fnb"      // its own Play listing: the package name cannot change once published
             manifestPlaceholders["appName"] = "POS Tasotek"
         }
     }

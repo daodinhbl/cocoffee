@@ -89,7 +89,7 @@ with a different key cannot update an installed app (uninstall + reinstall, losi
 
 ### Google Play (POS Tasotek)
 
-The same app is also published on Google Play as **POS Tasotek**, package `com.tasotek.pos` (flavor `play`): no in-app
+The same app is also published on Google Play as **POS Tasotek**, package `com.tasotek.fnb` (flavor `play`): no in-app
 updater and no installer permission, since Play forbids an app from updating itself. `scriptsuild-aab.ps1` builds the
 signed bundle into `dist/play/`; the Play Console steps, store text and the data-safety answers are in
 [docs/chplay-submission.md](docs/chplay-submission.md). The Play build and the sideloaded build install side by side.

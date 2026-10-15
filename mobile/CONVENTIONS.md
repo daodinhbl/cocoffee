@@ -46,6 +46,6 @@ prefer Notifier. Pull-to-refresh on lists (`RefreshIndicator` -> `ref.refresh(pr
 ## Build flavors (channel)
 
 `direct` = the APK offered at `/download` (package `com.tasotek.cocoffee_mobile`, in-app OTA updater). `play` = the Google
-Play bundle (package `com.tasotek.pos`, app name "POS Tasotek", `--dart-define=PLAY_STORE=true`, no installer
+Play bundle (package `com.tasotek.fnb`, app name "POS Tasotek", `--dart-define=PLAY_STORE=true`, no installer
 permission; see `android/app/src/play/AndroidManifest.xml`). Every build and run needs a flavor now:
 `flutter run --flavor direct`, `scriptsuild-apk.ps1` (direct), `scriptsuild-aab.ps1` (play).
