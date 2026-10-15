@@ -9,3 +9,6 @@ README.md        export-ignore
 
 # shell scripts must keep LF line endings (they run on Linux)
 *.sh text eol=lf
+
+# CI workflows are not part of the server deploy archive
+.github/         export-ignore

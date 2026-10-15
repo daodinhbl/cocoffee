@@ -21,3 +21,15 @@ dist/
 
 # Server-side database backups (Web Admin > Sao lưu)
 backups/
+
+# iOS signing material and App Store Connect keys: these live only in CI secrets (see docs/ios-testflight.md)
+*.p8
+*.p12
+*.cer
+*.mobileprovision
+AuthKey_*.p8
+ExportOptions*.plist
+mobile/ios/Pods/
+mobile/ios/.symlinks/
+mobile/ios/Flutter/ephemeral/
+mobile/ios/build/

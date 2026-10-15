@@ -1,6 +1,8 @@
 # cocoffee_mobile
 
-Tasotek FnB - quản lý quán F&B trên Android (giao diện bám Web Admin CoCoffee).
+Tasotek FnB - quản lý quán F&B trên Android và iOS (giao diện bám Web Admin CoCoffee).
+
+**iOS:** build, ký và đẩy TestFlight chạy trên GitHub Actions (không cần Mac): xem [docs/ios-testflight.md](../docs/ios-testflight.md).
 
 ## Getting Started
 

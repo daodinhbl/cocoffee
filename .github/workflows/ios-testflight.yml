@@ -1,0 +1,199 @@
+# File: .github/workflows/ios-testflight.yml
+#
+# Builds the Flutter app in mobile/ for iOS on a GitHub macOS runner, signs it with Apple-managed ("cloud")
+# signing through an App Store Connect API key, and uploads the build to TestFlight.
+# The Android build keeps its current manual process (scripts\build-apk.ps1 / build-aab.ps1); nothing here touches it.
+#
+# Run it: GitHub > Actions > "iOS TestFlight" > Run workflow  (or push a tag named ios-v*).
+# One-time setup (Apple Developer account, App ID, API key, secrets): docs/ios-testflight.md
+#
+# Secrets (Settings > Secrets and variables > Actions > Repository secrets). Never commit any of them:
+#   APPSTORE_ISSUER_ID        Issuer ID shown on App Store Connect > Users and Access > Integrations > App Store Connect API
+#   APPSTORE_KEY_ID           Key ID of the API key (needs the "Admin" role for Apple-managed distribution signing)
+#   APPSTORE_API_PRIVATE_KEY  full text of the AuthKey_XXXX.p8 file, including the BEGIN/END lines
+#   APPLE_TEAM_ID             10-character Team ID (Apple Developer > Membership details)
+
+name: iOS TestFlight
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: "Upload the build to TestFlight (untick to only build and keep the .ipa as an artifact)"
+        type: boolean
+        default: true
+      build_number_offset:
+        description: "Added to the run number to form the build number (raise it if Apple rejects a duplicate build number)"
+        type: string
+        default: "0"
+  push:
+    tags:
+      - "ios-v*"
+
+# One iOS build at a time; a newer run does not cancel a build that is already signing/uploading.
+concurrency:
+  group: ios-testflight
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  BUNDLE_ID: com.tasotek.fnb
+  # Apple only accepts uploads built with a recent Xcode / iOS SDK; use the newest the runner offers.
+  XCODE_VERSION: latest-stable
+
+jobs:
+  ios:
+    name: Build and upload iOS
+    runs-on: macos-26   # if this label is not available on your plan, use macos-15 and pin an Xcode version Apple still accepts
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      APPSTORE_ISSUER_ID: ${{ secrets.APPSTORE_ISSUER_ID }}
+      APPSTORE_KEY_ID: ${{ secrets.APPSTORE_KEY_ID }}
+      APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+    steps:
+      - name: Check that the signing secrets are configured
+        run: |
+          missing=0
+          for name in APPSTORE_ISSUER_ID APPSTORE_KEY_ID APPSTORE_API_PRIVATE_KEY APPLE_TEAM_ID; do
+            if [ -z "${!name}" ]; then echo "::error::Secret $name is not set (see docs/ios-testflight.md)"; missing=1; fi
+          done
+          exit $missing
+
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: ${{ env.XCODE_VERSION }}
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.47.0"
+          cache: true
+
+      - name: Flutter version and dependencies
+        run: |
+          flutter --version
+          flutter pub get
+
+      - name: Static analysis and tests
+        run: |
+          flutter analyze --no-fatal-infos --no-fatal-warnings
+          flutter test
+
+      - name: Store the App Store Connect API key (outside the repository)
+        run: |
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          KEY_FILE="$HOME/.appstoreconnect/private_keys/AuthKey_${APPSTORE_KEY_ID}.p8"
+          printf '%s\n' "$APPSTORE_API_PRIVATE_KEY" > "$KEY_FILE"
+          chmod 600 "$KEY_FILE"
+          echo "KEY_FILE=$KEY_FILE" >> "$GITHUB_ENV"
+
+      - name: Work out version and build number
+        env:
+          OFFSET_INPUT: ${{ github.event.inputs.build_number_offset || '0' }}
+          RUN_NUMBER: ${{ github.run_number }}
+        run: |
+          case "$OFFSET_INPUT" in ''|*[!0-9]*) echo "::error::build_number_offset must be a whole number"; exit 1;; esac
+          VERSION_NAME="$(grep -E '^version:' pubspec.yaml | sed -E 's/version:[[:space:]]*([0-9.]+).*/\1/')"
+          BUILD_NUMBER="$(( RUN_NUMBER + OFFSET_INPUT ))"
+          echo "VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
+          echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
+          echo "Building $VERSION_NAME ($BUILD_NUMBER) for $BUNDLE_ID"
+
+      - name: Configure the iOS build (Flutter)
+        # PLAY_STORE=true switches the in-app APK updater off; Apple forbids apps that update themselves.
+        run: |
+          flutter build ios --config-only --release --no-codesign \
+            --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER" \
+            --dart-define=PLAY_STORE=true
+
+      - name: Archive (Apple-managed signing through the API key)
+        run: |
+          xcodebuild archive \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/ios/Runner.xcarchive \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$KEY_FILE" \
+            -authenticationKeyID "$APPSTORE_KEY_ID" \
+            -authenticationKeyIssuerID "$APPSTORE_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_STYLE=Automatic
+
+      - name: Export the .ipa
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions-export.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>${APPLE_TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>destination</key><string>export</string>
+            <key>uploadSymbols</key><true/>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath build/ios/Runner.xcarchive \
+            -exportPath build/ios/ipa \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions-export.plist" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$KEY_FILE" \
+            -authenticationKeyID "$APPSTORE_KEY_ID" \
+            -authenticationKeyIssuerID "$APPSTORE_ISSUER_ID"
+          ls -l build/ios/ipa
+
+      - name: Keep the .ipa as a build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pos-tasotek-ios-${{ env.VERSION_NAME }}-${{ env.BUILD_NUMBER }}
+          path: mobile/build/ios/ipa/*.ipa
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Upload to TestFlight
+        # Tag pushes always upload; a manual run uploads unless the "upload" box is unticked.
+        if: ${{ github.event_name == 'push' || github.event.inputs.upload != 'false' }}
+        run: |
+          cat > "$RUNNER_TEMP/ExportOptions-upload.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>${APPLE_TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>destination</key><string>upload</string>
+            <key>uploadSymbols</key><true/>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath build/ios/Runner.xcarchive \
+            -exportPath build/ios/upload \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions-upload.plist" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$KEY_FILE" \
+            -authenticationKeyID "$APPSTORE_KEY_ID" \
+            -authenticationKeyIssuerID "$APPSTORE_ISSUER_ID"
+
+      - name: Remove the API key from the runner
+        if: always()
+        run: rm -f "$HOME/.appstoreconnect/private_keys/AuthKey_${APPSTORE_KEY_ID}.p8"

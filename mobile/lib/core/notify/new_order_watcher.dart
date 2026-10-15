@@ -22,6 +22,7 @@ const _channel = AndroidNotificationDetails(
   importance: Importance.high,
   priority: Priority.high,
 );
+const _iosDetails = DarwinNotificationDetails(presentAlert: true, presentSound: true, presentBadge: false);
 
 /// One Zalo order the customer confirmed (GET /api/admin/new-orders).
 class NewOrder {
@@ -51,11 +52,18 @@ class LocalNotifier {
     if (_ready) return;
     try {
       await _plugin.initialize(
-        settings: const InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher')),
+        settings: const InitializationSettings(
+          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+          // The permission is asked below, once, instead of at start-up.
+          iOS: DarwinInitializationSettings(requestAlertPermission: false, requestBadgePermission: false, requestSoundPermission: false),
+        ),
       );
       await _plugin
           .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
           ?.requestNotificationsPermission(); // Android 13+: asks once
+      await _plugin
+          .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
+          ?.requestPermissions(alert: true, sound: true); // iOS: asks once
       _ready = true;
     } catch (e) {
       if (kDebugMode) debugPrint('Notifications unavailable: $e');
@@ -65,7 +73,7 @@ class LocalNotifier {
   Future<void> show(int id, String title, String body) async {
     if (!_ready) return;
     try {
-      await _plugin.show(id: id, title: title, body: body, notificationDetails: const NotificationDetails(android: _channel));
+      await _plugin.show(id: id, title: title, body: body, notificationDetails: const NotificationDetails(android: _channel, iOS: _iosDetails));
     } catch (e) {
       if (kDebugMode) debugPrint('Notification not shown: $e');
     }
