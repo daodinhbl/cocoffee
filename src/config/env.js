@@ -1,5 +1,6 @@
 const path = require('path');
 const crypto = require('crypto');
+const { jwtSecretProblems } = require('./jwtSecretCheck');
 
 // Local dev reads .env; on Hostinger the same keys come from the app's environment variables.
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env'), quiet: true });
@@ -27,8 +28,16 @@ const int = (key, fallback) => {
  */
 const jwtSecret = () => {
   const explicit = optional('JWT_SECRET');
+  if (bool('REQUIRE_JWT_SECRET', false)) {
+    const problems = jwtSecretProblems(explicit);
+    if (problems.length) {
+      const bar = '='.repeat(78);
+      const list = problems.map((p) => `   - ${p}`).join('\n');
+      console.error(`\n${bar}\n  FATAL: REQUIRE_JWT_SECRET is on and JWT_SECRET is not acceptable:\n${list}\n  Generate one:  node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"\n${bar}\n`);
+      process.exit(1);
+    }
+  }
   if (explicit) return explicit;
-  if (bool('REQUIRE_JWT_SECRET', false)) throw new Error('Missing required environment variable: JWT_SECRET (REQUIRE_JWT_SECRET is on)');
   if (optional('NODE_ENV', 'development') === 'production') {
     console.warn('[warn] JWT_SECRET is not set: the signing key is derived from DB_PASSWORD. Set JWT_SECRET (and REQUIRE_JWT_SECRET=1) so a leaked database password cannot forge tokens.');
   }
