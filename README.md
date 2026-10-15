@@ -43,6 +43,7 @@ phone (<768: bottom tab bar, card lists, bottom-sheet dialogs) · tablet (icon r
 | Báo cáo | `/admin/reports` | any date range: by day, hour, channel, payment method, top products |
 | Zalo bot | `/admin/zalo` | bot connection (secret set, last message), webhook counters (24 h), pending drafts, recent events |
 | Cài đặt | `/admin/settings` | change password, staff accounts (add / reset password / lock), read-only system config |
+| Sao lưu & khôi phục | `/admin/backup` | download a full database backup (`.sql.gz`), automatic server-side copies (interval + how many to keep), restore from a stored or uploaded file (password re-entry, a pre-restore snapshot is taken first). Folder: `BACKUP_DIR` |
 
 Every state change is a plain HTML form (POST → redirect → flash message); destructive ones ask for confirmation. All of it goes through the
 same models/services as the POS REST API, so stock, COGS and payment rules cannot diverge between the two.

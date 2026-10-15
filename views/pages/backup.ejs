@@ -1,0 +1,126 @@
+<%
+  const { input, label, btnPrimary, btnSecondary, btnGhost, sheet, grabber } = ui;
+  const TONE = { auto: 'info', manual: 'good', uploaded: 'neutral', 'pre-restore': 'warn' };
+%>
+<div>
+  <h1 class="text-xl font-semibold tracking-tight sm:text-2xl">Sao lưu &amp; khôi phục</h1>
+  <p class="mt-1 text-sm text-gray-500">Toàn bộ dữ liệu (đơn hàng, khách hàng, công nợ, kho, thực đơn, ảnh, tài khoản, cấu hình) được lưu thành một file <span class="font-mono">.sql.gz</span>.</p>
+</div>
+
+<% if (busy) { %>
+<p class="mt-4 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800" role="status">Hệ thống đang <%= busy === 'restore' ? 'khôi phục dữ liệu' : 'sao lưu' %>. Vui lòng đợi rồi tải lại trang.</p>
+<% } %>
+
+<div class="mt-5 grid grid-cols-12 gap-4 sm:gap-6">
+  <section class="col-span-12 rounded border border-gray-200 p-5 lg:col-span-7" aria-labelledby="bk-now">
+    <h2 id="bk-now" class="text-base font-semibold">Sao lưu ngay</h2>
+    <p class="mt-1 text-xs text-gray-500">Nên tải một bản về máy tính hoặc Google Drive định kỳ: các bản lưu trên máy chủ có thể mất khi cập nhật/triển khai lại ứng dụng.</p>
+    <div class="mt-4 flex flex-wrap gap-3">
+      <a href="/admin/backup/download" class="<%= btnPrimary %> w-full sm:w-auto">Tải bản sao lưu về máy</a>
+      <form method="post" action="/admin/backup/create" class="max-sm:w-full">
+        <%- include('../partials/csrf') %>
+        <input type="hidden" name="_back" value="/admin/backup">
+        <button type="submit" class="<%= btnSecondary %> w-full sm:w-auto">Lưu một bản trên máy chủ</button>
+      </form>
+    </div>
+    <dl class="mt-4 space-y-1 text-xs text-gray-500">
+      <div class="flex justify-between gap-3"><dt>Thư mục lưu trên máy chủ</dt><dd class="break-all text-right font-mono"><%= backupDir %></dd></div>
+      <div class="flex justify-between gap-3"><dt>Đang chiếm</dt><dd><%= (totalSize / 1048576).toFixed(2) %> MB · <%= files.length %> file</dd></div>
+      <% if (autoWhen) { %><div class="flex justify-between gap-3"><dt>Lần tự động gần nhất</dt><dd><%= autoWhen %></dd></div><% } %>
+      <% if (lastAuto.error) { %><div class="text-red-700">Lần tự động gần nhất bị lỗi: <%= lastAuto.error %></div><% } %>
+    </dl>
+  </section>
+
+  <section class="col-span-12 rounded border border-gray-200 p-5 lg:col-span-5" aria-labelledby="bk-auto">
+    <h2 id="bk-auto" class="text-base font-semibold">Sao lưu tự động</h2>
+    <form method="post" action="/admin/backup/settings" class="mt-4 space-y-4">
+      <%- include('../partials/csrf') %>
+      <input type="hidden" name="_back" value="/admin/backup">
+      <label class="flex min-h-10 items-center gap-2 text-sm">
+        <input type="hidden" name="autoEnabled" value="0">
+        <input type="checkbox" name="autoEnabled" value="1" <%= config.autoEnabled ? 'checked' : '' %> class="h-4 w-4 rounded border-gray-300 accent-blue-700">
+        Bật sao lưu tự động trên máy chủ
+      </label>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label for="bk-int" class="<%= label %>">Chu kỳ</label>
+          <select id="bk-int" name="intervalHours" class="<%= input %>">
+            <% intervals.forEach((h) => { %><option value="<%= h %>" <%= config.intervalHours === h ? 'selected' : '' %>><%= h === 168 ? '1 tuần' : (h % 24 === 0 ? (h / 24) + ' ngày' : h + ' giờ') %></option><% }) %>
+          </select>
+        </div>
+        <div>
+          <label for="bk-keep" class="<%= label %>">Giữ lại (bản)</label>
+          <input id="bk-keep" name="keep" type="number" min="1" max="60" step="1" value="<%= config.keep %>" class="<%= input %> text-right font-mono">
+        </div>
+      </div>
+      <p class="text-xs text-gray-500">Bản tự động cũ hơn số lượng giữ lại sẽ bị xóa. Bản thủ công và bản tải lên chỉ xóa khi bạn bấm Xóa.</p>
+      <button type="submit" class="<%= btnPrimary %> w-full sm:w-auto">Lưu cấu hình</button>
+    </form>
+  </section>
+
+  <section class="col-span-12 rounded border border-gray-200 max-lg:border-0" aria-labelledby="bk-list">
+    <div class="border-b border-gray-200 px-5 py-4 max-lg:border-b-0 max-lg:px-0"><h2 id="bk-list" class="text-base font-semibold">Bản sao lưu trên máy chủ (<%= files.length %>)</h2></div>
+    <% if (!files.length) { %>
+      <p class="px-5 py-6 text-sm text-gray-500 max-lg:px-0">Chưa có bản sao lưu nào trên máy chủ.</p>
+    <% } else { %>
+    <table class="rtable w-full border-collapse text-left text-sm lg:min-w-[640px]">
+      <caption class="sr-only">Bản sao lưu trên máy chủ</caption>
+      <thead class="<%= ui.thead %>"><tr><th scope="col" class="px-4 py-3">Thời gian</th><th scope="col" class="px-4 py-3">Loại</th><th scope="col" class="px-4 py-3 text-right">Dung lượng</th><th scope="col" class="px-4 py-3 text-right"><span class="sr-only">Hành động</span></th></tr></thead>
+      <tbody>
+        <% files.forEach((f) => { %>
+        <tr class="border-b border-gray-200 last:border-b-0 hover:bg-gray-50">
+          <td data-label="" class="rt-title px-4 py-3"><span class="font-medium"><%= f.when %></span><span class="block break-all font-mono text-xs text-gray-500"><%= f.name %></span></td>
+          <td data-label="Loại" class="px-4 py-3"><%- badge(kinds[f.kind] || f.kind, TONE[f.kind] || 'neutral') %></td>
+          <td data-label="Dung lượng" class="px-4 py-3 text-right font-mono"><%= f.mb %> MB</td>
+          <td data-label="" class="rt-actions px-4 py-3 text-right">
+            <div class="inline-flex flex-wrap items-center justify-end gap-1">
+              <a href="/admin/backup/files/<%= f.name %>" class="<%= btnGhost %> w-auto px-2 text-xs font-medium">Tải về</a>
+              <button type="button" class="<%= btnGhost %> w-auto px-2 text-xs font-medium" data-modal-open="#restore-dialog" data-action="/admin/backup/files/<%= f.name %>/restore" data-title="Khôi phục từ <%= f.when %>">Khôi phục</button>
+              <form method="post" action="/admin/backup/files/<%= f.name %>/delete" data-confirm="Xóa bản sao lưu <%= f.when %>? Không thể hoàn tác.">
+                <%- include('../partials/csrf') %>
+                <input type="hidden" name="_back" value="/admin/backup">
+                <button type="submit" class="<%= btnGhost %> w-auto px-2 text-xs font-medium text-red-700">Xóa</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        <% }) %>
+      </tbody>
+    </table>
+    <% } %>
+  </section>
+
+  <section class="col-span-12 rounded border border-gray-200 p-5" aria-labelledby="bk-up">
+    <h2 id="bk-up" class="text-base font-semibold">Khôi phục từ file trên máy tính</h2>
+    <p class="mt-1 text-xs text-gray-500">Chọn file <span class="font-mono">.sql.gz</span> hoặc <span class="font-mono">.sql</span> do hệ thống này tạo (tối đa <%= maxUploadMb %> MB). File được kiểm tra đầy đủ rồi thêm vào danh sách ở trên; chưa có gì bị thay đổi cho tới khi bạn bấm "Khôi phục".</p>
+    <form data-backup-upload method="post" action="#" class="mt-4 flex flex-wrap items-center gap-3">
+      <%- include('../partials/csrf') %>
+      <input type="file" name="file" accept=".gz,.sql" required class="min-w-0 flex-1 text-sm" aria-label="File sao lưu">
+      <button type="submit" class="<%= btnSecondary %> max-sm:w-full">Tải lên &amp; kiểm tra</button>
+      <p data-backup-status class="w-full text-sm" role="status"></p>
+    </form>
+  </section>
+</div>
+
+<dialog id="restore-dialog" aria-labelledby="restore-title" class="max-w-md <%= sheet %>">
+  <form method="post" action="#" class="flex flex-col">
+    <%- include('../partials/csrf') %>
+    <input type="hidden" name="_back" value="/admin/backup">
+    <%- grabber %>
+    <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4">
+      <h2 id="restore-title" data-dialog-title class="text-lg font-semibold">Khôi phục dữ liệu</h2>
+      <button type="button" data-modal-close aria-label="Đóng" class="<%= btnGhost %>"><%- icon('x', 'h-5 w-5') %></button>
+    </div>
+    <div class="space-y-4 px-4 py-4 sm:px-6 sm:py-5">
+      <p class="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"><b>Toàn bộ dữ liệu hiện tại sẽ bị thay bằng bản sao lưu này</b> (đơn, công nợ, kho, tài khoản…). Hệ thống tự lưu một bản "Trước khi khôi phục" để quay lại nếu nhầm. Nên tạm dừng bán hàng trong lúc khôi phục; có thể bạn sẽ phải đăng nhập lại.</p>
+      <div>
+        <label for="rs-pw" class="<%= label %>">Nhập mật khẩu của bạn để xác nhận</label>
+        <input id="rs-pw" name="password" type="password" required maxlength="200" autocomplete="current-password" class="<%= input %>">
+      </div>
+    </div>
+    <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-4 py-3 max-sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
+      <button type="button" data-modal-close class="<%= btnSecondary %> max-sm:flex-1">Hủy</button>
+      <button type="submit" class="<%= btnPrimary %> max-sm:flex-[2]">Khôi phục</button>
+    </div>
+  </form>
+</dialog>

@@ -425,6 +425,7 @@
   /* ------------------------------------------------------------------ submits */
   document.addEventListener('submit', function (e) {
     var form = e.target;
+    if (form.matches('[data-backup-upload]')) { e.preventDefault(); uploadBackup(form); return; }
     if (form.matches('[data-no-submit]')) { e.preventDefault(); return; }
     if (form.id === 'recipe-form') {
       if (!form.reportValidity()) { e.preventDefault(); return; }
@@ -446,6 +447,30 @@
     form._confirmed = false;
     lockSubmit(form, e);
   });
+
+  // Backup page: send the chosen file as the raw request body (gzip'd in the browser when it is plain .sql).
+  function uploadBackup(form) {
+    var input = $('input[type="file"]', form);
+    var status = $('[data-backup-status]', form);
+    var btn = $('button[type="submit"]', form);
+    var file = input.files && input.files[0];
+    if (!file) return;
+    var say = function (text, bad) { status.textContent = text; status.className = 'w-full text-sm ' + (bad ? 'text-red-700' : 'text-gray-600'); };
+    var prepare = /\.gz$/i.test(file.name) || !window.CompressionStream
+      ? Promise.resolve(file)
+      : new Response(file.stream().pipeThrough(new CompressionStream('gzip'))).blob();
+    btn.disabled = true;
+    say('Đang tải lên và kiểm tra…');
+    prepare.then(function (body) {
+      return fetch('/admin/backup/upload', { method: 'POST', headers: { 'x-csrf-token': $('[name="_csrf"]', form).value, 'content-type': 'application/octet-stream' }, body: body });
+    }).then(function (res) {
+      return res.json().catch(function () { return { ok: false, error: 'Máy chủ trả lời không hợp lệ.' }; });
+    }).then(function (data) {
+      if (data.ok) { window.location.reload(); return; }
+      say(data.error || 'Không tải lên được.', true);
+      btn.disabled = false;
+    }).catch(function () { say('Không kết nối được máy chủ.', true); btn.disabled = false; });
+  }
 
   // A double-click (or Enter twice) must not POST twice: e.g. the same stock receipt booked two times.
   function lockSubmit(form, e) {

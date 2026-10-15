@@ -133,4 +133,13 @@ function requireCsrf(req, res, next) {
   return next();
 }
 
-module.exports = { startSession, endSession, flash, loadSession, requireStaff, requireAdmin, requireCsrf, safeBack, readCookies, STAFF_ROLES };
+/** CSRF for non-form POSTs (fetch with a raw body): the token travels in the x-csrf-token header. */
+function requireCsrfHeader(req, res, next) {
+  const sent = String(req.get('x-csrf-token') || '');
+  const want = String(req.session?.csrf || '');
+  const ok = want.length > 0 && sent.length === want.length && crypto.timingSafeEqual(Buffer.from(sent), Buffer.from(want));
+  if (!ok) return res.status(403).json({ ok: false, error: 'Phiên làm việc đã hết hạn. Hãy tải lại trang.' });
+  return next();
+}
+
+module.exports = { requireCsrfHeader, startSession, endSession, flash, loadSession, requireStaff, requireAdmin, requireCsrf, safeBack, readCookies, STAFF_ROLES };

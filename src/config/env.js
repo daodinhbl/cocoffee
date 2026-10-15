@@ -35,6 +35,8 @@ module.exports = {
   nodeEnv: optional('NODE_ENV', 'development'),
   rootDir: path.resolve(__dirname, '../..'),
   publicBaseUrl: optional('PUBLIC_BASE_URL').replace(/\/+$/, ''),
+  // Where Web Admin > Sao lưu keeps its .sql.gz files. A redeploy replaces the app folder, so point this outside it if you can.
+  backupDir: path.resolve(optional('BACKUP_DIR', path.resolve(__dirname, '../../backups'))),
 
   db: {
     // Hostinger writes DB_HOST=localhost, which Node may resolve to ::1 (no grant there): force IPv4 loopback.

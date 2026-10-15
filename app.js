@@ -12,6 +12,7 @@ const { bootstrapIfEmpty, ensureDemoAccount, ensureSchemaUpgrades } = require('.
 const { ensureMenuSeed, ensureMenuAliases } = require('./src/config/menuSeed');
 const { ensureMenuPhotos } = require('./src/config/menuPhotos');
 const productModel = require('./src/models/productModel');
+const backupService = require('./src/services/backupService');
 const webhookGuard = require('./src/services/zalo/webhookGuard');
 const logger = require('./src/utils/logger');
 const routes = require('./src/routes');
@@ -82,6 +83,7 @@ async function start() {
   await ensureMenuAliases();                            // how customers really order it ("đen đá", "cf muối"), once; never throws
   await ensureMenuPhotos();                             // shipped public/menu photos for items without one; never throws
   await ensureDemoAccount();                            // DEMO_MODE only; never throws
+  backupService.startScheduler();                       // automatic database backups (Admin > Sao lưu); never throws
   webhookGuard.ensure().catch(() => {});                // Zalo Bot Platform: re-register the webhook when its URL / secret changed; never throws, not awaited
 
   const isPassenger = typeof PhusionPassenger !== 'undefined'; // eslint-disable-line no-undef

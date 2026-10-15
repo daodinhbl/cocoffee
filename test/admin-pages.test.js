@@ -112,6 +112,7 @@ test('admin pages', async (t) => {
       '/admin/reports': [/Doanh thu theo ngày/, /Món bán chạy/, /Chưa thu tiền/],
       '/admin/zalo': [/Webhook/, /user_send_text/, /CF-D/],
       '/admin/settings': [/Đổi mật khẩu/, /Tài khoản nhân viên/, /Cấu hình hệ thống/],
+      '/admin/backup': [/Sao lưu ngay/, /Sao lưu tự động/],
     };
     for (const [path, patterns] of Object.entries(checks)) {
       const res = await admin.get(path);

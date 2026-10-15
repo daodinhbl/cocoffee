@@ -1,6 +1,6 @@
 const express = require('express');
 const { adminSecurity, pageRenderer } = require('../middlewares/adminSecurity');
-const { flash, loadSession, requireStaff, requireAdmin, requireCsrf } = require('../middlewares/adminAuth');
+const { flash, loadSession, requireStaff, requireAdmin, requireCsrf, requireCsrfHeader } = require('../middlewares/adminAuth');
 const rateLimit = require('../middlewares/rateLimit');
 const { AppError } = require('../utils/httpError');
 const logger = require('../utils/logger');
@@ -19,6 +19,8 @@ const zalo = require('../controllers/admin/zalo');
 const settings = require('../controllers/admin/settings');
 const pos = require('../controllers/admin/pos');
 const customers = require('../controllers/admin/customers');
+const backup = require('../controllers/admin/backup');
+const backupService = require('../services/backupService');
 
 const router = express.Router();
 
@@ -37,6 +39,12 @@ router.get('/pos/receipt/sample', requireStaff, pos.sampleReceipt);
 router.get('/pos/receipt/:id', requireStaff, pos.receipt);
 router.post('/pos/checkout', requireStaff, requireCsrf, pos.json(pos.checkout));
 router.post('/pos/hold', requireStaff, requireCsrf, pos.json(pos.hold));
+
+// Backup upload: the body is the file itself (raw), so the CSRF token comes in a header instead of a form field.
+const rawBackup = express.raw({ type: () => true, limit: backupService.MAX_UPLOAD_BYTES });
+router.post('/backup/upload', requireAdmin, requireCsrfHeader, (req, res, next) => rawBackup(req, res, (err) => (
+  err ? res.status(err.status === 413 ? 413 : 400).json({ ok: false, error: err.status === 413 ? 'File quá lớn.' : 'Không đọc được file tải lên.' }) : next()
+)), backup.upload);
 
 router.use(requireAdmin, requireCsrf);
 
@@ -103,6 +111,14 @@ router.post('/settings/printer', act(settings.savePrinter));
 router.post('/settings/users', act(settings.createUser));
 router.post('/settings/users/:id/password', act(settings.resetPassword));
 router.post('/settings/users/:id/active', act(settings.setActive));
+
+router.get('/backup', backup.page);
+router.post('/backup/create', act(backup.create));
+router.get('/backup/download', backup.downloadNow);
+router.get('/backup/files/:name', backup.downloadFile);
+router.post('/backup/settings', act(backup.saveSettings));
+router.post('/backup/files/:name/delete', act(backup.remove));
+router.post('/backup/files/:name/restore', act(backup.restore));
 
 router.use((req, _res, next) => next(new AppError(404, 'NOT_FOUND', `Không tìm thấy trang ${req.path}`)));
 
