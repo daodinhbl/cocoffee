@@ -59,14 +59,21 @@ void refreshAllFrom(WidgetRef ref) {
 final offlineCoordinatorProvider = Provider<void>((ref) {
   ref.listen<NetState>(netProvider, (prev, next) {
     if (prev != null && !prev.online && next.online) {
-      ref.read(outboxProvider.notifier).sync();
-      refreshAll(ref);
-      ref.read(snapshotSyncProvider.notifier).sync();
+      if (ref.read(outboxProvider).pending.isNotEmpty) {
+        ref.read(outboxProvider.notifier).sync(); // the screens are refreshed once the replay is over (below)
+      } else {
+        refreshAll(ref);
+        ref.read(snapshotSyncProvider.notifier).sync();
+      }
     }
   });
-  // Queued writes were replayed: take a fresh copy so the offline database matches the server again.
+  // A replay ended: the writes are on the server now, so the open screens refetch; and when nothing is left in the
+  // queue, a fresh copy so the offline database matches the server again (forced: runs even if a copy is in flight).
   ref.listen<OutboxState>(outboxProvider, (prev, next) {
-    if (prev != null && prev.syncing && !next.syncing) ref.read(snapshotSyncProvider.notifier).sync(force: true);
+    if (prev != null && prev.syncing && !next.syncing) {
+      refreshAll(ref);
+      if (next.pending.isEmpty) ref.read(snapshotSyncProvider.notifier).sync(force: true);
+    }
   });
   // Signed in (at start, or just logged in): first copy of the shop's data.
   ref.listen<AuthState>(authProvider, (prev, next) {

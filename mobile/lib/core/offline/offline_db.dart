@@ -46,6 +46,7 @@ class OfflineDb {
       try {
         return await open();
       } catch (_) {
+        _db = null; // a locked or full disk now is not forever: the next call tries again
         return null;
       }
     }();
@@ -113,10 +114,11 @@ class OfflineDb {
       [for (final e in (v as List? ?? const [])) if (e is Map) Map<String, dynamic>.from(e)];
 
   /// Replaces the whole local copy with [s] (the body of GET /api/sync/snapshot) in one transaction. Collections
-  /// the snapshot does not carry (a cashier gets no customer list) are left as they are.
-  Future<void> replaceSnapshot(Map<String, dynamic> s) async {
+  /// the snapshot does not carry (a cashier gets no customer list) are left as they are. False when there is no
+  /// database to write to.
+  Future<bool> replaceSnapshot(Map<String, dynamic> s) async {
     final db = await database();
-    if (db == null) return;
+    if (db == null) return false;
     await db.transaction((tx) async {
       final b = tx.batch();
 
@@ -132,7 +134,7 @@ class OfflineDb {
       replace('products', s['products'], (m) => {
             'id': m['id'],
             'category_id': m['category_id'],
-            'name_norm': foldVi('${m['name'] ?? ''} ${m['sku'] ?? ''}'),
+            'name_norm': foldVi('${m['name'] ?? ''}'),
             'is_active': _flag(m['is_active']),
           });
       replace('tables', s['tables'], (m) => {'id': m['id'], 'code': '${m['code'] ?? ''}', 'is_active': _flag(m['is_active'] ?? 1)});
@@ -140,7 +142,7 @@ class OfflineDb {
       if (inv is Map) {
         replace('inventory', inv['items'], (m) => {
               'id': m['id'],
-              'name_norm': foldVi('${m['name'] ?? ''} ${m['sku'] ?? ''}'),
+              'name_norm': foldVi('${m['name'] ?? ''}'),
               'is_active': _flag(m['is_active']),
               'is_low': _flag(m['is_low']),
             });
@@ -179,6 +181,7 @@ class OfflineDb {
           conflictAlgorithm: ConflictAlgorithm.replace);
       await b.commit(noResult: true);
     });
+    return true;
   }
 
   /// Row counts for the sync screen.
