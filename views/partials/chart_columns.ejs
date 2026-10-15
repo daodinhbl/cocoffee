@@ -1,0 +1,40 @@
+<%
+  /*
+   * Revenue by hour as columns with gridlines (server-rendered SVG). The busiest hour is highlighted and named.
+   *   locals: hours = [{ hour, revenue, orders }]
+   */
+  const W = 720, H = 220, L = 52, R = 10, T = 12, B = 26;
+  const iw = W - L - R, ih = H - T - B;
+  const vals = hours.map((h) => Number(h.revenue));
+  const niceMax = (v) => { if (v <= 0) return 4; const raw = v / 4; const mag = Math.pow(10, Math.floor(Math.log10(raw))); const m = raw / mag; const s = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find((c) => m <= c + 1e-9); return s * mag * 4; };
+  const top = niceMax(Math.max(1, ...vals));
+  const compact = (v) => (v >= 1e6 ? (v / 1e6).toFixed(1).replace('.0', '') + 'tr' : v >= 1e3 ? Math.round(v / 1e3) + 'k' : String(v));
+  const n = hours.length;
+  const slot = iw / n, bw = Math.max(4, slot * 0.62);
+  const peak = vals.some((v) => v > 0) ? vals.indexOf(Math.max(...vals)) : -1;
+  const pad = (v) => String(v).padStart(2, '0');
+%>
+<% if (peak >= 0) { %>
+  <p class="mb-2 text-xs text-gray-600">Cao điểm: <b class="text-navy-darker"><%= pad(hours[peak].hour) %>:00</b> · <%= money(hours[peak].revenue) %> · <%= hours[peak].orders %> đơn</p>
+<% } %>
+<svg viewBox="0 0 <%= W %> <%= H %>" class="h-auto w-full" role="img" aria-label="Biểu đồ doanh thu theo giờ trong ngày" preserveAspectRatio="xMidYMid meet">
+  <% [0, 1, 2, 3, 4].forEach((k) => { const v = (top * k) / 4; const yy = T + ih - (v / top) * ih; %>
+    <line x1="<%= L %>" x2="<%= W - R %>" y1="<%= yy.toFixed(1) %>" y2="<%= yy.toFixed(1) %>" stroke="<%= k === 0 ? '#CBD5E1' : '#E8E3DA' %>" stroke-width="1"/>
+    <text x="<%= L - 8 %>" y="<%= (yy + 4).toFixed(1) %>" text-anchor="end" font-size="11" fill="#8C8478"><%= compact(v) %></text>
+  <% }) %>
+  <% hours.forEach((h, i) => {
+       const v = Number(h.revenue); const bh = v > 0 ? Math.max(3, (v / top) * ih) : 2; const bx = L + i * slot + (slot - bw) / 2; const by = T + ih - bh;
+       const tx = Math.min(Math.max(bx + bw / 2 - 70, L), W - R - 140); %>
+    <g class="group" tabindex="0" aria-label="<%= pad(h.hour) %>:00: <%= money(h.revenue) %>, <%= h.orders %> đơn">
+      <rect x="<%= (L + i * slot).toFixed(1) %>" y="<%= T %>" width="<%= slot.toFixed(1) %>" height="<%= ih %>" fill="transparent"/>
+      <rect x="<%= bx.toFixed(1) %>" y="<%= by.toFixed(1) %>" width="<%= bw.toFixed(1) %>" height="<%= bh.toFixed(1) %>" rx="2"
+        fill="<%= v <= 0 ? '#E8E3DA' : (i === peak ? '#FBBF24' : '#1E3A8A') %>" class="<%= v > 0 && i !== peak ? 'group-hover:fill-[#1D4ED8]' : '' %>"/>
+      <g class="pointer-events-none opacity-0 group-hover:opacity-100 group-focus:opacity-100">
+        <rect x="<%= tx.toFixed(1) %>" y="<%= T %>" width="140" height="40" rx="6" fill="#0F172A"/>
+        <text x="<%= (tx + 10).toFixed(1) %>" y="<%= T + 17 %>" font-size="12" font-weight="700" fill="#fff"><%= pad(h.hour) %>:00 · <%= h.orders %> đơn</text>
+        <text x="<%= (tx + 10).toFixed(1) %>" y="<%= T + 32 %>" font-size="11" fill="#CBD5E1"><%= money(h.revenue) %></text>
+      </g>
+    </g>
+    <% if (n <= 12 || i % 2 === 0) { %><text x="<%= (L + i * slot + slot / 2).toFixed(1) %>" y="<%= H - 8 %>" text-anchor="middle" font-size="11" fill="<%= i === peak ? '#0F172A' : '#8C8478' %>" <%- i === peak ? 'font-weight="700"' : '' %>><%= pad(h.hour) %></text><% } %>
+  <% }) %>
+</svg>

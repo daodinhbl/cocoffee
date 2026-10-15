@@ -1,0 +1,35 @@
+<%
+  /*
+   * Share-of-total donut with a legend (server-rendered SVG).
+   *   locals: slices = [{ label, value, sub? }], totalLabel, emptyText
+   * Colour is never the only carrier: every slice is also listed with its percentage and amount.
+   */
+  const PALETTE = ['#1E3A8A', '#3B82F6', '#93C5FD', '#FBBF24', '#94A3B8', '#059669'];
+  const total = slices.reduce((s, p) => s + Number(p.value), 0);
+  const R0 = 52, C = 2 * Math.PI * R0;
+  let acc = 0;
+%>
+<% if (!slices.length || total <= 0) { %>
+  <p class="py-6 text-center text-sm text-gray-500"><%= locals.emptyText || '—' %></p>
+<% } else { %>
+  <div class="flex flex-wrap items-center gap-5">
+    <svg viewBox="0 0 140 140" class="h-36 w-36 shrink-0" role="img" aria-label="<%= slices.map((s) => `${s.label} ${Math.round((Number(s.value) / total) * 100)}%`).join(', ') %>">
+      <circle cx="70" cy="70" r="<%= R0 %>" fill="none" stroke="#F4F1EC" stroke-width="22"/>
+      <% slices.forEach((s, i) => { const frac = Number(s.value) / total; const len = frac * C; const off = acc; acc += len; %>
+        <circle cx="70" cy="70" r="<%= R0 %>" fill="none" stroke="<%= PALETTE[i % PALETTE.length] %>" stroke-width="22"
+          stroke-dasharray="<%= Math.max(len - (slices.length > 1 ? 1.5 : 0), 0.1).toFixed(2) %> <%= (C - len + (slices.length > 1 ? 1.5 : 0)).toFixed(2) %>"
+          stroke-dashoffset="<%= (-off).toFixed(2) %>" transform="rotate(-90 70 70)"><title><%= s.label %>: <%= money(s.value) %></title></circle>
+      <% }) %>
+      <text x="70" y="66" text-anchor="middle" font-size="10" fill="#8C8478"><%= locals.totalLabel || 'Tổng' %></text>
+      <text x="70" y="82" text-anchor="middle" font-size="13" font-weight="700" fill="#0F172A"><%= money(total) %></text>
+    </svg>
+    <ul class="min-w-0 flex-1 space-y-2 text-sm">
+      <% slices.forEach((s, i) => { %>
+        <li class="flex items-center justify-between gap-3">
+          <span class="flex min-w-0 items-center gap-2"><span class="h-2.5 w-2.5 shrink-0 rounded-sm" style="background: <%= PALETTE[i % PALETTE.length] %>"></span><span class="truncate"><%= s.label %></span><% if (s.sub) { %><span class="shrink-0 text-xs text-gray-500">· <%= s.sub %></span><% } %></span>
+          <span class="shrink-0 text-right"><span class="font-mono font-semibold tnum"><%= money(s.value) %></span> <span class="text-xs text-gray-500 tnum">(<%= Math.round((Number(s.value) / total) * 100) %>%)</span></span>
+        </li>
+      <% }) %>
+    </ul>
+  </div>
+<% } %>

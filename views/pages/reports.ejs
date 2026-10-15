@@ -1,8 +1,6 @@
 <%
   const { input, btnPrimary, btnSecondary } = ui;
   const dayLabel = (d) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
-  const maxDay = Math.max(1, ...days.map((d) => Number(d.revenue)));
-  const maxHour = Math.max(1, ...hours.map((h) => Number(h.revenue)));
   const rangeText = range.from === range.to ? dayLabel(range.from) + '/' + range.from.slice(0, 4) : `${dayLabel(range.from)}/${range.from.slice(0, 4)} – ${dayLabel(range.to)}/${range.to.slice(0, 4)}`;
   const isActive = (p) => p.from === range.from && p.to === range.to;
   const share = (v, total) => (total > 0 ? pct((Number(v) / total) * 100) : '—');
@@ -44,7 +42,7 @@
     { label: 'Lãi gộp', value: money(summary.gross_profit), sub: summary.revenue > 0 ? `${pct(margin)} biên lợi nhuận` : '—' },
     { label: 'Chưa thu tiền', value: money(summary.unpaid), sub: 'Đơn Zalo đã hoàn tất, chờ thu' },
   ].forEach((k) => { %>
-    <div class="col-span-6 rounded border border-gray-200 p-3 sm:p-5 xl:col-span-3">
+    <div class="<%= ui.card %> col-span-6 p-3 sm:p-5 xl:col-span-3">
       <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-500 sm:text-xs"><%= k.label %></p>
       <p class="mt-2 font-mono text-xl font-semibold tnum sm:mt-3 sm:text-2xl"><%= k.value %></p>
       <p class="mt-1.5 text-[11px] text-gray-500 sm:mt-2 sm:text-xs"><%= k.sub %></p>
@@ -54,36 +52,39 @@
 
 <div class="mt-5 grid grid-cols-12 gap-4 sm:mt-6 sm:gap-6">
   <!-- By day -->
-  <section class="col-span-12 rounded border border-gray-200 xl:col-span-7" aria-labelledby="day-title">
-    <h2 id="day-title" class="border-b border-gray-200 px-5 py-4 text-base font-semibold">Doanh thu theo ngày</h2>
+  <section class="<%= ui.card %> col-span-12 overflow-hidden" aria-labelledby="day-title">
+    <h2 id="day-title" class="border-b border-milk-200 px-5 py-4 text-base font-semibold text-navy-darker">Doanh thu theo ngày</h2>
     <% if (!summary.orders) { %>
-      <p class="px-5 py-10 text-center text-sm text-gray-500">Không có đơn hoàn tất trong khoảng này.</p>
+      <p class="px-5 py-10 text-center text-sm text-milk-500">Không có đơn hoàn tất trong khoảng này.</p>
     <% } else { %>
-    <div class="max-h-[28rem] overflow-y-auto">
-      <table class="w-full border-collapse text-sm">
-        <caption class="sr-only">Doanh thu, giá vốn và lãi gộp theo ngày</caption>
-        <thead class="sticky top-0 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500">
-          <tr><th scope="col" class="px-5 py-2 text-left">Ngày</th><th scope="col" class="px-3 py-2 text-left max-sm:hidden"><span class="sr-only">Biểu đồ</span></th><th scope="col" class="px-3 py-2 text-right">Đơn</th><th scope="col" class="px-3 py-2 text-right">Doanh thu</th><th scope="col" class="px-5 py-2 text-right">Lãi gộp</th></tr>
-        </thead>
-        <tbody>
-          <% days.forEach((d) => { %>
-            <tr class="border-t border-gray-100 <%= d.orders ? '' : 'text-gray-400' %>">
-              <th scope="row" class="whitespace-nowrap px-5 py-2 text-left font-mono text-[13px] font-normal tnum"><%= dayLabel(d.day) %></th>
-              <td class="w-1/3 px-3 py-2 max-sm:hidden"><div class="h-2 rounded-sm bg-amber-400" style="width: <%= Math.round((Number(d.revenue) / maxDay) * 100) %>%" role="img" aria-label="<%= money(d.revenue) %>"></div></td>
-              <td class="px-3 py-2 text-right font-mono tnum"><%= d.orders %></td>
-              <td class="px-3 py-2 text-right font-mono tnum"><%= money(d.revenue) %></td>
-              <td class="px-5 py-2 text-right font-mono tnum"><%= money(Number(d.revenue) - Number(d.cogs)) %></td>
-            </tr>
-          <% }) %>
-        </tbody>
-      </table>
-    </div>
+    <div class="px-3 py-4 sm:px-5"><%- include('../partials/chart_trend', { days }) %></div>
+    <details class="border-t border-milk-200">
+      <summary class="cursor-pointer select-none px-5 py-3 text-sm font-medium text-navy-accent hover:bg-milk-50">Xem bảng số liệu theo ngày</summary>
+      <div class="max-h-[28rem] overflow-y-auto">
+        <table class="w-full border-collapse text-sm">
+          <caption class="sr-only">Doanh thu, giá vốn và lãi gộp theo ngày</caption>
+          <thead class="sticky top-0 <%= ui.thead %>">
+            <tr><th scope="col" class="px-5 py-2 text-left">Ngày</th><th scope="col" class="px-3 py-2 text-right">Đơn</th><th scope="col" class="px-3 py-2 text-right">Doanh thu</th><th scope="col" class="px-5 py-2 text-right">Lãi gộp</th></tr>
+          </thead>
+          <tbody>
+            <% days.forEach((d) => { %>
+              <tr class="border-t border-milk-200 hover:bg-milk-50 <%= d.orders ? '' : 'text-milk-500' %>">
+                <th scope="row" class="whitespace-nowrap px-5 py-2 text-left font-mono text-[13px] font-normal tnum"><%= dayLabel(d.day) %></th>
+                <td class="px-3 py-2 text-right font-mono tnum"><%= d.orders %></td>
+                <td class="px-3 py-2 text-right font-mono tnum"><%= money(d.revenue) %></td>
+                <td class="px-5 py-2 text-right font-mono tnum"><%= money(Number(d.revenue) - Number(d.cogs)) %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </details>
     <% } %>
   </section>
 
   <!-- Top products -->
-  <section class="col-span-12 rounded border border-gray-200 xl:col-span-5" aria-labelledby="top-title">
-    <h2 id="top-title" class="border-b border-gray-200 px-5 py-4 text-base font-semibold">Món bán chạy (theo doanh thu)</h2>
+  <section class="<%= ui.card %> col-span-12 overflow-hidden xl:col-span-5" aria-labelledby="top-title">
+    <h2 id="top-title" class="border-b border-milk-200 px-5 py-4 text-base font-semibold text-navy-darker">Món bán chạy (theo doanh thu)</h2>
     <% if (!top.length) { %>
       <p class="px-5 py-10 text-center text-sm text-gray-500">Chưa có dữ liệu.</p>
     <% } else { %>
@@ -103,41 +104,22 @@
   </section>
 
   <!-- By hour -->
-  <section class="col-span-12 rounded border border-gray-200 xl:col-span-7" aria-labelledby="hour-title">
-    <h2 id="hour-title" class="border-b border-gray-200 px-5 py-4 text-base font-semibold">Theo giờ trong ngày</h2>
-    <div class="overflow-x-auto px-5 py-4">
-      <ol class="flex h-40 min-w-[560px] items-end gap-1" aria-label="Doanh thu theo giờ">
-        <% hours.forEach((h) => { const pctH = Math.round((Number(h.revenue) / maxHour) * 100); %>
-          <li class="flex h-full flex-1 flex-col items-center justify-end gap-1" title="<%= h.hour %>h: <%= money(h.revenue) %> · <%= h.orders %> đơn">
-            <span class="w-full rounded-sm <%= h.orders ? 'bg-amber-400' : 'bg-gray-100' %>" style="height: <%= h.orders ? Math.max(pctH, 4) : 2 %>%"></span>
-            <span class="font-mono text-[10px] text-gray-500 tnum"><%= h.hour %></span>
-          </li>
-        <% }) %>
-      </ol>
-    </div>
+  <section class="<%= ui.card %> col-span-12 overflow-hidden xl:col-span-7" aria-labelledby="hour-title">
+    <h2 id="hour-title" class="border-b border-milk-200 px-5 py-4 text-base font-semibold text-navy-darker">Theo giờ trong ngày</h2>
+    <div class="px-3 py-4 sm:px-5"><%- include('../partials/chart_columns', { hours }) %></div>
   </section>
 
   <!-- Channels + payments -->
-  <section class="col-span-12 rounded border border-gray-200 xl:col-span-5" aria-labelledby="chan-title">
-    <h2 id="chan-title" class="border-b border-gray-200 px-5 py-4 text-base font-semibold">Kênh bán &amp; thanh toán</h2>
-    <div class="grid grid-cols-1 gap-0 sm:grid-cols-2 xl:grid-cols-1">
+  <section class="<%= ui.card %> col-span-12 overflow-hidden xl:col-span-5" aria-labelledby="chan-title">
+    <h2 id="chan-title" class="border-b border-milk-200 px-5 py-4 text-base font-semibold text-navy-darker">Kênh bán &amp; thanh toán</h2>
+    <div class="divide-y divide-milk-200">
       <div class="px-5 py-4">
-        <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500">Kênh</h3>
-        <ul class="mt-2 space-y-2 text-sm">
-          <% bySource.forEach((s) => { %>
-            <li class="flex justify-between gap-3"><span><%= SOURCE[s.source] || s.source %> <span class="text-xs text-gray-500">· <%= s.orders %> đơn · <%= share(s.revenue, summary.revenue) %></span></span><span class="font-mono tnum"><%= money(s.revenue) %></span></li>
-          <% }) %>
-          <% if (!bySource.length) { %><li class="text-gray-500">—</li><% } %>
-        </ul>
+        <h3 class="mb-3 text-xs font-semibold uppercase tracking-wide text-milk-500">Kênh</h3>
+        <%- include('../partials/chart_donut', { slices: bySource.map((s) => ({ label: SOURCE[s.source] || s.source, value: s.revenue, sub: s.orders + ' đơn' })), totalLabel: 'Doanh thu', emptyText: '—' }) %>
       </div>
-      <div class="border-t border-gray-100 px-5 py-4 sm:border-l sm:border-t-0 xl:border-l-0 xl:border-t">
-        <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500">Thanh toán</h3>
-        <ul class="mt-2 space-y-2 text-sm">
-          <% byPayment.forEach((p) => { %>
-            <li class="flex justify-between gap-3"><span><%= METHOD_LABEL[p.method] || p.method %> <span class="text-xs text-gray-500">· <%= p.orders %> đơn</span></span><span class="font-mono tnum"><%= money(p.revenue) %></span></li>
-          <% }) %>
-          <% if (!byPayment.length) { %><li class="text-gray-500">—</li><% } %>
-        </ul>
+      <div class="px-5 py-4">
+        <h3 class="mb-3 text-xs font-semibold uppercase tracking-wide text-milk-500">Thanh toán</h3>
+        <%- include('../partials/chart_donut', { slices: byPayment.map((p) => ({ label: METHOD_LABEL[p.method] || p.method, value: p.revenue, sub: p.orders + ' đơn' })), totalLabel: 'Doanh thu', emptyText: '—' }) %>
       </div>
     </div>
   </section>

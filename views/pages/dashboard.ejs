@@ -3,7 +3,6 @@
   const kpiChip = { revenue: 'bg-navy text-white', cogs: 'bg-milk-100 text-navy', profit: 'bg-emerald-50 text-emerald-700', unpaid: 'bg-amber-50 text-amber-700' };
   const revenue = kpis[0];
   const others = kpis.slice(1);
-  const maxHour = Math.max(1, ...hourly.map((h) => h.revenue));
   const nowHour = Number(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hour12: false, timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date()));
   const dateText = new Intl.DateTimeFormat('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
   const hello = nowHour < 11 ? 'Chào buổi sáng' : nowHour < 14 ? 'Chào buổi trưa' : nowHour < 18 ? 'Chào buổi chiều' : 'Chào buổi tối';
@@ -58,17 +57,7 @@
     <h2 id="hour-title" class="text-base font-semibold text-navy-darker">Doanh thu theo giờ</h2>
     <p class="text-xs text-milk-500">06:00 – 22:00 · hôm nay</p>
   </div>
-  <div class="no-scrollbar mt-4 overflow-x-auto">
-    <ol class="flex h-40 min-w-[560px] items-end gap-1.5" role="img" aria-label="Doanh thu từng giờ trong ngày">
-      <% hourly.forEach((h) => { const pctH = h.revenue ? Math.max(4, Math.round((h.revenue / maxHour) * 100)) : 0; const isNow = h.hour === nowHour; %>
-        <li class="group relative flex h-full flex-1 flex-col items-center justify-end" title="<%= String(h.hour).padStart(2, '0') %>:00 · <%= money(h.revenue) %> · <%= h.orders %> đơn">
-          <% if (h.revenue) { %><span class="mb-1 hidden whitespace-nowrap font-mono text-[10px] text-navy group-hover:block tnum"><%= money(h.revenue) %></span><% } %>
-          <span class="block w-full rounded-t-md <%= h.revenue ? (isNow ? 'bg-amber-400' : 'bg-navy group-hover:bg-navy-accent') : 'bg-milk-200' %>" style="height: <%= h.revenue ? pctH : 3 %>%"></span>
-          <span class="mt-1.5 font-mono text-[10px] <%= isNow ? 'font-bold text-navy' : 'text-milk-500' %> tnum"><%= String(h.hour).padStart(2, '0') %></span>
-        </li>
-      <% }) %>
-    </ol>
-  </div>
+  <div class="mt-4"><%- include('../partials/chart_columns', { hours: hourly }) %></div>
 </section>
 
 <div class="mt-4 grid grid-cols-12 gap-4 sm:mt-6 sm:gap-6">
