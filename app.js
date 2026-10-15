@@ -63,6 +63,9 @@ app.get('/health', async (_req, res) => {
 // Android app for staff phones: landing page, APK, manifest, QR code (public; see routes/downloadRoutes.js).
 app.use('/download', downloadRoutes);
 
+// Privacy policy (public; store listings such as APKPure ask for its URL).
+app.get('/privacy', (_req, res) => res.render('privacy', { shopName: env.business.shopName, phone: env.business.phone, address: env.business.address }));
+
 app.use('/admin', adminRoutes);
 app.use('/api', routes);
 app.use(notFound);

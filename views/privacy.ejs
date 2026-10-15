@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Chính sách quyền riêng tư · <%= shopName %></title>
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <style>
+    body { margin: 0; background: #FBF6EF; color: #1f1f1f; font: 16px/1.6 "Times New Roman", Times, serif; }
+    main { max-width: 42rem; margin: 0 auto; padding: 2rem 1rem 3rem; }
+    h1 { color: #4C2C0E; font-size: 1.6rem; margin: 0 0 .25rem; }
+    h2 { color: #603813; font-size: 1.15rem; margin: 1.6rem 0 .4rem; }
+    p, li { margin: .4rem 0; }
+    .muted { color: #6b6b6b; font-size: .9rem; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Chính sách quyền riêng tư</h1>
+  <p class="muted">Ứng dụng Tasotek FnB và trang quản lý của <%= shopName %> · Cập nhật 15/10/2026</p>
+
+  <h2>1. Ứng dụng này dành cho ai</h2>
+  <p>Tasotek FnB là ứng dụng nội bộ của cửa hàng dùng để bán hàng, quản lý kho và công nợ. Chỉ nhân viên và chủ quán có tài khoản do cửa hàng cấp mới đăng nhập được; ứng dụng không có đăng ký công khai và không hiển thị quảng cáo.</p>
+
+  <h2>2. Dữ liệu được xử lý</h2>
+  <ul>
+    <li><b>Tài khoản nhân viên:</b> họ tên, tên đăng nhập, vai trò; mật khẩu được lưu dưới dạng băm, không lưu nguyên văn.</li>
+    <li><b>Khách hàng của cửa hàng:</b> tên, số điện thoại (nếu có), mã tài khoản Zalo (khi khách đặt món qua Zalo), ghi chú và sổ công nợ.</li>
+    <li><b>Giao dịch:</b> đơn hàng, món, số tiền, hình thức thanh toán, thời gian.</li>
+    <li><b>Kho:</b> nguyên liệu, nhập kho, điều chỉnh tồn kho.</li>
+  </ul>
+
+  <h2>3. Dữ liệu lưu ở đâu</h2>
+  <p>Dữ liệu nằm trên máy chủ của cửa hàng. Để dùng khi mất mạng, ứng dụng lưu một bản sao trên điện thoại (trong vùng lưu trữ riêng của ứng dụng) và gửi lên máy chủ khi có mạng trở lại. Mã đăng nhập được giữ trong kho khóa an toàn của Android. Gỡ ứng dụng sẽ xóa bản sao này.</p>
+
+  <h2>4. Chia sẻ dữ liệu</h2>
+  <p>Cửa hàng không bán dữ liệu và không dùng dịch vụ quảng cáo hay phân tích theo dõi người dùng. Khi khách hàng nhắn tin đặt món qua Zalo, nội dung trao đổi (đơn hàng, hóa đơn, bảng công nợ của chính khách đó) đi qua nền tảng Zalo theo chính sách của Zalo.</p>
+
+  <h2>5. Quyền của ứng dụng trên Android</h2>
+  <ul>
+    <li><b>Internet:</b> kết nối với máy chủ của cửa hàng.</li>
+    <li><b>Thông báo:</b> báo đơn mới và bản cập nhật.</li>
+    <li><b>Cài đặt gói ứng dụng:</b> chỉ dùng khi bạn bấm “Cập nhật” trong ứng dụng; bản cập nhật tải từ máy chủ của cửa hàng và được kiểm tra mã SHA-256 trước khi cài.</li>
+  </ul>
+
+  <h2>6. Yêu cầu truy cập, sửa hoặc xóa dữ liệu</h2>
+  <p>Khách hàng hoặc nhân viên muốn xem, sửa hoặc xóa dữ liệu của mình hãy liên hệ cửa hàng<% if (phone || address) { %>:
+    <%= [address, phone].filter(Boolean).join(' · ') %><% } %>. Cửa hàng sẽ xử lý trong thời gian hợp lý, trừ dữ liệu phải giữ theo quy định kế toán.</p>
+
+  <h2>7. Thay đổi chính sách</h2>
+  <p>Khi chính sách thay đổi, ngày cập nhật ở đầu trang sẽ được đổi.</p>
+</main>
+</body>
+</html>
