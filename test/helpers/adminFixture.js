@@ -60,6 +60,7 @@ async function start() {
   const customerModel = require('../../src/models/customerModel');
   const customerService = require('../../src/services/customerService');
   const mediaModel = require('../../src/models/mediaModel');
+  const idempotencyModel = require('../../src/models/idempotencyModel');
   const { pool } = require('../../src/config/db');
 
   // Password changes are kept per app instance, so a changed password really invalidates older sessions.
@@ -178,6 +179,12 @@ async function start() {
   mock.method(mediaModel, 'create', rec('media.create', ({ folder, mime, bytes }) => { const id = ++mediaSeq; MEDIA.set(id, { id, folder, mime, bytes }); return id; }));
   mock.method(mediaModel, 'get', async (id) => MEDIA.get(Number(id)) || null);
   mock.method(mediaModel, 'remove', rec('media.remove', (id) => { MEDIA.delete(Number(id)); }));
+  const IDEMPOTENCY = new Map();   // idempotency_keys, in memory (scope -> row)
+  mock.method(idempotencyModel, 'find', async (scope) => IDEMPOTENCY.get(scope) || null);
+  mock.method(idempotencyModel, 'claim', async (scope, hash) => { if (IDEMPOTENCY.has(scope)) return false; IDEMPOTENCY.set(scope, { request_hash: hash, status: null, body: null }); return true; });
+  mock.method(idempotencyModel, 'complete', async (scope, status, body) => { IDEMPOTENCY.set(scope, { ...IDEMPOTENCY.get(scope), status, body: JSON.stringify(body) }); });
+  mock.method(idempotencyModel, 'release', async (scope) => { IDEMPOTENCY.delete(scope); });
+  mock.method(idempotencyModel, 'sweep', async () => {});
   const SETTINGS = new Map();   // app_settings, in memory
   mock.method(settingsModel, 'getByPrefix', async (prefix) => Object.fromEntries([...SETTINGS].filter(([k]) => k.startsWith(prefix))));
   mock.method(settingsModel, 'setMany', rec('settings.setMany', (values) => { for (const [k, v] of Object.entries(values)) SETTINGS.set(k, String(v)); }));

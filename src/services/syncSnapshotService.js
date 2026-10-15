@@ -27,7 +27,8 @@ async function recentOrders(limit) {
   for (let i = 0; i < rows.length; i += 20) {                                   // small batches: the pool is tiny
     const slice = rows.slice(i, i + 20);
     const parts = await Promise.all(slice.map(async (o) => ({
-      ...o, items: await orderModel.getItems(o.id), payments: await orderModel.getPayments(o.id),
+      ...o, ...(await orderModel.getById(o.id) || {}),            // the full row: subtotal, discount, table_name, paid_at...
+      items: await orderModel.getItems(o.id), payments: await orderModel.getPayments(o.id),
     })));
     full.push(...parts);
   }

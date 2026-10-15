@@ -85,7 +85,8 @@ async function adjust(req, res) {
     conn, id,
     v.num(req.body.new_quantity, 'new_quantity', { min: 0 }),
     { type: v.oneOf(req.body.type, 'type', ['adjustment', 'waste'], { required: false }) || 'adjustment',
-      userId: req.user.id, note: v.str(req.body.note, 'note', { required: false }) }
+      userId: req.user.id, note: v.str(req.body.note, 'note', { required: false }),
+      expectedQuantity: v.num(req.body.expected_quantity, 'expected_quantity', { min: 0, required: false }) }
   ));
   res.json(result);
 }

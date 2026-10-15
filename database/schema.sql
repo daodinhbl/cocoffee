@@ -6,7 +6,7 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
-DROP TABLE IF EXISTS media_files, customer_ledger, customers, app_settings, zalo_tokens, zalo_events, zalo_sessions, payments, inventory_movements,
+DROP TABLE IF EXISTS idempotency_keys, media_files, customer_ledger, customers, app_settings, zalo_tokens, zalo_events, zalo_sessions, payments, inventory_movements,
                      order_items, orders, dining_tables, recipes, product_aliases, products,
                      inventory_items, categories, users;
 
@@ -336,4 +336,18 @@ CREATE TABLE customer_ledger (
   KEY idx_ledger_customer (customer_id, created_at),
   CONSTRAINT fk_ledger_customer FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE CASCADE,
   CONSTRAINT fk_ledger_order    FOREIGN KEY (order_id)    REFERENCES orders (id)    ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Remembered answers of the app's idempotent writes (Idempotency-Key header, src/middlewares/idempotency.js):
+-- a retry after a redeploy or on another worker replays the first answer instead of running the write again.
+-- Also created at startup on older databases (ensureSchemaUpgrades).
+CREATE TABLE idempotency_keys (
+  id            CHAR(64)      NOT NULL,             -- SHA-256 of scope
+  scope         VARCHAR(255)  NOT NULL,             -- user:METHOD:/api/path:key
+  request_hash  CHAR(64)      NOT NULL,             -- SHA-256 of the JSON body
+  status        SMALLINT      NULL,                 -- NULL while the first request runs
+  body          MEDIUMTEXT    NULL,
+  created_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_idempotency_created (created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

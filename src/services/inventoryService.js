@@ -100,16 +100,29 @@ async function receive(conn, itemId, quantity, unitCost, { userId = null, note =
 }
 
 /** Stocktake / waste: set the counted quantity (type 'adjustment') or remove waste. */
-async function adjust(conn, itemId, newQuantity, { type = 'adjustment', userId = null, note = null } = {}) {
+/**
+ * Stock count. `expectedQuantity` is the figure the count was made against (the app sends what it showed); when the
+ * stock has moved since — an offline count replayed later, another device selling meanwhile — the difference the
+ * count found is applied to the current stock instead of overwriting it, so those movements are kept.
+ */
+async function adjust(conn, itemId, newQuantity, { type = 'adjustment', userId = null, note = null, expectedQuantity } = {}) {
   const row = (await inventoryModel.lockByIds([itemId], conn)).get(itemId);
   if (!row) throw new AppError(404, 'NOT_FOUND', 'Inventory item not found');
-  const delta = round(newQuantity - row.quantity_on_hand, 3);
-  await inventoryModel.setStock(itemId, newQuantity, row.avg_cost, conn);
+  const current = Number(row.quantity_on_hand);
+  let target = newQuantity;
+  let reconciled = false;
+  if (expectedQuantity !== undefined && expectedQuantity !== null && round(Number(expectedQuantity) - current, 3) !== 0) {
+    target = Math.max(0, round(current + (newQuantity - Number(expectedQuantity)), 3));
+    reconciled = true;
+    note = `${note ? `${note} ` : ''}(đếm ${newQuantity} khi máy ghi ${expectedQuantity}, hệ thống ${current})`.slice(0, 255);
+  }
+  const delta = round(target - current, 3);
+  await inventoryModel.setStock(itemId, target, row.avg_cost, conn);
   await inventoryModel.addMovement({
     inventoryItemId: itemId, type, quantityChange: delta, unitCost: row.avg_cost,
-    balanceAfter: newQuantity, note, userId,
+    balanceAfter: target, note, userId,
   }, conn);
-  return { quantity_on_hand: newQuantity, delta };
+  return { quantity_on_hand: target, delta, ...(reconciled ? { reconciled: true, counted: newQuantity, expected_quantity: Number(expectedQuantity) } : {}) };
 }
 
 /**

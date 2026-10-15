@@ -155,6 +155,17 @@ UPGRADES.push(
      CONSTRAINT fk_ledger_customer FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE CASCADE,
      CONSTRAINT fk_ledger_order    FOREIGN KEY (order_id)    REFERENCES orders (id)    ON DELETE SET NULL
    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  // Answers of the app's idempotent writes (middlewares/idempotency.js): survive a redeploy, shared by every worker.
+  `CREATE TABLE IF NOT EXISTS idempotency_keys (
+     id            CHAR(64)      NOT NULL,
+     scope         VARCHAR(255)  NOT NULL,
+     request_hash  CHAR(64)      NOT NULL,
+     status        SMALLINT      NULL,
+     body          MEDIUMTEXT    NULL,
+     created_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     PRIMARY KEY (id),
+     KEY idx_idempotency_created (created_at)
+   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   // Photos uploaded from the admin live in the database: a Node.js redeploy replaces public_html (public/uploads).
   `CREATE TABLE IF NOT EXISTS media_files (
      id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
