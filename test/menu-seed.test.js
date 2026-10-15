@@ -226,3 +226,19 @@ test('menu seed never renames, duplicates or steals from what the owner already 
     assert.deepEqual(db.named('Cà Phê Sữa Pha Máy').map((p) => p.id), [51]);
   });
 });
+
+test('every drink on the board ships a photo named after it (public/menu/<slug>.jpg), so the boot step can attach it', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const { MENU } = require('../src/config/menuSeed');
+  const { slugify } = require('../src/config/menuPhotos');
+  const dir = path.join(__dirname, '..', 'public', 'menu');
+  const noPhotoYet = new Set(['cigarette']);   // retail packs: the owner uploads their own pictures in Web Admin > Thực đơn
+  for (const item of MENU.filter((m) => !noPhotoYet.has(m.cat))) {
+    const file = path.join(dir, `${slugify(item.name)}.jpg`);
+    assert.ok(fs.existsSync(file), `${item.name}: public/menu/${slugify(item.name)}.jpg is missing`);
+    const head = fs.readFileSync(file).subarray(0, 2);
+    assert.deepEqual([...head], [0xFF, 0xD8], `${item.name}: not a JPEG`);
+    assert.ok(fs.statSync(file).size < 300 * 1024, `${item.name}: photo is larger than 300 KB (the POS loads these on every table)`);
+  }
+});
