@@ -39,6 +39,13 @@
       { t: 'Ứng dụng Android cho nhân viên', d: 'Cài bằng mã QR. Hoạt động ngay cả khi mất mạng: đơn được lưu tạm và đồng bộ lại, không bị trùng.' },
       { t: 'Sao lưu & phục hồi', d: 'Sao lưu tự động theo lịch, tải bản sao lưu về máy, phục hồi từ bản đã lưu và tự chụp bản trước khi khôi phục.' },
     ];
+    const shots = [
+      { file: 'dashboard.jpg', w: 1440, h: 900, wide: true, t: 'Tổng quan', c: 'doanh thu, giá vốn, lãi gộp, đơn chờ thu và cảnh báo tồn kho thấp trong một màn hình.', alt: 'Màn hình tổng quan của trang quản trị' },
+      { file: 'pos.jpg', w: 1440, h: 900, t: 'Bán hàng (POS)', c: 'chọn món theo danh mục, giữ đơn, giảm giá và thanh toán nhanh.', alt: 'Màn hình bán hàng POS' },
+      { file: 'menu.jpg', w: 1440, h: 900, t: 'Thực đơn', c: 'danh mục, giá bán và tình trạng từng món.', alt: 'Màn hình quản lý thực đơn' },
+      { file: 'inventory.jpg', w: 1440, h: 900, t: 'Kho nguyên liệu', c: 'tồn kho, mức tối thiểu và giá trị tồn theo giá vốn bình quân.', alt: 'Màn hình kho nguyên liệu' },
+      { file: 'mobile-dashboard.jpg', w: 780, h: 1688, narrow: true, t: 'Trên điện thoại', c: 'giao diện tự thích ứng với màn hình nhỏ.', alt: 'Trang tổng quan trên điện thoại' },
+    ];
     const pillars = [
       ['Một nơi cho mọi việc', 'Đơn hàng, thực đơn, kho, công nợ và báo cáo dùng chung một dữ liệu, nên số liệu không bao giờ lệch nhau.'],
       ['Dùng được trên mọi thiết bị', 'Điện thoại, máy tính bảng, laptop hay máy tính để bàn — giao diện tự thích ứng theo màn hình.'],
@@ -54,7 +61,9 @@
       </a>
       <nav class="flex items-center gap-4 text-sm" aria-label="Điều hướng">
         <a href="#tinh-nang" class="hidden text-navy-700 hover:underline sm:inline">Tính năng</a>
+        <a href="#hinh-anh" class="hidden text-navy-700 hover:underline sm:inline">Hình ảnh</a>
         <a href="#ung-dung" class="hidden text-navy-700 hover:underline sm:inline">Ứng dụng</a>
+        <a href="#lien-he" class="hidden text-navy-700 hover:underline sm:inline">Liên hệ</a>
         <a href="/admin/login" class="inline-flex h-9 items-center rounded bg-navy-700 px-4 font-semibold text-white hover:bg-navy-800">Đăng nhập</a>
       </nav>
     </div>
@@ -106,6 +115,20 @@
       </ul>
     </section>
 
+    <!-- Screenshots -->
+    <section id="hinh-anh" class="mx-auto max-w-6xl px-4 pb-14" aria-labelledby="shots-title">
+      <h2 id="shots-title" class="text-3xl font-semibold text-navy-800">Hình ảnh hệ thống</h2>
+      <p class="mt-2 max-w-2xl text-gray-700">Giao diện thật của trang quản trị và màn hình bán hàng (dữ liệu minh hoạ).</p>
+      <div class="mt-8 grid gap-6 md:grid-cols-2">
+        <% shots.forEach((s) => { %>
+          <figure class="overflow-hidden rounded-xl border border-navy-200 bg-white shadow-[0_10px_30px_-18px_rgba(30,58,138,.35)] <%= s.wide ? 'md:col-span-2' : '' %> <%= s.narrow ? 'mx-auto w-full max-w-xs md:col-span-2' : '' %>">
+            <a href="/landing/<%= s.file %>" target="_blank" rel="noopener"><img src="/landing/<%= s.file %>" alt="<%= s.alt %>" width="<%= s.w %>" height="<%= s.h %>" loading="lazy" class="w-full"></a>
+            <figcaption class="border-t border-navy-100 px-4 py-3 text-sm text-gray-700"><b class="text-navy-800"><%= s.t %></b> — <%= s.c %></figcaption>
+          </figure>
+        <% }) %>
+      </div>
+    </section>
+
     <!-- How it works -->
     <section class="bg-navy-100">
       <div class="mx-auto max-w-6xl px-4 py-14">
@@ -135,6 +158,32 @@
         <% } %>
       </div>
     </section>
+
+    <!-- Contact -->
+    <% const rows = [
+      ['Cửa hàng', contact.name, ''],
+      ['Điện thoại', contact.phone, contact.phone ? 'tel:' + contact.phone.replace(/[^\d+]/g, '') : ''],
+      ['Zalo', contact.zalo, ''],
+      ['Email', contact.email, contact.email ? 'mailto:' + contact.email : ''],
+      ['Địa chỉ', contact.address, ''],
+      ['Giờ làm việc', contact.hours, ''],
+    ].filter((r) => r[1]); %>
+    <% if (rows.length) { %>
+      <section id="lien-he" class="mx-auto max-w-6xl px-4 pb-14" aria-labelledby="contact-title">
+        <h2 id="contact-title" class="text-3xl font-semibold text-navy-800">Liên hệ</h2>
+        <p class="mt-2 max-w-2xl text-gray-700">Cần tư vấn, dùng thử hoặc hỗ trợ cài đặt? Liên hệ với chúng tôi.</p>
+        <dl class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <% rows.forEach((r) => { %>
+            <div class="rounded-xl border border-navy-200 bg-white p-5">
+              <dt class="text-xs font-semibold uppercase tracking-wide text-navy-600"><%= r[0] %></dt>
+              <dd class="mt-1 break-words text-base font-semibold text-navy-800">
+                <% if (r[2]) { %><a href="<%= r[2] %>" class="hover:underline"><%= r[1] %></a><% } else { %><%= r[1] %><% } %>
+              </dd>
+            </div>
+          <% }) %>
+        </dl>
+      </section>
+    <% } %>
 
     <!-- CTA -->
     <section class="bg-navy-700">

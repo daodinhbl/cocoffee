@@ -67,7 +67,7 @@ app.get('/health', async (_req, res) => {
 app.use('/download', downloadRoutes);
 
 // Product introduction page (public; linked from the login page "Xem thêm").
-app.get('/gioi-thieu', adminSecurity, (_req, res) => res.render('landing', { shopName: env.business.shopName, appDownload: appRelease.loginCard() }));
+app.get('/gioi-thieu', adminSecurity, (_req, res) => res.render('landing', { shopName: env.business.shopName, appDownload: appRelease.loginCard(), contact: env.contact }));
 
 // Privacy policy (public; store listings such as APKPure ask for its URL).
 app.get('/privacy', (_req, res) => res.render('privacy', { shopName: env.business.shopName, phone: env.business.phone, address: env.business.address }));

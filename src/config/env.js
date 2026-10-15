@@ -114,6 +114,16 @@ module.exports = {
     secretKey: optional('PAYON_SECRET_KEY'),
   },
 
+  // "Liên hệ" block of the public introduction page (/gioi-thieu). Public details, overridable per site; a blank value hides its row.
+  contact: {
+    name: optional('CONTACT_NAME', 'Cò Coffee'),
+    address: optional('CONTACT_ADDRESS', 'TDP 20, phường 2, Bảo Lộc'),
+    phone: optional('CONTACT_PHONE', '0383 966 336'),
+    email: optional('CONTACT_EMAIL', 'dinhxuandaodc.435@gmail.com'),
+    zalo: optional('CONTACT_ZALO'),
+    hours: optional('CONTACT_HOURS'),
+  },
+
   business: {
     allowNegativeStock: bool('ALLOW_NEGATIVE_STOCK', false),
     // Largest discount (% of the order subtotal) a cashier may give; an admin has no limit.
@@ -122,6 +132,10 @@ module.exports = {
     paymentNote: optional('SHOP_PAYMENT_NOTE'),
     address: optional('SHOP_ADDRESS'),
     phone: optional('SHOP_PHONE'),
+    // Shown in the "Liên hệ" block of the public introduction page (/gioi-thieu); blank entries are hidden.
+    email: optional('SHOP_EMAIL'),
+    zalo: optional('SHOP_ZALO'),
+    hours: optional('SHOP_HOURS'),
   },
 
   // Printed receipt (thermal printer). 80mm paper prints ~72mm wide; 58mm prints ~48mm.
