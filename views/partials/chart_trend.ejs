@@ -1,10 +1,11 @@
 <%
   /*
    * Revenue (area) + gross profit (line) per day: server-rendered SVG, no library, CSP-safe (no inline script).
-   *   locals: days = [{ day: 'YYYY-MM-DD', revenue, cogs, orders }], id
+   *   locals: days = [{ day: 'YYYY-MM-DD', revenue, cogs, orders }], wide (optional: a layout for full-width cards)
    * Hover/focus a day to read its numbers; the table next to the chart carries the same figures as text.
    */
-  const W = 720, H = 260, L = 52, R = 14, T = 14, B = 30;
+  const wide = Boolean(locals.wide);
+  const W = wide ? 1100 : 720, H = wide ? 300 : 260, L = 52, R = 14, T = 14, B = 30;
   const iw = W - L - R, ih = H - T - B;
   const rev = days.map((d) => Number(d.revenue));
   const prof = days.map((d) => Number(d.revenue) - Number(d.cogs));

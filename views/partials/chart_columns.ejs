@@ -1,9 +1,10 @@
 <%
   /*
    * Revenue by hour as columns with gridlines (server-rendered SVG). The busiest hour is highlighted and named.
-   *   locals: hours = [{ hour, revenue, orders }]
+   *   locals: hours = [{ hour, revenue, orders }], wide (optional: a layout for full-width cards)
    */
-  const W = 720, H = 220, L = 52, R = 10, T = 12, B = 26;
+  const wide = Boolean(locals.wide);
+  const W = wide ? 1100 : 720, H = wide ? 240 : 220, L = 52, R = 10, T = 12, B = 26;
   const iw = W - L - R, ih = H - T - B;
   const vals = hours.map((h) => Number(h.revenue));
   const niceMax = (v) => { if (v <= 0) return 4; const raw = v / 4; const mag = Math.pow(10, Math.floor(Math.log10(raw))); const m = raw / mag; const s = [1, 1.2, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find((c) => m <= c + 1e-9); return s * mag * 4; };

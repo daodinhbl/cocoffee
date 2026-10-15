@@ -57,7 +57,7 @@
     <% if (!summary.orders) { %>
       <p class="px-5 py-10 text-center text-sm text-milk-500">Không có đơn hoàn tất trong khoảng này.</p>
     <% } else { %>
-    <div class="px-3 py-4 sm:px-5"><%- include('../partials/chart_trend', { days }) %></div>
+    <div class="px-3 py-4 sm:px-5"><%- include('../partials/chart_trend', { days, wide: true }) %></div>
     <details class="border-t border-milk-200">
       <summary class="cursor-pointer select-none px-5 py-3 text-sm font-medium text-navy-accent hover:bg-milk-50">Xem bảng số liệu theo ngày</summary>
       <div class="max-h-[28rem] overflow-y-auto">
