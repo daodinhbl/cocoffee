@@ -41,6 +41,17 @@ extension OfflineEffects on OfflineDb {
     await setMeta('customer_stats', jsonEncode(s));
   }
 
+  /// Adds a row at the top of a customer's ledger copy (a collection or an adjustment made offline).
+  Future<void> addLedgerEntry(int customerId, {required String type, required num amount, String? method, String? note}) async {
+    final existing = await metaJson('ledger:$customerId');
+    final rows = existing is List ? [...existing] : <dynamic>[];
+    rows.insert(0, {
+      'id': -DateTime.now().millisecondsSinceEpoch, 'entry_type': type, 'amount': amount, 'method': method, 'note': note,
+      'created_at': DateTime.now().toUtc().toIso8601String(), 'order_id': null, 'order_code': null, 'created_by_name': null,
+    });
+    await setMeta('ledger:$customerId', jsonEncode(rows));
+  }
+
   /// A customer created offline, under a temporary negative [id].
   Future<Map<String, dynamic>> insertCustomer(int id, {required String name, String? phone, String? zaloUserId, String? note}) async {
     final now = DateTime.now().toUtc().toIso8601String();

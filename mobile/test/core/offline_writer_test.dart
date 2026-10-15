@@ -64,7 +64,10 @@ void main() {
         kind: 'customer.collect',
         path: '/admin/customers/5/collect',
         body: {'amount': amount, 'method': 'cash'},
-        effect: (d) async => {'balance': await d.addCustomerBalance(5, -amount)},
+        effect: (d) async {
+          await d.addLedgerEntry(5, type: 'payment', amount: -amount, method: 'cash');
+          return {'balance': await d.addCustomerBalance(5, -amount)};
+        },
       );
 
   test('online: sent at once with an Idempotency-Key, nothing queued', () async {
@@ -90,6 +93,9 @@ void main() {
     final list = (await OfflineResolverFor(db).customers())['customers'] as List;
     expect(list.single['balance'], 70000);
     expect((await db.metaJson('customer_stats') as Map)['total_debt'], 70000);
+    final ledger = await db.metaJson('ledger:5') as List;
+    expect(ledger.first['amount'], -50000);
+    expect(ledger.first['entry_type'], 'payment');
   });
 
   test('known to be offline: not even tried, queued', () async {

@@ -42,6 +42,9 @@ Map<String, dynamic> snapshot() => {
           {'id': i, 'name': 'Khách $i', 'phone': null, 'zalo_user_id': null, 'balance': 0, 'order_count': 0, 'updated_at': '2026-10-01T0${i % 9}:00:00.000Z'},
       ],
       'customer_stats': {'total_customers': 39, 'debt_customers': 1, 'total_debt': 120000},
+      'ledgers': {
+        '1': [{'id': 3, 'entry_type': 'debt', 'amount': 120000, 'note': 'Nợ đơn CF-9'}],
+      },
       'orders': [
         order(9, 'completed', 'unpaid', source: 'zalo', customer: 1, total: 79000),
         order(8, 'cancelled', 'unpaid'),
@@ -159,7 +162,9 @@ void main() {
     final d = (await r.resolve('/admin/customers/1', null, detail: true))!;
     expect(d['customer']['name'], 'Chị Lan');
     expect((d['orders'] as List).single['id'], 9);
-    expect(d['ledger'], isEmpty);
+    expect((d['ledger'] as List).single['note'], 'Nợ đơn CF-9');
+    final other = (await r.resolve('/admin/customers/2', null, detail: true))!;
+    expect(other['ledger'], isEmpty, reason: 'no history copied for this customer');
   });
 
   test('a new snapshot replaces the old rows; a cashier snapshot keeps the customers it does not carry', () async {

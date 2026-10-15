@@ -453,7 +453,10 @@ class _CollectSheetState extends ConsumerState<_CollectSheet> {
           if (note.isNotEmpty) 'note': note,
         },
         local: {'customer': c.name, 'total': amount},
-        effect: (db) async => {'amount': amount, 'balance': await db.addCustomerBalance(c.id, -amount), 'settled': <String>[]},
+        effect: (db) async {
+          await db.addLedgerEntry(c.id, type: 'payment', amount: -amount, method: _method, note: note.isEmpty ? null : note);
+          return {'amount': amount, 'balance': await db.addCustomerBalance(c.id, -amount), 'settled': <String>[]};
+        },
       );
       if (mounted) Navigator.of(context).pop(out.body);
     } catch (e) {
@@ -581,7 +584,11 @@ class _AdjustSheetState extends ConsumerState<AdjustSheet> {
           'note': _note.text.trim(),
         },
         local: {'customer': c.name, 'total': amount},
-        effect: (db) async => {'balance': await db.addCustomerBalance(c.id, _direction == 'decrease' ? -amount : amount)},
+        effect: (db) async {
+          final signed = _direction == 'decrease' ? -amount : amount;
+          await db.addLedgerEntry(c.id, type: 'adjust', amount: signed, note: _note.text.trim());
+          return {'balance': await db.addCustomerBalance(c.id, signed)};
+        },
       );
       if (mounted) Navigator.of(context).pop(out.body);
     } catch (e) {

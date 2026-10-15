@@ -171,14 +171,14 @@ class OfflineResolver {
     };
   }
 
-  /// GET /admin/customers/:id: the customer and his orders; the ledger is only known online (empty here).
+  /// GET /admin/customers/:id: the customer, his debt ledger (newest rows, for the customers copied) and his orders.
   Future<Map<String, dynamic>?> _customer(Database d, int id) async {
     final rows = await d.query('customers', where: 'id = ?', whereArgs: [id], limit: 1);
     if (rows.isEmpty) return null;
     final orders = await d.query('orders', where: 'customer_id = ?', whereArgs: [id], orderBy: 'created_ms DESC', limit: 50);
     return {
       'customer': _json(rows.first['data']),
-      'ledger': const [],
+      'ledger': await db.metaJson('ledger:$id') ?? const [],
       'orders': [for (final o in orders) _orderRow(_json(o['data']))],
     };
   }

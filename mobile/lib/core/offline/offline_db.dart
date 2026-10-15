@@ -166,6 +166,11 @@ class OfflineDb {
             'total': _num(m['total']),
           });
 
+      final ledgers = s['ledgers'];
+      if (ledgers is Map) {
+        b.delete('meta', where: "key LIKE 'ledger:%'");
+        ledgers.forEach((id, rows) => b.insert('meta', {'key': 'ledger:$id', 'value': jsonEncode(rows)}, conflictAlgorithm: ConflictAlgorithm.replace));
+      }
       for (final key in const ['drafts', 'printer', 'customer_stats']) {
         if (s[key] != null) b.insert('meta', {'key': key, 'value': jsonEncode(s[key])}, conflictAlgorithm: ConflictAlgorithm.replace);
       }

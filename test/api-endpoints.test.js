@@ -66,6 +66,8 @@ test('API endpoints for the app', async (t) => {
     assert.equal(a.body.role, 'admin');
     assert.equal(a.body.customers[0].name, 'Chị Lan');
     assert.equal(a.body.customer_stats.total_debt, 120000);
+    assert.equal(a.body.ledgers[a.body.customers[0].id].length, 2, 'debt history of the customers');
+    assert.equal(c.body.ledgers, undefined);
     assert.ok(a.body.inventory.items.length > 0);
     assert.equal(typeof a.body.inventory.stock_value, 'number');
     assert.equal((await api('GET', '/api/sync/snapshot')).status, 401);

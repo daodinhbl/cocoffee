@@ -16,6 +16,8 @@ const printerSettings = require('./printerSettings');
  */
 const RECENT_ORDERS = 200;
 const MAX_CUSTOMERS = 5000;
+const LEDGER_CUSTOMERS = 300;             // customers whose debt history is copied (those owing, then the most recently active)
+const LEDGER_ROWS = 50;
 
 const n = (x) => Number(x) || 0;
 
@@ -30,6 +32,20 @@ async function recentOrders(limit) {
     full.push(...parts);
   }
   return full;
+}
+
+/** { customerId: newest ledger rows } for the customers the shop is most likely to open offline. */
+async function ledgers(customers) {
+  const owing = customers.filter((c) => n(c.balance) !== 0);
+  const recent = customers.filter((c) => n(c.balance) === 0);
+  const chosen = [...owing, ...recent].slice(0, LEDGER_CUSTOMERS);
+  const out = {};
+  for (let i = 0; i < chosen.length; i += 10) {
+    const slice = chosen.slice(i, i + 10);
+    const rows = await Promise.all(slice.map((c) => customerModel.ledgerHistory(c.id, LEDGER_ROWS)));
+    slice.forEach((c, k) => { out[c.id] = rows[k]; });
+  }
+  return out;
 }
 
 async function build(user) {
@@ -49,6 +65,7 @@ async function build(user) {
     ]);
     snapshot.inventory = { items, stock_value: stockValue };
     snapshot.customers = customers.map((c) => ({ ...c, balance: n(c.balance), order_count: n(c.order_count) }));
+    snapshot.ledgers = await ledgers(snapshot.customers);
     snapshot.customer_stats = {
       total_customers: n(summary.total_customers), debt_customers: n(summary.debt_customers), total_debt: n(summary.total_debt),
     };
