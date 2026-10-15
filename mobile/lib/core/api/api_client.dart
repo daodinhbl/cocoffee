@@ -168,6 +168,7 @@ class ApiClient {
     Dio? dio,
     this.cache,
     this.offline,
+    this.hasLocalEdits,
     NetHooks net = const NetHooks(),
   })  : _dio = dio ?? Dio(),
         _server = serverUrl.replaceAll(RegExp(r'/+$'), ''),
@@ -205,22 +206,25 @@ class ApiClient {
   /// The offline database (SQLite copy of the shop's data): answers list screens with any filter when offline.
   final OfflineResolver? offline;
 
-  /// GET, answered without the server when it cannot be reached ([useCache] false skips that): first from the offline
-  /// database (any filter, search or page), then from the response cache (the exact request seen before), then
-  /// from the offline database's single-record pages.
+  /// Are writes queued whose effects exist only in the offline database? Then it wins over the response cache.
+  final bool Function()? hasLocalEdits;
+
+  /// GET. Online the server always answers. When it cannot be reached ([useCache] false skips this) the answer comes
+  /// from the phone: the offline database (any filter, search or page, plus the effects of queued writes) or the
+  /// response cache (the exact request seen before) — whichever is fresher, the database winning while writes
+  /// are queued, since their effects exist only there.
   Future<Map<String, dynamic>> get(String path, {Map<String, dynamic>? query, bool useCache = true}) async {
     final q = _clean(query);
     final store = useCache ? cache : null;
     final key = store == null ? null : ResponseCache.keyFor(path, q);
     Future<Map<String, dynamic>?> local() async {
       if (!useCache) return null;
-      final fromDb = await offline?.resolve(path, q);
-      if (fromDb != null) return fromDb;
-      if (key != null) {
-        final hit = await store!.read(key);
-        if (hit != null) return hit.data;
-      }
-      return offline?.resolve(path, q, detail: true);
+      final fromDb = await offline?.resolve(path, q, detail: true);
+      final hit = key == null ? null : await store!.read(key);
+      if (fromDb == null) return hit?.data;
+      if (hit == null || (hasLocalEdits?.call() ?? false)) return fromDb;
+      final copyAt = await offline!.db.syncedAt();
+      return copyAt != null && hit.at.isAfter(copyAt) ? hit.data : fromDb;
     }
 
     if (_net.isOffline?.call() ?? false) {

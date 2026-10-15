@@ -11,6 +11,7 @@ import 'offline/connectivity.dart';
 import 'offline/local_store.dart';
 import 'offline/offline_db.dart';
 import 'offline/offline_resolver.dart';
+import 'offline/outbox.dart';
 import 'offline/response_cache.dart';
 
 /// Production server; the login screen lets staff point the app at another one (e.g. http://10.0.2.2:3000
@@ -129,7 +130,7 @@ final localStoreProvider = Provider<LocalStore>((ref) {
 /// (tests, memory-only runs) or nobody signed in: a disabled database that answers nothing.
 final offlineDbProvider = Provider<OfflineDb>((ref) {
   final dir = ref.watch(appDirProvider);
-  final user = ref.watch(authProvider.select((a) => a is SignedIn ? a.user.id : null));
+  final user = ref.watch(currentUserProvider.select((u) => u?.id));
   if (dir == null || user == null) return OfflineDb.disabled();
   final server = ref.watch(serverUrlProvider);
   final tag = server.codeUnits.fold<int>(7, (h, c) => (h * 31 + c) & 0x7fffffff).toRadixString(36);
@@ -149,6 +150,7 @@ final apiProvider = Provider<ApiClient>((ref) {
     onMustChangePassword: () => ref.read(authProvider.notifier).requirePasswordChange(),
     cache: ResponseCache(ref.watch(localStoreProvider), scope: '$server|${userId ?? 'anon'}'),
     offline: OfflineResolver(ref.watch(offlineDbProvider)),
+    hasLocalEdits: () => ref.read(outboxProvider).pending.isNotEmpty,
     net: NetHooks(
       isOffline: () => !ref.read(netProvider).online,
       onOffline: () => ref.read(netProvider.notifier).markOffline(),
@@ -223,7 +225,15 @@ class AuthNotifier extends Notifier<AuthState> {
     state = SignedIn(user);
   }
 
+  /// Signing out on purpose also forgets the shop's data kept on the phone for this account (the SQLite copy and the
+  /// cached answers); queued writes are kept and replayed at the next sign-in of the same account.
   Future<void> logout() async {
+    try {
+      await ref.read(offlineDbProvider).clear();
+      await ref.read(apiProvider).cache?.clear();
+    } catch (_) {
+      // storage trouble must not keep the user signed in
+    }
     await ref.read(sessionStoreProvider).clear();
     state = const SignedOut();
   }

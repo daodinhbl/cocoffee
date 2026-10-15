@@ -7,10 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../api/api_client.dart';
 import '../session.dart';
 
-/// A write that could not reach the server and waits to be replayed: a POS checkout, a held order, a payment.
-/// [id] doubles as the Idempotency-Key, so a request that did reach the server (answer lost on the way back) is
-/// replayed as the same request and not executed twice. [local] holds what the screens show meanwhile (code,
-/// table, lines, total...). [error] is set when the server refused the replay (a business error, in Vietnamese).
 /// Vietnamese name of a queued write.
 String kindLabel(String kind) => switch (kind) {
       'checkout' => 'Thanh toán',
@@ -26,6 +22,11 @@ String kindLabel(String kind) => switch (kind) {
       _ => kind,
     };
 
+/// A write that could not reach the server and waits to be replayed: a POS checkout, a held order, a payment, or a
+/// write of the management screens. [id] doubles as the Idempotency-Key, so a request that did reach the server
+/// (answer lost on the way back) is replayed as the same request and not executed twice. [local] holds what the
+/// screens show meanwhile (code, table, lines, total...). [error] is set when the server refused the replay (a
+/// business error, in Vietnamese).
 class OutboxItem {
   const OutboxItem({
     required this.id,
@@ -99,6 +100,7 @@ class OutboxItem {
         body: body ?? this.body,
         local: local ?? this.local,
         createdAt: createdAt,
+        method: method,
         attempts: attempts ?? this.attempts,
         error: clearError ? null : (error ?? this.error),
         errorCode: clearError ? null : (errorCode ?? this.errorCode),
@@ -181,25 +183,52 @@ String? resolveRefs(String path, Map<int, int> refs) {
   return ok ? out : null;
 }
 
+/// The record a write is about: `/admin/customers/7/collect` -> `/admin/customers/7`, `/inventory/3/receive` ->
+/// `/inventory/3`; a path without an id (`/pos/checkout`) is its own record. Writes on one record keep their order.
+String recordKeyOf(String path) => RegExp(r'^(/(?:admin/)?[a-z_]+/-?\d+)').firstMatch(path)?.group(1) ?? path;
+
 final outboxProvider = NotifierProvider<OutboxNotifier, OutboxState>(OutboxNotifier.new);
 
-/// The queue of writes waiting for the server, persisted per server URL. Replayed oldest first by [sync]:
-/// on reconnect (offline coordinator), when the app comes back to the foreground, and on demand.
+/// The queue of writes waiting for the server, persisted per server URL AND account: another account on the same
+/// phone neither sees nor sends them, and they are replayed only while the account that made them is signed in.
+/// Replayed oldest first by [sync]: on reconnect (offline coordinator), when the app comes back to the foreground,
+/// after an online write, and on demand. A session that ended (401) pauses the queue until the next sign-in.
 class OutboxNotifier extends Notifier<OutboxState> {
   late Future<void> ready;
-  late String _key;
+  String? _key;
+  late String _legacyKey;
+  Future<void>? _running;
 
   @override
   OutboxState build() {
-    _key = 'outbox:${ref.watch(serverUrlProvider)}';
+    final server = ref.watch(serverUrlProvider);
+    final userId = ref.watch(currentUserProvider.select((u) => u?.id));
+    _key = userId == null ? null : 'outbox:$server:u$userId';
+    _legacyKey = 'outbox:$server';   // 1.4.0 kept one queue per server, whoever was signed in
+    _running = null;
     ready = _load();
     return const OutboxState();
   }
 
   Future<void> _load() async {
+    final key = _key;
     var loaded = const OutboxState(loaded: true);
+    if (key == null) {
+      if (ref.mounted) state = loaded;
+      return;
+    }
     try {
-      final raw = await ref.read(localStoreProvider).read(_key);
+      final store = ref.read(localStoreProvider);
+      var raw = await store.read(key);
+      if (raw == null) {
+        // Queue of the 1.4.0 app (not per account): the first account to sign in after the update adopts it, so no
+        // sale made offline before the update is lost.
+        raw = await store.read(_legacyKey);
+        if (raw != null) {
+          await store.write(key, raw);
+          await store.delete(_legacyKey);
+        }
+      }
       if (raw != null) {
         final j = jsonDecode(raw) as Map;
         loaded = OutboxState(
@@ -217,14 +246,18 @@ class OutboxNotifier extends Notifier<OutboxState> {
     if (loaded.pending.isNotEmpty) unawaited(sync());
   }
 
-  Future<void> _persist() => ref.read(localStoreProvider).write(
-        _key,
-        jsonEncode({
-          'items': [for (final i in state.items) i.toJson()],
-          'synced': [for (final s in state.synced.take(kSyncedKept)) s.toJson()],
-          'refs': {for (final e in state.refs.entries) '${e.key}': e.value},
-        }),
-      );
+  Future<void> _persist() async {
+    final key = _key;
+    if (key == null) return;
+    await ref.read(localStoreProvider).write(
+          key,
+          jsonEncode({
+            'items': [for (final i in state.items) i.toJson()],
+            'synced': [for (final s in state.synced.take(kSyncedKept)) s.toJson()],
+            'refs': {for (final e in state.refs.entries) '${e.key}': e.value},
+          }),
+        );
+  }
 
   OutboxItem? byId(String id) {
     for (final i in state.items) {
@@ -241,6 +274,12 @@ class OutboxNotifier extends Notifier<OutboxState> {
     return null;
   }
 
+  /// Queued (not failed) writes on the same record as [path], oldest first.
+  List<OutboxItem> pendingFor(String path) {
+    final key = recordKeyOf(path);
+    return [for (final i in state.pending) if (recordKeyOf(i.path) == key || recordKeyOf(resolveRefs(i.path, state.refs) ?? i.path) == key) i];
+  }
+
   Future<OutboxItem> enqueue({
     required String kind,
     required String path,
@@ -250,6 +289,7 @@ class OutboxNotifier extends Notifier<OutboxState> {
     String method = 'POST',
   }) async {
     await ready;
+    if (_key == null) throw ApiException(code: 'UNAUTHORIZED', message: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', status: 401);
     final itemId = id ?? newLocalId();
     final item = OutboxItem(id: itemId, kind: kind, path: path, body: body, local: {'code': localCodeOf(itemId), ...local}, createdAt: DateTime.now(), method: method);
     state = state.copyWith(items: [...state.items, item]);
@@ -280,17 +320,34 @@ class OutboxNotifier extends Notifier<OutboxState> {
     await _persist();
   }
 
-  /// Replays the pending items, oldest first. A network failure stops the run (still offline); a business error
-  /// marks that item failed and the run moves on, so one refused sale never blocks the others.
-  Future<void> sync() async {
-    if (state.syncing) return;
+  bool _canSend() {
+    final user = ref.read(currentUserProvider);
+    return user != null && !user.mustChangePassword;
+  }
+
+  /// Replays the pending items, oldest first. Returns the run already going when there is one. A network failure,
+  /// an ended session (401), a server still busy with the first attempt or a rate limit stop the run: the rest
+  /// waits. A business error marks that item failed and the run moves on, so one refused sale never blocks the
+  /// others. The queue is saved after every item, so an app killed mid-run never sends an accepted item again.
+  Future<void> sync() {
+    final running = _running;
+    if (running != null) return running;
+    final run = _sync();
+    _running = run;
+    return run.whenComplete(() {
+      if (identical(_running, run)) _running = null;
+    });
+  }
+
+  Future<void> _sync() async {
     await ready;
-    if (!ref.mounted || state.pending.isEmpty) return;
+    if (!ref.mounted || state.pending.isEmpty || !_canSend()) return;
     state = state.copyWith(syncing: true);
     try {
       for (final item in state.pending) {
         if (!ref.mounted) return;
         if (byId(item.id) == null) continue; // discarded meanwhile
+        if (!_canSend()) break; // signed out meanwhile
         try {
           final path = resolveRefs(item.path, state.refs);
           if (path == null) {
@@ -299,6 +356,7 @@ class OutboxNotifier extends Notifier<OutboxState> {
               for (final i in state.items)
                 if (i.id == item.id) i.copyWith(attempts: i.attempts + 1, error: 'Khách hàng tạo ngoại tuyến chưa được gửi lên máy chủ.', errorCode: 'DEPENDENCY') else i,
             ]);
+            await _persist();
             continue;
           }
           final api = ref.read(apiProvider);
@@ -323,15 +381,18 @@ class OutboxNotifier extends Notifier<OutboxState> {
             synced: [done, ...state.synced].take(kSyncedKept).toList(),
             refs: refs,
           );
+          await _persist();
         } catch (e) {
           final x = toApiException(e);
           if (x.isNetwork) break; // offline again: the rest waits
+          if (x.isUnauthorized || x.code == 'MUST_CHANGE_PASSWORD') break; // session over: replayed after the next sign-in
           if (x.code == 'IDEMPOTENCY_IN_PROGRESS' || x.code == 'RATE_LIMITED') break; // try again later
           if (!ref.mounted) return;
           state = state.copyWith(items: [
             for (final i in state.items)
               if (i.id == item.id) i.copyWith(attempts: i.attempts + 1, error: x.message, errorCode: x.code) else i,
           ]);
+          await _persist();
         }
       }
     } finally {
