@@ -4,10 +4,13 @@ import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite/sqflite.dart';
 
 import 'api/api_client.dart';
 import 'offline/connectivity.dart';
 import 'offline/local_store.dart';
+import 'offline/offline_db.dart';
+import 'offline/offline_resolver.dart';
 import 'offline/response_cache.dart';
 
 /// Production server; the login screen lets staff point the app at another one (e.g. http://10.0.2.2:3000
@@ -122,6 +125,18 @@ final localStoreProvider = Provider<LocalStore>((ref) {
   return dir == null ? MemoryStore() : FileStore(Directory('${dir.path}${Platform.pathSeparator}offline'));
 });
 
+/// The offline database of the signed-in account on this server (SQLite file in the app directory). No storage
+/// (tests, memory-only runs) or nobody signed in: a disabled database that answers nothing.
+final offlineDbProvider = Provider<OfflineDb>((ref) {
+  final dir = ref.watch(appDirProvider);
+  final user = ref.watch(authProvider.select((a) => a is SignedIn ? a.user.id : null));
+  if (dir == null || user == null) return OfflineDb.disabled();
+  final server = ref.watch(serverUrlProvider);
+  final tag = server.codeUnits.fold<int>(7, (h, c) => (h * 31 + c) & 0x7fffffff).toRadixString(36);
+  final db = OfflineDb(() => OfflineDb.openAt(databaseFactory, '${dir.path}${Platform.pathSeparator}offline_${tag}_u$user.db'));
+  return db;
+});
+
 final apiProvider = Provider<ApiClient>((ref) {
   final store = ref.watch(sessionStoreProvider);
   final server = ref.watch(serverUrlProvider);
@@ -133,6 +148,7 @@ final apiProvider = Provider<ApiClient>((ref) {
     onUnauthorized: () => ref.read(authProvider.notifier).expired(),
     onMustChangePassword: () => ref.read(authProvider.notifier).requirePasswordChange(),
     cache: ResponseCache(ref.watch(localStoreProvider), scope: '$server|${userId ?? 'anon'}'),
+    offline: OfflineResolver(ref.watch(offlineDbProvider)),
     net: NetHooks(
       isOffline: () => !ref.read(netProvider).online,
       onOffline: () => ref.read(netProvider.notifier).markOffline(),

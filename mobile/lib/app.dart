@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/notify/new_order_watcher.dart';
 import 'core/offline/connectivity.dart';
+import 'core/update/app_update.dart';
 import 'core/offline/offline_coordinator.dart';
 import 'core/offline/outbox.dart';
+import 'core/offline/snapshot_sync.dart';
 import 'core/router.dart';
 import 'core/session.dart';
 import 'core/theme/app_theme.dart';
@@ -27,6 +29,7 @@ class _CoCoffeeAppState extends ConsumerState<CoCoffeeApp> {
     _lifecycle = AppLifecycleListener(onResume: () {
       ref.read(netProvider.notifier).probe();
       ref.read(outboxProvider.notifier).sync();
+      ref.read(snapshotSyncProvider.notifier).sync();
     });
     // A stored session: re-read the account (GET /api/auth/me), since the role, the name or the "must change
     // password" flag may have changed in the Web Admin. A dead token answers 401 and the API client signs out;
@@ -44,6 +47,7 @@ class _CoCoffeeAppState extends ConsumerState<CoCoffeeApp> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(updateWatcherProvider); // a newer APK on the server: banner + one notification per build
     ref.watch(newOrderWatcherProvider); // admin signed in: notify when a customer confirms a Zalo order
     ref.watch(offlineCoordinatorProvider); // reconnect -> replay the outbox, refresh the open screens
     return MaterialApp.router(

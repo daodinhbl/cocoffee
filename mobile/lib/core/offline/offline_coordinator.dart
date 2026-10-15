@@ -9,8 +9,10 @@ import '../../features/pos/pos_providers.dart';
 import '../../features/reports/report_providers.dart';
 import '../../features/settings/settings_models.dart';
 import '../../features/tables/table_models.dart';
+import '../session.dart';
 import 'connectivity.dart';
 import 'outbox.dart';
+import 'snapshot_sync.dart';
 
 /// Every read provider of the app. Invalidating them makes the screens that are open fetch again (the ones that
 /// are not open are not alive, so nothing is fetched for them).
@@ -59,7 +61,16 @@ final offlineCoordinatorProvider = Provider<void>((ref) {
     if (prev != null && !prev.online && next.online) {
       ref.read(outboxProvider.notifier).sync();
       refreshAll(ref);
+      ref.read(snapshotSyncProvider.notifier).sync();
     }
   });
+  // Queued writes were replayed: take a fresh copy so the offline database matches the server again.
+  ref.listen<OutboxState>(outboxProvider, (prev, next) {
+    if (prev != null && prev.syncing && !next.syncing) ref.read(snapshotSyncProvider.notifier).sync();
+  });
+  // Signed in (at start, or just logged in): first copy of the shop's data.
+  ref.listen<AuthState>(authProvider, (prev, next) {
+    if (next is SignedIn) Future<void>.microtask(() => ref.read(snapshotSyncProvider.notifier).sync());
+  }, fireImmediately: true);
   ref.read(outboxProvider);
 });

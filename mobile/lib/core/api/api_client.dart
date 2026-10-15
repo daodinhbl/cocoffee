@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 
+import '../offline/offline_resolver.dart';
 import '../offline/response_cache.dart';
 
 /// Error from the CoCoffee API: `{ error: { code, message, details } }` (src/middlewares/errorHandler.js).
@@ -166,6 +167,7 @@ class ApiClient {
     void Function()? onMustChangePassword,
     Dio? dio,
     this.cache,
+    this.offline,
     NetHooks net = const NetHooks(),
   })  : _dio = dio ?? Dio(),
         _server = serverUrl.replaceAll(RegExp(r'/+$'), ''),
@@ -200,23 +202,39 @@ class ApiClient {
   /// The offline cache behind [get] (null when the client was built without one).
   final ResponseCache? cache;
 
-  /// GET, answered from the offline cache when the server cannot be reached ([useCache] false skips the cache).
+  /// The offline database (SQLite copy of the shop's data): answers list screens with any filter when offline.
+  final OfflineResolver? offline;
+
+  /// GET, answered without the server when it cannot be reached ([useCache] false skips that): first from the offline
+  /// database (any filter, search or page), then from the response cache (the exact request seen before), then
+  /// from the offline database's single-record pages.
   Future<Map<String, dynamic>> get(String path, {Map<String, dynamic>? query, bool useCache = true}) async {
     final q = _clean(query);
     final store = useCache ? cache : null;
     final key = store == null ? null : ResponseCache.keyFor(path, q);
-    if (key != null && (_net.isOffline?.call() ?? false)) {
-      final hit = await store!.read(key);
-      if (hit != null) return hit.data;
+    Future<Map<String, dynamic>?> local() async {
+      if (!useCache) return null;
+      final fromDb = await offline?.resolve(path, q);
+      if (fromDb != null) return fromDb;
+      if (key != null) {
+        final hit = await store!.read(key);
+        if (hit != null) return hit.data;
+      }
+      return offline?.resolve(path, q, detail: true);
+    }
+
+    if (_net.isOffline?.call() ?? false) {
+      final hit = await local();
+      if (hit != null) return hit;
     }
     try {
       final data = await _send(() => _dio.get<dynamic>(path, queryParameters: q));
       if (key != null) unawaited(store!.write(key, data).catchError((Object _) {}));
       return data;
     } on ApiException catch (e) {
-      if (e.isNetwork && key != null) {
-        final hit = await store!.read(key);
-        if (hit != null) return hit.data;
+      if (e.isNetwork) {
+        final hit = await local();
+        if (hit != null) return hit;
       }
       rethrow;
     }
