@@ -70,10 +70,10 @@ function readPayment(body = {}) {
  * never leaves a half-done sale behind.
  * @returns {Promise<{ order: object, change: number }>} order with items
  */
-async function checkout(cart, { method, discount, tendered, reference }, userId) {
+async function checkout(cart, { method, discount, tendered, reference }, userId, isAdmin = false) {
   const { order, created } = await saveOpen(cart, userId);
   try {
-    const result = await orderService.payOrder(order.id, { method, tendered, ...(reference ? { reference } : {}), discount, userId });
+    const result = await orderService.payOrder(order.id, { method, tendered, ...(reference ? { reference } : {}), discount, userId, isAdmin });
     return { order: result.order, change: Number(result.change) || 0 };
   } catch (err) {
     if (created) await orderService.cancelOrder(order.id).catch((e) => logger.warn('POS: could not cancel unpaid order', e));

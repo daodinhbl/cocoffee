@@ -380,7 +380,7 @@ test('admin pages', async (t) => {
     assert.equal(j.ok, true);
     assert.equal(called('order.createPos')[0].args[0].table_id, 2);
     assert.deepEqual(called('order.createPos')[0].args[0].items, items);
-    assert.deepEqual(called('order.pay')[0].args, [77, { method: 'cash', tendered: 100000, discount: 5000, userId: 2 }]);
+    assert.deepEqual(called('order.pay')[0].args, [77, { method: 'cash', tendered: 100000, discount: 5000, userId: 2, isAdmin: false }]);
 
     reset();   // existing open order of a busy table: items replaced, then paid
     r = await c.postJson('/admin/pos/checkout', { _csrf: tok, order_id: 42, items, method: 'transfer' });

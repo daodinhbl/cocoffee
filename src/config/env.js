@@ -116,6 +116,8 @@ module.exports = {
 
   business: {
     allowNegativeStock: bool('ALLOW_NEGATIVE_STOCK', false),
+    // Largest discount (% of the order subtotal) a cashier may give; an admin has no limit.
+    maxCashierDiscountPct: Math.min(100, Math.max(0, int('MAX_CASHIER_DISCOUNT_PCT', 20))),
     shopName: optional('SHOP_NAME', 'CoCoffee'),
     paymentNote: optional('SHOP_PAYMENT_NOTE'),
     address: optional('SHOP_ADDRESS'),

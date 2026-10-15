@@ -193,6 +193,19 @@ UPGRADES.push(
      PRIMARY KEY (id),
      KEY idx_idempotency_created (created_at)
    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+  // Who did what (discounts so far): models/auditModel.js
+  `CREATE TABLE IF NOT EXISTS audit_log (
+    id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id     INT UNSIGNED  NULL,
+    action      VARCHAR(40)   NOT NULL,
+    entity      VARCHAR(60)   NOT NULL,
+    details     JSON          NULL,
+    created_at  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_audit_entity (entity, created_at),
+    KEY idx_audit_action (action, created_at),
+    KEY idx_audit_user (user_id, created_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   // Photos uploaded from the admin live in the database: a Node.js redeploy replaces public_html (public/uploads).
   `CREATE TABLE IF NOT EXISTS media_files (
      id          INT UNSIGNED NOT NULL AUTO_INCREMENT,

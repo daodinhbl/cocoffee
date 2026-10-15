@@ -91,6 +91,7 @@ async function pay(req) {
     discount: v.num(optional(req.body.discount), 'Giảm giá', { required: false }),
     userId: req.user.id,
     allowDebtSettlement: true,                         // admin-only page: may settle a customer's debt order
+    isAdmin: true,
   });
   const notified = result.order.source === 'zalo' ? await paymentNotification.notifyOrderPaidSoon(id) : null;
   return { message: `Đã ghi nhận thanh toán đơn ${result.order.order_code}.${paymentNotification.describe(notified)}` };

@@ -29,7 +29,7 @@ async function bootstrap(_req, res) {
 async function checkout(req, res) {
   const cart = posService.readCart(req.body);
   const payment = posService.readPayment(req.body);
-  res.json(await posService.checkout(cart, payment, req.user.id));
+  res.json(await posService.checkout(cart, payment, req.user.id, req.user.role === 'admin'));
 }
 
 /** POST /api/pos/hold: same cart, no payment; needs table_id or order_id -> { order } */

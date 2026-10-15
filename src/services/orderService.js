@@ -5,8 +5,12 @@ const tableModel = require('../models/tableModel');
 const productModel = require('../models/productModel');
 const inventoryService = require('./inventoryService');
 const customerModel = require('../models/customerModel');
+const auditModel = require('../models/auditModel');
+const env = require('../config/env');
+const logger = require('../utils/logger');
 
 const MAX_QTY = 99;
+const MAX_CASHIER_DISCOUNT_PCT = env.business.maxCashierDiscountPct;   // % of the subtotal; admins are not limited
 
 // ------------------------------------------------------------------ helpers
 async function getWithItems(orderId, conn) {
@@ -79,6 +83,17 @@ async function replaceOpenOrderItems(orderId, items) {
   });
 }
 
+/** Audit trail of a discount, in the payment's own transaction. A failing audit write is logged and never blocks a sale. */
+async function recordDiscount(conn, { userId, orderId, discountAmount, subtotal, isAdminApproved }) {
+  const details = { orderId, discountAmount, subtotal, isAdminApproved, timestamp: new Date().toISOString() };
+  logger.info(`Discount order=${orderId} user=${userId} amount=${discountAmount} subtotal=${subtotal} admin=${isAdminApproved}`);
+  try {
+    await auditModel.write(conn, { userId, action: 'order.discount', entity: `order:${orderId}`, details });
+  } catch (err) {
+    logger.error('Audit log write failed (discount)', err);
+  }
+}
+
 /**
  * Take payment. Two legal entry states:
  *  - open      (POS)  -> finalize (deduct stock, COGS) + record payment
@@ -86,7 +101,7 @@ async function replaceOpenOrderItems(orderId, items) {
  * A completed order linked to a customer is on that customer's debt ledger: paying it settles debt, which only an
  * admin may do (allowDebtSettlement). Checked after the row lock, so the order cannot change in between.
  */
-async function payOrder(orderId, { method, tendered, reference, discount, userId, allowDebtSettlement = false }) {
+async function payOrder(orderId, { method, tendered, reference, discount, userId, allowDebtSettlement = false, isAdmin = false }) {
   return withTransaction(async (conn) => {
     let order = await orderModel.getById(orderId, conn, { forUpdate: true });
     if (!order) throw new AppError(404, 'NOT_FOUND', 'Order not found');
@@ -98,7 +113,12 @@ async function payOrder(orderId, { method, tendered, reference, discount, userId
       if (discount !== undefined && discount !== null) {
         if (!(Number(discount) >= 0)) throw new AppError(400, 'VALIDATION', 'discount must be >= 0');
         if (Number(discount) > Number(order.subtotal)) throw new AppError(400, 'VALIDATION', 'Giảm giá không được lớn hơn tạm tính của đơn.');
-        await orderModel.setDiscount(orderId, Number(discount), conn);
+        const amount = Number(discount);
+        if (!isAdmin && amount > Number(order.subtotal) * MAX_CASHIER_DISCOUNT_PCT / 100) {
+          throw new AppError(403, 'DISCOUNT_NEEDS_ADMIN', `Giảm giá vượt quá ${MAX_CASHIER_DISCOUNT_PCT}% cần quyền Quản trị viên`);
+        }
+        await orderModel.setDiscount(orderId, amount, conn);
+        if (amount > 0) await recordDiscount(conn, { userId, orderId, discountAmount: amount, subtotal: Number(order.subtotal), isAdminApproved: Boolean(isAdmin) });
         order = await orderModel.getById(orderId, conn, { forUpdate: true });
       }
       await finalizeOrder(conn, order);

@@ -117,6 +117,7 @@ async function pay(req, res) {
     discount: v.num(req.body.discount, 'discount', { required: false }),
     userId: req.user.id,
     allowDebtSettlement: isAdmin,
+    isAdmin,
   });
   // a paid Zalo order: the customer gets a confirmation on Zalo (waited for at most 4 s; `zalo_notify` says how it went)
   if (result.order && result.order.source === 'zalo') {

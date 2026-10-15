@@ -57,7 +57,7 @@ async function hold(req) {
 async function checkout(req) {
   const cart = readCart(req.body);
   const payment = posService.readPayment(req.body);
-  const result = await posService.checkout(cart, payment, req.user.id);
+  const result = await posService.checkout(cart, payment, req.user.id, req.user.role === 'admin');
   return {
     message: `Đã thanh toán ${result.order.order_code}.`,
     order: { id: result.order.id, code: result.order.order_code, total: Number(result.order.total) },

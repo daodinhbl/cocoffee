@@ -6,7 +6,7 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
-DROP TABLE IF EXISTS payon_payments, idempotency_keys, media_files, customer_ledger, customers, app_settings, zalo_tokens, zalo_events, zalo_sessions, payments, inventory_movements,
+DROP TABLE IF EXISTS audit_log, payon_payments, idempotency_keys, media_files, customer_ledger, customers, app_settings, zalo_tokens, zalo_events, zalo_sessions, payments, inventory_movements,
                      order_items, orders, dining_tables, recipes, product_aliases, products,
                      inventory_items, categories, users;
 
@@ -379,4 +379,18 @@ CREATE TABLE payon_payments (
   UNIQUE KEY uq_payon_request (merchant_request_id),
   KEY idx_payon_order (order_id),
   KEY idx_payon_status (status, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Who did what to which record (discounts so far; see models/auditModel.js)
+CREATE TABLE audit_log (
+  id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  user_id     INT UNSIGNED  NULL,
+  action      VARCHAR(40)   NOT NULL,
+  entity      VARCHAR(60)   NOT NULL,
+  details     JSON          NULL,
+  created_at  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_audit_entity (entity, created_at),
+  KEY idx_audit_action (action, created_at),
+  KEY idx_audit_user (user_id, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -230,6 +230,55 @@ test('API security', async (t) => {
     }
   });
 
+  await t.test('discount cap: a cashier may give at most MAX_CASHIER_DISCOUNT_PCT of the subtotal, an admin any amount; discounts are audited', async () => {
+    const inventoryService = require('../src/services/inventoryService');
+    const auditModel = require('../src/models/auditModel');
+    const OPEN = { ...fx.ORDER, id: 45, status: 'open', payment_status: 'unpaid', customer_id: null, subtotal: 100000, total: 100000, discount: 0 };
+    const getById = orderModel.getById.mock;
+    getById.mockImplementation(async (id) => (Number(id) === 45 ? OPEN : fx.ORDER));
+    const discounts = [];
+    const audits = [];
+    mock.method(orderModel, 'setDiscount', async (id, amount) => { discounts.push([Number(id), amount]); });
+    mock.method(orderModel, 'insertPayment', async () => {});
+    mock.method(orderModel, 'markPaid', async () => {});
+    mock.method(orderModel, 'markCompleted', async () => {});
+    mock.method(inventoryService, 'consumeForOrder', async () => ({ cogsTotal: 0, lines: [] }));
+    mock.method(auditModel, 'write', async (_conn, entry) => { audits.push(entry); });
+    const pay = (token, discount) => {
+      orderService.payOrder.mock.mockImplementationOnce(realPayOrder);
+      return api('POST', '/api/orders/45/pay', { token, json: { method: 'cash', discount } });
+    };
+    try {
+      const cap = env.business.maxCashierDiscountPct;
+      const over = await pay(cashier.token, 50000);
+      assert.equal(over.status, 403);
+      assert.equal(over.body.error.code, 'DISCOUNT_NEEDS_ADMIN');
+      assert.match(over.body.error.message, new RegExp(`${cap}%`));
+      assert.equal(discounts.length, 0, 'nothing applied');
+      assert.equal(audits.length, 0);
+
+      const within = await pay(cashier.token, 100000 * cap / 100);
+      assert.equal(within.status, 200, 'exactly the cap is allowed');
+      assert.equal(audits.length, 1);
+      assert.equal(audits[0].action, 'order.discount');
+      assert.equal(audits[0].entity, 'order:45');
+      assert.equal(audits[0].userId, cashier.user.id);
+      assert.equal(audits[0].details.isAdminApproved, false);
+
+      const boss50 = await pay(boss.token, 50000);
+      assert.equal(boss50.status, 200, 'an admin is not limited');
+      assert.equal(audits.length, 2);
+      assert.deepEqual([audits[1].details.discountAmount, audits[1].details.subtotal, audits[1].details.isAdminApproved], [50000, 100000, true]);
+      assert.equal(audits[1].userId, boss.user.id);
+      assert.ok(audits[1].details.timestamp);
+
+      await pay(cashier.token, 0);
+      assert.equal(audits.length, 2, 'no discount, no audit entry');
+    } finally {
+      getById.mockImplementation(async () => fx.ORDER);
+    }
+  });
+
   await t.test('Idempotency-Key: a retried POST /api/orders creates one order and replays the answer', async () => {
     fx.calls.length = 0;
     const body = { table_id: 2, items: [{ product_id: 1, quantity: 2 }] };

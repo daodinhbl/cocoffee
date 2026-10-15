@@ -93,7 +93,7 @@ test('API endpoints for the app', async (t) => {
     assert.deepEqual(Object.keys(r.body).sort(), ['change', 'order']);
     assert.equal(r.body.order.order_code, fx.ORDER.order_code);
     assert.deepEqual(called('order.createPos')[0].args[0].items, items, 'item notes reach the order');
-    assert.deepEqual(called('order.pay')[0].args, [77, { method: 'cash', tendered: 100000, discount: 5000, userId: 2 }]);
+    assert.deepEqual(called('order.pay')[0].args, [77, { method: 'cash', tendered: 100000, discount: 5000, userId: 2, isAdmin: false }]);
 
     reset();
     r = await api('POST', '/api/pos/checkout', { token: cashier, json: { items, method: 'other' } });
