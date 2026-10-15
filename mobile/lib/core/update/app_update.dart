@@ -6,7 +6,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ota_update/ota_update.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../features/settings/settings_models.dart';
+import '../notify/new_order_watcher.dart';
 import '../session.dart';
 
 /// The build the server offers (GET /download/manifest.json, written by scripts/publish-apk.js).
@@ -193,3 +196,33 @@ class UpdateBanner extends ConsumerWidget {
     );
   }
 }
+
+/// How often a signed-in app asks again whether a newer build exists (it also asks at start and on resume).
+const kUpdatePoll = Duration(hours: 4);
+const _kNotifiedBuild = 'update_notified_build';
+
+/// Keeps [updateCheckProvider] fresh for every signed-in role (a cashier only ever sees the POS screen, so the
+/// news must reach it there) and raises one system notification per new build.
+final updateWatcherProvider = Provider<void>((ref) {
+  if (!ref.watch(updateCheckEnabledProvider)) return;
+  final auth = ref.watch(authProvider);
+  if (auth is! SignedIn || auth.user.mustChangePassword) return;
+
+  final timer = Timer.periodic(kUpdatePoll, (_) => ref.invalidate(updateCheckProvider));
+  ref.onDispose(timer.cancel);
+  final lifecycle = AppLifecycleListener(onResume: () => ref.invalidate(updateCheckProvider));
+  ref.onDispose(lifecycle.dispose);
+
+  ref.listen<AsyncValue<AppRelease?>>(updateCheckProvider, (_, next) async {
+    final release = next.asData?.value;
+    if (release == null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getInt(_kNotifiedBuild) == release.versionCode) return;   // announced already
+      await prefs.setInt(_kNotifiedBuild, release.versionCode);
+    } catch (_) {/* announce anyway */}
+    final notifier = ref.read(localNotifierProvider);
+    await notifier.init();
+    await notifier.show(900001, 'Có bản cập nhật ${release.label}', 'Mở ứng dụng và bấm vào thanh thông báo để cập nhật.');
+  }, fireImmediately: true);
+});

@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../core/update/app_update.dart';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -377,7 +378,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       return Scaffold(
         appBar: appBar,
         body: Column(children: [
-          const OfflineBanner(),
+          const UpdateBanner(),
+        const OfflineBanner(),
           Expanded(child: AsyncBody<PosData>(value: boot, onRetry: _reload, data: (_) => const SizedBox.shrink())),
         ]),
       );
@@ -429,7 +431,8 @@ class _PosScreenState extends ConsumerState<PosScreen> {
       return Scaffold(
         appBar: appBar,
         body: Column(children: [
-          const OfflineBanner(),
+          const UpdateBanner(),
+        const OfflineBanner(),
           Expanded(
             child: Row(children: [
           NavigationRail(
@@ -472,6 +475,7 @@ class _PosScreenState extends ConsumerState<PosScreen> {
     return Scaffold(
       appBar: appBar,
       body: Column(children: [
+        const UpdateBanner(),
         const OfflineBanner(),
         Expanded(
           child: switch (view) {
