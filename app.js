@@ -21,6 +21,8 @@ const adminRoutes = require('./src/routes/adminRoutes');
 const mediaRoutes = require('./src/routes/mediaRoutes');
 const downloadRoutes = require('./src/routes/downloadRoutes');
 const viewHelpers = require('./src/utils/viewHelpers');
+const { adminSecurity } = require('./src/middlewares/adminSecurity');
+const appRelease = require('./src/services/appRelease');
 const { notFound, errorHandler } = require('./src/middlewares/errorHandler');
 
 const app = express();
@@ -63,6 +65,9 @@ app.get('/health', async (_req, res) => {
 
 // Android app for staff phones: landing page, APK, manifest, QR code (public; see routes/downloadRoutes.js).
 app.use('/download', downloadRoutes);
+
+// Product introduction page (public; linked from the login page "Xem thêm").
+app.get('/gioi-thieu', adminSecurity, (_req, res) => res.render('landing', { shopName: env.business.shopName, appDownload: appRelease.loginCard() }));
 
 // Privacy policy (public; store listings such as APKPure ask for its URL).
 app.get('/privacy', (_req, res) => res.render('privacy', { shopName: env.business.shopName, phone: env.business.phone, address: env.business.address }));

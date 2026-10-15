@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full scroll-smooth">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#603813">
+  <title>Giới thiệu · <%= shopName %> — Quản lý quán ở một nơi</title>
+  <meta name="description" content="<%= shopName %>: phần mềm bán hàng và quản lý quán cà phê — POS, thực đơn, kho, công nợ, báo cáo, chatbot Zalo và ứng dụng Android.">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="/brand/favicon-32.png">
+  <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png">
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script nonce="<%= nonce %>">
+    tailwind.config = {
+      theme: { extend: {
+        colors: {
+          roast: { 50: '#FBF6EF', 100: '#F5EADB', 200: '#E9D3B6', 300: '#D2AE82', 600: '#7A4A1F', 700: '#603813', 800: '#4C2C0E', 900: '#341E09' },
+        },
+        fontFamily: { sans: ['"Times New Roman"', 'Times', '"Liberation Serif"', 'Tinos', 'serif'] },
+        borderRadius: { DEFAULT: '4px', sm: '2px', md: '4px', lg: '6px', xl: '10px' },
+      } },
+    };
+  </script>
+  <style>
+    :focus-visible { outline: 2px solid #603813; outline-offset: 2px; }
+    .steam { background-image: radial-gradient(circle at 20% 15%, rgba(96,56,19,.08) 0, transparent 45%), radial-gradient(circle at 85% 80%, rgba(96,56,19,.10) 0, transparent 50%); }
+  </style>
+</head>
+<body class="min-h-full bg-roast-50 font-sans text-gray-900 antialiased">
+  <%
+    const features = [
+      { t: 'Bán hàng (POS) nhanh', d: 'Mở bàn, gọi món, tách/gộp hoá đơn, mang đi, giảm giá có giới hạn và nhật ký kiểm soát. Thu ngân vào thẳng màn hình bán hàng.' },
+      { t: 'Thực đơn & công thức (BOM)', d: 'Danh mục, giá, từ khoá đặt món, hàng bán lẻ. Công thức đồ uống tự tính giá vốn và biên lợi nhuận theo từng món.' },
+      { t: 'Kho & nhập hàng', d: 'Tồn kho theo nguyên liệu, tồn tối thiểu, giá vốn bình quân gia quyền, kiểm kê, hao hụt và sổ kho chi tiết.' },
+      { t: 'Báo cáo theo thời gian thực', d: 'Doanh thu, giá vốn, lãi gộp so với hôm qua; báo cáo theo ngày, giờ, kênh bán, hình thức thanh toán và món bán chạy.' },
+      { t: 'Chatbot đặt món qua Zalo', d: 'Khách nhắn tên món, bot tạo đơn, gửi hoá đơn dạng ảnh kèm mã VietQR thanh toán và đối chiếu công nợ khi cần.' },
+      { t: 'Công nợ khách hàng', d: 'Ghi nợ ngay trên đơn, theo dõi sổ nợ, thu tiền, sao kê và đối chiếu công nợ theo tháng.' },
+      { t: 'Ứng dụng Android cho nhân viên', d: 'Cài bằng mã QR. Hoạt động ngay cả khi mất mạng: đơn được lưu tạm và đồng bộ lại, không bị trùng.' },
+      { t: 'Sao lưu & phục hồi', d: 'Sao lưu tự động theo lịch, tải bản sao lưu về máy, phục hồi từ bản đã lưu và tự chụp bản trước khi khôi phục.' },
+    ];
+    const pillars = [
+      ['Một nơi cho mọi việc', 'Đơn hàng, thực đơn, kho, công nợ và báo cáo dùng chung một dữ liệu, nên số liệu không bao giờ lệch nhau.'],
+      ['Dùng được trên mọi thiết bị', 'Điện thoại, máy tính bảng, laptop hay máy tính để bàn — giao diện tự thích ứng theo màn hình.'],
+      ['An toàn mặc định', 'Phiên đăng nhập bảo mật, chống dò mật khẩu, mật khẩu tối thiểu 10 ký tự, kiểm soát giảm giá và ghi nhật ký thao tác.'],
+    ];
+  %>
+
+  <header class="border-b border-roast-200 bg-white/80 backdrop-blur">
+    <div class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
+      <a href="/gioi-thieu" class="flex items-center gap-3">
+        <img src="/brand/mark.png" alt="" width="256" height="200" class="h-10 w-auto">
+        <span class="text-lg font-semibold text-roast-800"><%= shopName %></span>
+      </a>
+      <nav class="flex items-center gap-4 text-sm" aria-label="Điều hướng">
+        <a href="#tinh-nang" class="hidden text-roast-700 hover:underline sm:inline">Tính năng</a>
+        <a href="#ung-dung" class="hidden text-roast-700 hover:underline sm:inline">Ứng dụng</a>
+        <a href="/admin/login" class="inline-flex h-9 items-center rounded bg-roast-700 px-4 font-semibold text-white hover:bg-roast-800">Đăng nhập</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero -->
+    <section class="steam">
+      <div class="mx-auto grid max-w-6xl items-center gap-10 px-4 py-14 lg:grid-cols-2 lg:py-20">
+        <div>
+          <p class="text-sm font-semibold uppercase tracking-wide text-roast-600">Giải pháp quản lý quán F&amp;B</p>
+          <h1 class="mt-3 text-4xl font-semibold leading-tight text-roast-800 sm:text-5xl">Quản lý quán — đơn hàng, thực đơn, kho và báo cáo — ở một nơi.</h1>
+          <p class="mt-5 max-w-xl text-lg text-gray-700"><%= shopName %> giúp quán cà phê và nhà hàng nhỏ bán hàng nhanh hơn, kiểm soát kho chính xác hơn và biết ngay lãi lỗ mỗi ngày, từ điện thoại hay máy tính.</p>
+          <div class="mt-8 flex flex-wrap gap-3">
+            <a href="/admin/login" class="inline-flex h-12 items-center rounded bg-roast-700 px-6 text-base font-semibold text-white hover:bg-roast-800">Đăng nhập quản trị</a>
+            <a href="#tinh-nang" class="inline-flex h-12 items-center rounded border border-roast-300 bg-white px-6 text-base font-semibold text-roast-700 hover:bg-roast-100">Xem tính năng</a>
+          </div>
+        </div>
+        <div class="flex justify-center">
+          <img src="/brand/logo.png" alt="Logo <%= shopName %>" width="480" height="472" class="w-full max-w-sm drop-shadow-sm">
+        </div>
+      </div>
+    </section>
+
+    <!-- Pillars -->
+    <section class="border-y border-roast-200 bg-white">
+      <div class="mx-auto grid max-w-6xl gap-6 px-4 py-10 md:grid-cols-3">
+        <% pillars.forEach((p) => { %>
+          <div>
+            <h2 class="text-lg font-semibold text-roast-800"><%= p[0] %></h2>
+            <p class="mt-1 text-sm text-gray-700"><%= p[1] %></p>
+          </div>
+        <% }) %>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section id="tinh-nang" class="mx-auto max-w-6xl px-4 py-14" aria-labelledby="features-title">
+      <h2 id="features-title" class="text-3xl font-semibold text-roast-800">Tính năng nổi bật</h2>
+      <p class="mt-2 max-w-2xl text-gray-700">Mọi thao tác trong ngày của một quán — từ lúc khách gọi món đến lúc chốt báo cáo — nằm trong cùng một hệ thống.</p>
+      <ul class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <% features.forEach((f, i) => { %>
+          <li class="rounded-xl border border-roast-200 bg-white p-5 shadow-[0_10px_30px_-18px_rgba(96,56,19,.35)]">
+            <span class="flex h-8 w-8 items-center justify-center rounded-full bg-roast-100 text-sm font-semibold text-roast-800"><%= i + 1 %></span>
+            <h3 class="mt-3 text-base font-semibold text-roast-800"><%= f.t %></h3>
+            <p class="mt-1 text-sm text-gray-700"><%= f.d %></p>
+          </li>
+        <% }) %>
+      </ul>
+    </section>
+
+    <!-- How it works -->
+    <section class="bg-roast-100">
+      <div class="mx-auto max-w-6xl px-4 py-14">
+        <h2 class="text-3xl font-semibold text-roast-800">Hoạt động như thế nào</h2>
+        <ol class="mt-8 grid gap-4 md:grid-cols-3">
+          <li class="rounded-xl bg-white p-5"><p class="text-sm font-semibold text-roast-600">Bước 1</p><p class="mt-1 text-base font-semibold text-roast-800">Thiết lập thực đơn và kho</p><p class="mt-1 text-sm text-gray-700">Nhập món, giá, công thức và tồn kho ban đầu trên trang quản trị.</p></li>
+          <li class="rounded-xl bg-white p-5"><p class="text-sm font-semibold text-roast-600">Bước 2</p><p class="mt-1 text-base font-semibold text-roast-800">Bán hàng mỗi ngày</p><p class="mt-1 text-sm text-gray-700">Nhân viên bán trên ứng dụng Android hoặc khách đặt qua Zalo; kho tự trừ theo công thức.</p></li>
+          <li class="rounded-xl bg-white p-5"><p class="text-sm font-semibold text-roast-600">Bước 3</p><p class="mt-1 text-base font-semibold text-roast-800">Xem báo cáo, đối chiếu</p><p class="mt-1 text-sm text-gray-700">Chủ quán xem doanh thu, lãi gộp, tồn kho thấp và công nợ bất cứ lúc nào.</p></li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- App download -->
+    <section id="ung-dung" class="mx-auto max-w-6xl px-4 py-14" aria-labelledby="app-title">
+      <div class="grid items-center gap-8 rounded-xl border border-roast-200 bg-white p-6 sm:p-8 md:grid-cols-[1fr_auto]">
+        <div>
+          <h2 id="app-title" class="text-2xl font-semibold text-roast-800">Ứng dụng Android cho nhân viên</h2>
+          <% if (appDownload) { %>
+            <p class="mt-2 text-gray-700"><%= appDownload.app_name %> phiên bản <%= appDownload.version_name %> (<%= appDownload.sizeLabel %>). Quét mã QR bằng camera điện thoại hoặc mở liên kết để tải bản cài đặt.</p>
+            <a href="/download" class="mt-4 inline-flex h-11 items-center rounded bg-roast-700 px-5 text-sm font-semibold text-white hover:bg-roast-800">Tải ứng dụng</a>
+          <% } else { %>
+            <p class="mt-2 text-gray-700">Ứng dụng Android sẽ sớm có mặt tại đây. Trong lúc chờ, bạn có thể dùng đầy đủ tính năng trên trình duyệt.</p>
+          <% } %>
+        </div>
+        <% if (appDownload) { %>
+          <img src="/download/qr.svg" alt="Mã QR tải ứng dụng" width="144" height="144" class="mx-auto h-36 w-36 rounded border border-roast-100 bg-white p-1">
+        <% } %>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="bg-roast-700">
+      <div class="mx-auto flex max-w-6xl flex-col items-start justify-between gap-4 px-4 py-10 sm:flex-row sm:items-center">
+        <p class="text-xl font-semibold text-white">Sẵn sàng quản lý quán gọn gàng hơn?</p>
+        <a href="/admin/login" class="inline-flex h-11 items-center rounded bg-white px-6 text-sm font-semibold text-roast-800 hover:bg-roast-100">Đăng nhập quản trị</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="mx-auto max-w-6xl px-4 py-8 text-center text-xs text-gray-500">
+    © <%= new Date().getFullYear() %> <%= shopName %> ·
+    <a href="/privacy" class="hover:underline">Chính sách quyền riêng tư</a> ·
+    <a href="/admin/login" class="hover:underline">Trang quản trị</a>
+  </footer>
+</body>
+</html>
