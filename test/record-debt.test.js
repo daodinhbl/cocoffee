@@ -4,7 +4,6 @@
  */
 process.env.FNB_NO_LISTEN = '1';
 process.env.DB_NAME ||= 'x'; process.env.DB_USER ||= 'x'; process.env.DB_PASSWORD ||= 'x';
-process.env.DEMO_MODE = 'false';
 
 const test = require('node:test');
 const assert = require('node:assert/strict');

@@ -8,7 +8,7 @@ const helmet = require('helmet');
 
 const env = require('./src/config/env');
 const { pool } = require('./src/config/db');
-const { bootstrapIfEmpty, ensureDemoAccount, ensureSchemaUpgrades } = require('./src/config/bootstrapDb');
+const { bootstrapIfEmpty, ensureSchemaUpgrades } = require('./src/config/bootstrapDb');
 const { ensureMenuSeed, ensureMenuAliases } = require('./src/config/menuSeed');
 const { ensureMenuPhotos } = require('./src/config/menuPhotos');
 const productModel = require('./src/models/productModel');
@@ -92,7 +92,6 @@ async function start() {
   await ensureMenuSeed();                               // printed menu, once per database; never throws
   await ensureMenuAliases();                            // how customers really order it ("đen đá", "cf muối"), once; never throws
   await ensureMenuPhotos();                             // shipped public/menu photos for items without one; never throws
-  await ensureDemoAccount();                            // DEMO_MODE only; never throws
   backupService.startScheduler();                       // automatic database backups (Admin > Sao lưu); never throws
   webhookGuard.ensure().catch(() => {});                // Zalo Bot Platform: re-register the webhook when its URL / secret changed; never throws, not awaited
   payonService.startRecovery();                         // PayOn: finishes claims a dead process left half-applied; never throws

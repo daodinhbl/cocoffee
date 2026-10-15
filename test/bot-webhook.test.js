@@ -7,7 +7,6 @@ process.env.FNB_NO_LISTEN = '1';
 process.env.DB_NAME ||= 'x'; process.env.DB_USER ||= 'x'; process.env.DB_PASSWORD ||= 'x';
 process.env.ZALO_MODE = 'bot';
 process.env.BOT_WEBHOOK_SECRET = 'test-bot-secret-0123456789';
-process.env.DEMO_MODE = 'false';
 process.env.RECEIPT_SAVE_DIR = require('node:path').join(require('node:os').tmpdir(), 'cc-bills-' + process.pid);   // never write into the real uploads folder
 
 const test = require('node:test');

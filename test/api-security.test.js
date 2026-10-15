@@ -127,7 +127,7 @@ test('API security', async (t) => {
     fx.resetPasswords();
   });
 
-  await t.test('change-password: same password, wrong current password, too short, demo account', async () => {
+  await t.test('change-password: same password, wrong current password, too short', async () => {
     fx.calls.length = 0;
     const same = await api('POST', '/api/auth/change-password', { token: boss.token, json: { current_password: PASSWORD, new_password: PASSWORD } });
     assert.equal(same.status, 400);
@@ -138,18 +138,6 @@ test('API security', async (t) => {
     const short = await api('POST', '/api/auth/change-password', { token: boss.token, json: { current_password: PASSWORD, new_password: 'short' } });
     assert.equal(short.body.error.code, 'WEAK_PASSWORD');
     assert.equal(called('user.setPassword').length, 0);
-
-    const demoBefore = { ...env.demo };
-    Object.assign(env.demo, { enabled: true, username: 'admin', password: 'admin' });
-    try {
-      const demo = await login('admin', 'admin');
-      assert.equal(demo.must_change_password, false, 'the public demo account is never forced to change');
-      const r = await api('POST', '/api/auth/change-password', { token: demo.token, json: { current_password: 'admin', new_password: 'A-brand-new-pass-1' } });
-      assert.equal(r.status, 403);
-      assert.equal(r.body.error.code, 'DEMO_ACCOUNT');
-    } finally {
-      Object.assign(env.demo, demoBefore);
-    }
   });
 
   await t.test('an admin with a weak password gets 403 MUST_CHANGE_PASSWORD until change-password', async () => {
