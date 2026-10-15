@@ -44,7 +44,7 @@
           },
           width: { sidebar: '240px', 'sidebar-collapsed': '72px' },
           height: { header: '64px' },
-          maxWidth: { content: '1280px' },
+          maxWidth: { content: '1440px' },
           // flat industrial look: nothing rounder than 4px
           borderRadius: { DEFAULT: '4px', sm: '2px', md: '4px', lg: '6px', xl: '10px', '2xl': '14px' },
         },
@@ -67,6 +67,13 @@
     :focus-visible { outline: 2px solid #1d4ed8; outline-offset: 2px; }
     html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; touch-action: manipulation; }
     .tnum { font-variant-numeric: tabular-nums; }
+    ::selection { background: #c7d2fe; color: #0f172a; }
+    html { scrollbar-gutter: stable; }
+    main h1 { letter-spacing: -0.01em; color: #0f172a; }
+    table tbody tr { transition: background-color .12s ease; }
+    .overflow-x-auto, .overflow-y-auto { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+    button:not(:disabled), a[class*="rounded"] { transition: background-color .12s ease, border-color .12s ease, box-shadow .12s ease; }
+    button:not(:disabled):active { transform: translateY(0.5px); }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { scrollbar-width: none; }
     dialog::backdrop { background: rgba(15, 23, 42, 0.55); }
@@ -142,7 +149,7 @@
     <div class="flex min-w-0 flex-1 flex-col">
       <%- include('partials/header') %>
 
-      <main id="main" tabindex="-1" class="flex-1 bg-milk-100 p-4 sm:p-6">
+      <main id="main" tabindex="-1" class="flex-1 bg-milk-100 p-4 sm:p-6 lg:p-8">
         <div class="mx-auto w-full max-w-content">
           <% if (typeof flash !== 'undefined' && flash) {
                const tone = { success: 'border-green-200 bg-green-50 text-green-800', error: 'border-red-200 bg-red-50 text-red-800', info: 'border-sky-200 bg-sky-50 text-sky-800' }[flash.type] || 'border-gray-200 bg-gray-50 text-gray-800'; %>

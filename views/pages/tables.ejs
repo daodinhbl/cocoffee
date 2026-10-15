@@ -11,59 +11,55 @@
   <button type="button" data-modal-open="#table-dialog" data-action="/admin/tables" data-title="Thêm bàn" class="<%= btnPrimary %>">+ Thêm bàn</button>
 </div>
 
-<div class="mt-5 rounded border border-gray-200">
-  <table class="rtable w-full border-collapse text-left text-sm lg:min-w-[640px]">
-    <caption class="sr-only">Danh sách bàn</caption>
-    <thead class="<%= ui.thead %>">
-      <tr>
-        <th scope="col" class="px-4 py-3">Bàn</th>
-        <th scope="col" class="px-4 py-3">Sức chứa</th>
-        <th scope="col" class="px-4 py-3">Trạng thái</th>
-        <th scope="col" class="px-4 py-3">Đơn hiện tại</th>
-        <th scope="col" class="px-4 py-3 text-right"><span class="sr-only">Hành động</span></th>
-      </tr>
-    </thead>
-    <tbody>
-      <% tables.forEach((t) => {
-           const fill = { code: t.code, name: t.name, capacity: t.capacity, is_active: Boolean(t.is_active) }; %>
-        <tr class="border-b border-gray-200 last:border-b-0 hover:bg-gray-50 <%= t.is_active ? '' : 'text-gray-400' %>">
-          <td data-label="" class="rt-title px-4 py-3">
-            <span class="font-medium"><%= t.name %></span>
-            <span class="ml-2 font-mono text-xs text-gray-500"><%= t.code %></span>
-          </td>
-          <td data-label="Sức chứa" class="px-4 py-3 font-mono tnum"><%= t.capacity %> chỗ</td>
-          <td data-label="Trạng thái" class="px-4 py-3">
-            <% if (!t.is_active) { %><%- badge('Ngừng sử dụng', 'neutral') %>
-            <% } else if (t.status === 'serving') { %><%- badge('Có khách', 'warn') %>
-            <% } else { %><%- badge('Trống', 'good') %><% } %>
-          </td>
-          <td data-label="Đơn hiện tại" class="px-4 py-3">
-            <% if (t.current_order_id) { %>
-              <a href="/admin/orders/<%= t.current_order_id %>" class="font-mono text-[13px] text-blue-700 hover:text-navy hover:underline"><%= t.current_order_code %></a>
-              <span class="ml-1 font-mono text-xs text-gray-500 tnum"><%= money(t.current_order_total) %></span>
-            <% } else { %>—<% } %>
-          </td>
-          <td data-label="" class="rt-actions px-4 py-3 text-right">
-            <div class="inline-flex items-center gap-1">
-              <button type="button" class="<%= btnGhost %>" aria-label="Sửa <%= t.name %>" title="Sửa"
-                data-modal-open="#table-dialog" data-action="/admin/tables/<%= t.id %>" data-title="Sửa bàn" data-fill="<%= safeJson(fill) %>">
-                <%- icon('pencil', 'h-4 w-4') %><span class="btn-label">Sửa</span>
-              </button>
-              <% if (!(t.is_active && t.status === 'serving')) { %>
-              <form method="post" action="/admin/tables/<%= t.id %>" <% if (t.is_active) { %>data-confirm="Ngừng sử dụng <%= t.name %>? Bàn sẽ ẩn khỏi sơ đồ POS."<% } %>>
-                <%- include('../partials/csrf') %>
-                <input type="hidden" name="is_active" value="<%= t.is_active ? 0 : 1 %>">
-                <button type="submit" class="<%= btnGhost %> w-auto px-2 text-xs font-medium"><%= t.is_active ? 'Ngừng dùng' : 'Dùng lại' %></button>
-              </form>
-              <% } %>
-            </div>
-          </td>
-        </tr>
-      <% }) %>
-      <% if (!tables.length) { %><tr><td colspan="5" data-label="" class="px-4 py-12 text-center text-sm text-gray-500">Chưa có bàn nào. Bấm “Thêm bàn” để bắt đầu.</td></tr><% } %>
-    </tbody>
-  </table>
+<% const freeCount = tables.filter((t) => t.is_active && t.status !== 'serving').length; %>
+<div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-600">
+  <span class="inline-flex items-center gap-2"><span class="h-3 w-3 rounded-sm border border-emerald-300 bg-emerald-100"></span>Trống <b class="font-mono tnum text-navy-darker"><%= freeCount %></b></span>
+  <span class="inline-flex items-center gap-2"><span class="h-3 w-3 rounded-sm border border-amber-300 bg-amber-100"></span>Có khách <b class="font-mono tnum text-navy-darker"><%= serving %></b></span>
+  <span class="inline-flex items-center gap-2"><span class="h-3 w-3 rounded-sm border border-milk-300 bg-milk-100"></span>Ngừng sử dụng <b class="font-mono tnum text-navy-darker"><%= tables.length - activeCount %></b></span>
 </div>
+
+<ul class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" aria-label="Sơ đồ bàn">
+  <% tables.forEach((t) => {
+       const fill = { code: t.code, name: t.name, capacity: t.capacity, is_active: Boolean(t.is_active) };
+       const state = !t.is_active ? 'off' : (t.status === 'serving' ? 'busy' : 'free');
+       const tone = { free: 'border-emerald-200 bg-white hover:border-emerald-400', busy: 'border-amber-300 bg-amber-50/60 hover:border-amber-400', off: 'border-milk-200 bg-milk-50 text-milk-500' }[state];
+       const bar = { free: 'bg-emerald-500', busy: 'bg-amber-400', off: 'bg-milk-300' }[state]; %>
+    <li class="relative flex flex-col overflow-hidden rounded-xl border shadow-[0_1px_2px_rgba(15,23,42,.04)] transition <%= tone %>">
+      <span class="absolute inset-x-0 top-0 h-1 <%= bar %>" aria-hidden="true"></span>
+      <div class="flex items-start justify-between gap-3 px-4 pb-3 pt-5">
+        <div class="min-w-0">
+          <p class="truncate text-lg font-semibold <%= t.is_active ? 'text-navy-darker' : '' %>"><%= t.name %></p>
+          <p class="mt-0.5 font-mono text-xs text-milk-500"><%= t.code %> · <%= t.capacity %> chỗ</p>
+        </div>
+        <% if (!t.is_active) { %><%- badge('Ngừng sử dụng', 'neutral') %>
+        <% } else if (t.status === 'serving') { %><%- badge('Có khách', 'warn') %>
+        <% } else { %><%- badge('Trống', 'good') %><% } %>
+      </div>
+      <div class="flex-1 px-4 pb-3 text-sm">
+        <% if (t.current_order_id) { %>
+          <a href="/admin/orders/<%= t.current_order_id %>" class="font-mono text-[13px] font-medium text-blue-700 hover:text-navy hover:underline"><%= t.current_order_code %></a>
+          <p class="mt-1 font-mono text-xl font-bold text-navy-darker tnum"><%= money(t.current_order_total) %></p>
+        <% } else { %>
+          <p class="text-milk-500"><%= t.is_active ? 'Chưa có đơn' : 'Không hiển thị trên máy POS' %></p>
+        <% } %>
+      </div>
+      <div class="flex items-center justify-end gap-1 border-t border-milk-200 px-2 py-2">
+        <button type="button" class="<%= btnGhost %>" aria-label="Sửa <%= t.name %>" title="Sửa"
+          data-modal-open="#table-dialog" data-action="/admin/tables/<%= t.id %>" data-title="Sửa bàn" data-fill="<%= safeJson(fill) %>">
+          <%- icon('pencil', 'h-4 w-4') %><span class="btn-label">Sửa</span>
+        </button>
+        <% if (!(t.is_active && t.status === 'serving')) { %>
+        <form method="post" action="/admin/tables/<%= t.id %>" <% if (t.is_active) { %>data-confirm="Ngừng sử dụng <%= t.name %>? Bàn sẽ ẩn khỏi sơ đồ POS."<% } %>>
+          <%- include('../partials/csrf') %>
+          <input type="hidden" name="is_active" value="<%= t.is_active ? 0 : 1 %>">
+          <button type="submit" class="<%= btnGhost %> w-auto px-2 text-xs font-medium"><%= t.is_active ? 'Ngừng dùng' : 'Dùng lại' %></button>
+        </form>
+        <% } %>
+      </div>
+    </li>
+  <% }) %>
+  <% if (!tables.length) { %><li class="col-span-full rounded-xl border border-dashed border-milk-300 bg-white px-4 py-12 text-center text-sm text-milk-500">Chưa có bàn nào. Bấm “Thêm bàn” để bắt đầu.</li><% } %>
+</ul>
 
 <dialog id="table-dialog" aria-labelledby="table-title" class="max-w-md <%= sheet %>">
   <form method="post" action="/admin/tables" class="flex flex-col">

@@ -46,6 +46,13 @@
       { file: 'inventory.jpg', w: 1440, h: 900, t: 'Kho nguyên liệu', c: 'tồn kho, mức tối thiểu và giá trị tồn theo giá vốn bình quân.', alt: 'Màn hình kho nguyên liệu' },
       { file: 'mobile-dashboard.jpg', w: 780, h: 1688, narrow: true, t: 'Trên điện thoại', c: 'giao diện tự thích ứng với màn hình nhỏ.', alt: 'Trang tổng quan trên điện thoại' },
     ];
+    const tablet = [
+      { file: 'tablet-pos.jpg', t: 'Bán hàng trên máy tính bảng', c: 'chọn món theo nhóm, giữ đơn, ghi chú, thanh toán một chạm; có thông báo đơn Zalo chờ xác nhận.', alt: 'Màn hình bán hàng POS của ứng dụng Android trên máy tính bảng' },
+      { file: 'tablet-dashboard.jpg', t: 'Tổng quan', c: 'doanh thu hôm nay, giá vốn, lãi gộp và đơn đang phục vụ ngay trên ứng dụng.', alt: 'Màn hình tổng quan của ứng dụng Android trên máy tính bảng' },
+      { file: 'tablet-orders.jpg', t: 'Đơn hàng', c: 'lọc theo trạng thái, kênh và ngày; xem và thu tiền từng đơn.', alt: 'Danh sách đơn hàng trong ứng dụng Android trên máy tính bảng' },
+      { file: 'tablet-inventory.jpg', t: 'Kho nguyên liệu', c: 'tồn kho, mức tối thiểu, nhập kho và kiểm kê ngay tại quầy.', alt: 'Màn hình kho nguyên liệu trong ứng dụng Android trên máy tính bảng' },
+      { file: 'tablet-reports.jpg', t: 'Báo cáo', c: 'doanh thu theo ngày và món bán chạy theo khoảng thời gian tuỳ chọn.', alt: 'Màn hình báo cáo trong ứng dụng Android trên máy tính bảng' },
+    ];
     const pillars = [
       ['Một nơi cho mọi việc', 'Đơn hàng, thực đơn, kho, công nợ và báo cáo dùng chung một dữ liệu, nên số liệu không bao giờ lệch nhau.'],
       ['Dùng được trên mọi thiết bị', 'Điện thoại, máy tính bảng, laptop hay máy tính để bàn — giao diện tự thích ứng theo màn hình.'],
@@ -123,6 +130,16 @@
         <% shots.forEach((s) => { %>
           <figure class="overflow-hidden rounded-xl border border-navy-200 bg-white shadow-[0_10px_30px_-18px_rgba(30,58,138,.35)] <%= s.wide ? 'md:col-span-2' : '' %> <%= s.narrow ? 'mx-auto w-full max-w-xs md:col-span-2' : '' %>">
             <a href="/landing/<%= s.file %>" target="_blank" rel="noopener"><img src="/landing/<%= s.file %>" alt="<%= s.alt %>" width="<%= s.w %>" height="<%= s.h %>" loading="lazy" class="w-full"></a>
+            <figcaption class="border-t border-navy-100 px-4 py-3 text-sm text-gray-700"><b class="text-navy-800"><%= s.t %></b> — <%= s.c %></figcaption>
+          </figure>
+        <% }) %>
+      </div>
+      <h3 id="tablet-title" class="mt-12 text-2xl font-semibold text-navy-800">Ứng dụng Android trên máy tính bảng</h3>
+      <p class="mt-2 max-w-2xl text-gray-700">Cùng một tài khoản, dùng trên máy tính bảng ở quầy hoặc điện thoại của nhân viên. Giao diện tự giãn theo kích thước màn hình.</p>
+      <div class="mt-6 grid gap-6 md:grid-cols-2" aria-labelledby="tablet-title">
+        <% tablet.forEach((s, i) => { %>
+          <figure class="overflow-hidden rounded-xl border border-navy-200 bg-white shadow-[0_10px_30px_-18px_rgba(30,58,138,.35)] <%= i === 0 ? 'md:col-span-2' : '' %>">
+            <a href="/landing/<%= s.file %>" target="_blank" rel="noopener"><img src="/landing/<%= s.file %>" alt="<%= s.alt %>" width="1600" height="894" loading="lazy" class="w-full"></a>
             <figcaption class="border-t border-navy-100 px-4 py-3 text-sm text-gray-700"><b class="text-navy-800"><%= s.t %></b> — <%= s.c %></figcaption>
           </figure>
         <% }) %>
