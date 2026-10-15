@@ -184,8 +184,9 @@ test('menu seed never renames, duplicates or steals from what the owner already 
   await t.test('demo database: the 4 kept drinks are renamed in place, the rest is added once', async () => {
     const db = memoryDb(clone(DEMO));
     assert.deepEqual(await applyMenu(db), { created: MENU.length - 4, updated: 4, skipped: 0 });
-    assert.deepEqual(db.named('Cà Phê Sữa').map((p) => [p.id, p.price]), [[2, 20000]]);
-    assert.equal(db.ownerOf('tra dao cam sa'), db.named('Trà Đào Cam Sả')[0].id, 'the loose keyword moves to the printed drink');
+    assert.deepEqual(db.named('Cà Phê Sữa Pha Máy').map((p) => [p.id, p.price]), [[2, 17000]]);
+    assert.deepEqual(db.named('Trà Đào Nóng').map((p) => [p.id, p.price]), [[4, 18000]], 'the demo peach tea becomes the hot one, recipe and all');
+    assert.equal(db.ownerOf('tra dao cam sa'), 4, 'an old keyword stays with the renamed demo row');
     assert.equal(db.ownerOf('ca phe sua da'), 2, 'old spellings stay with the renamed product');
     for (const m of MENU) assert.equal(db.named(m.name).length, 1, m.name);
     assert.deepEqual(await applyMenu(db), { created: 0, updated: MENU.length, skipped: 0 }, 'a second run changes nothing in shape');
@@ -193,34 +194,35 @@ test('menu seed never renames, duplicates or steals from what the owner already 
 
   await t.test('a kept demo row the owner turned into another printed drink stays that drink', async () => {
     const data = clone(DEMO);
-    Object.assign(data.products[3], { name: 'Trà đào cam sả', price: 28000 });   // TRA-DAO reused by the owner
+    Object.assign(data.products[3], { name: 'Sữa nóng', price: 16000 });   // TRA-DAO reused by the owner for another board item
+    data.aliases.push([4, 'Sữa nóng']);
     const db = memoryDb(data);
     const stats = await applyMenu(db);
-    assert.deepEqual(db.prods.find((p) => p.id === 4), { id: 4, sku: 'TRA-DAO', name: 'Trà đào cam sả', price: 28000, is_active: 1 });
-    assert.equal(db.named('Trà Đào Cam Sả').length, 1, 'no second cam sả');
-    assert.equal(db.named('Trà Đào')[0].sku, 'MN-TRA-DAO', 'plain Trà Đào is added under its own SKU');
-    assert.equal(db.ownerOf('tra dao cam sa'), 4, 'the owner\'s own name is not taken away');
+    assert.deepEqual(db.prods.find((p) => p.id === 4), { id: 4, sku: 'TRA-DAO', name: 'Sữa nóng', price: 16000, is_active: 1 });
+    assert.equal(db.named('Sữa Nóng').length, 1, 'no second hot milk');
+    assert.equal(db.named('Trà Đào Nóng')[0].sku, 'MN-TRA-DAO-NONG', 'the hot peach tea is added under its own SKU');
+    assert.equal(db.ownerOf('sua nong'), 4, "the owner's own name is not taken away");
     assert.equal(stats.skipped, 1);
   });
 
-  await t.test('an owner product named like one of the item\'s Zalo spellings blocks the item and keeps its alias', async () => {
+  await t.test("an owner product named like one of the item's Zalo spellings blocks the item and keeps its alias", async () => {
     const data = clone(DEMO);
-    data.products.push({ id: 50, sku: 'CFMKT', name: 'Cafe muối kem tươi', price: 30000 });
-    data.aliases.push([50, 'Cafe muối kem tươi']);
+    data.products.push({ id: 50, sku: 'CFSPP', name: 'Cafe sữa pha phin', price: 30000 });
+    data.aliases.push([50, 'Cafe sữa pha phin']);
     const db = memoryDb(data);
     await applyMenu(db);
-    assert.equal(db.named('Cà Phê Muối Kem Tươi').length, 0, 'not added next to the owner\'s drink');
-    assert.equal(db.ownerOf('cafe muoi kem tuoi'), 50);
+    assert.equal(db.named('Cà Phê Sữa Pha Phin').length, 0, "not added next to the owner's drink");
+    assert.equal(db.ownerOf('cafe sua pha phin'), 50);
     assert.equal(db.prods.find((p) => p.id === 50).price, 30000);
   });
 
   await t.test('a kept SKU is not renamed onto a name another active product already has', async () => {
     const data = clone(DEMO);
-    data.products.push({ id: 51, sku: 'OWN-CFS', name: 'Cà phê sữa', price: 22000 });
-    data.aliases.push([51, 'Cà phê sữa']);
+    data.products.push({ id: 51, sku: 'OWN-CFS', name: 'Cà phê sữa pha máy', price: 22000 });
+    data.aliases.push([51, 'Cà phê sữa pha máy']);
     const db = memoryDb(data);
     await applyMenu(db);
     assert.equal(db.prods.find((p) => p.id === 2).name, 'Cà phê sữa đá', 'demo row left alone');
-    assert.deepEqual(db.named('Cà Phê Sữa').map((p) => p.id), [51]);
+    assert.deepEqual(db.named('Cà Phê Sữa Pha Máy').map((p) => p.id), [51]);
   });
 });
