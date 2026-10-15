@@ -136,6 +136,19 @@ async function zaloPendingDrafts(limit = 20, conn) {
   return rows;
 }
 
+/** Zalo orders the customer confirmed after `afterId` (oldest first), plus the highest Zalo order id so far. */
+async function newZaloOrders(afterId = 0, limit = 20, conn) {
+  const [rows] = await db(conn).query(
+    `SELECT o.id, o.order_code, o.total, o.completed_at,
+            (SELECT COALESCE(SUM(oi.quantity), 0) FROM order_items oi WHERE oi.order_id = o.id) AS item_count,
+            (SELECT c.name FROM customers c WHERE c.zalo_user_id = o.zalo_user_id LIMIT 1) AS customer_name
+       FROM orders o WHERE o.source = 'zalo' AND o.status = 'completed' AND o.id > ? ORDER BY o.id ASC LIMIT ?`,
+    [afterId, limit]
+  );
+  const [[{ last_id: lastId }]] = await db(conn).query("SELECT COALESCE(MAX(id), 0) AS last_id FROM orders WHERE source = 'zalo'");
+  return { rows, lastId: Number(lastId) };
+}
+
 /**
  * Customers owing money, from the debt ledger (customer_ledger). Zalo orders confirmed but not paid by a
  * known customer open a debt row; payments close it.
@@ -148,5 +161,5 @@ async function topDebtors(limit = 6, conn) {
 module.exports = {
   topDebtors,
   queueCounts, receiptErrors, salesByDay, salesByHour, salesBySource, salesByPayment, topProducts,
-  recentPurchases, zaloEventStats, zaloRecentEvents, zaloPendingDrafts,
+  recentPurchases, zaloEventStats, zaloRecentEvents, zaloPendingDrafts, newZaloOrders,
 };

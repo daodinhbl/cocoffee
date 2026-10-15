@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/notify/new_order_watcher.dart';
 import 'core/offline/connectivity.dart';
 import 'core/offline/offline_coordinator.dart';
 import 'core/offline/outbox.dart';
@@ -43,6 +44,7 @@ class _CoCoffeeAppState extends ConsumerState<CoCoffeeApp> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(newOrderWatcherProvider); // admin signed in: notify when a customer confirms a Zalo order
     ref.watch(offlineCoordinatorProvider); // reconnect -> replay the outbox, refresh the open screens
     return MaterialApp.router(
       title: 'Tasotek FnB',

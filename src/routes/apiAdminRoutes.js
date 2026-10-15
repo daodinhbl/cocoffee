@@ -14,6 +14,7 @@ const settings = require('../controllers/api/settingsApi');
 const router = express.Router();
 
 router.get('/notifications', shell.notifications);
+router.get('/new-orders', shell.newOrders);
 router.get('/dashboard', analytics.dashboard);
 router.get('/reports', analytics.reports);
 

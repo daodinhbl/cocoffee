@@ -26,4 +26,21 @@ async function notifications(_req, res) {
   res.json(await notificationService.load({ receiptErrors: 3 }));
 }
 
-module.exports = { status, drafts, notifications };
+/**
+ * GET /api/admin/new-orders?after_id=N -> { last_id, orders: [{ id, order_code, total, item_count, customer_name, completed_at }] }
+ * Zalo orders confirmed after order N. The app polls it; without after_id (first run) it only returns last_id.
+ */
+async function newOrders(req, res) {
+  const after = parseInt(req.query.after_id, 10);
+  const { rows, lastId } = await adminModel.newZaloOrders(Number.isInteger(after) && after >= 0 ? after : lastIdSentinel, 20);
+  res.json({
+    last_id: lastId,
+    orders: Number.isInteger(after) && after >= 0 ? rows.map((o) => ({
+      id: o.id, order_code: o.order_code, total: Number(o.total || 0), item_count: Number(o.item_count || 0),
+      customer_name: o.customer_name || null, completed_at: o.completed_at,
+    })) : [],
+  });
+}
+const lastIdSentinel = Number.MAX_SAFE_INTEGER;   // no after_id: match nothing, just report last_id
+
+module.exports = { status, drafts, notifications, newOrders };

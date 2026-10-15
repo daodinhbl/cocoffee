@@ -1,3 +1,4 @@
+const newOrderNotice = require('../../services/zalo/newOrderNotificationService');
 const env = require('../../config/env');
 const { withTransaction } = require('../../config/db');
 const logger = require('../../utils/logger');
@@ -290,6 +291,7 @@ async function confirm(ctx) {
     case 'ok':
       // After COMMIT: a delivery problem must never undo the sale (the transport records it on the order).
       await deliverBill(ctx, outcome.orderId);
+      newOrderNotice.notifyNewOrder(outcome.orderId).catch(() => {});   // the owner's Zalo; never awaited, never throws
       return 'confirmed';
     case 'expired': return say(ctx, TXT.expired(env.zalo.draftTtlMinutes), 'expired');
     default: return isGroup ? 'ignored' : say(ctx, TXT.noDraft, 'ignored');

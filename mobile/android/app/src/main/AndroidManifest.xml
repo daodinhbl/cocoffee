@@ -1,6 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- The app talks to the CoCoffee server (/api) -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- New-order notifications (Android 13+ asks the user once) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="Tasotek FnB"
         android:name="${applicationName}"
