@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/session.dart';
 
 /// Shown under "Ứng dụng"; keep in step with `version:` in pubspec.yaml.
-const kAppVersion = '1.4.0 (5)';
+const kAppVersion = '1.5.0 (6)';
 
 /// versionCode (the number after `+` in pubspec.yaml): the OTA update compares it with the server's manifest.
 const kAppBuild = 5;
