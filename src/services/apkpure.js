@@ -33,6 +33,6 @@ function logo() {
 }
 
 /** What the login page needs. */
-const card = () => ({ url: url(), logo: logo(), appIcon: '/brand/app-icon.png', packageName: 'com.tasotek.fnb' });
+const card = () => ({ url: url(), logo: logo(), appIcon: '/brand/co-coffee.png', packageName: 'com.tasotek.fnb' });
 
 module.exports = { url, logo, card, safeUrl, DEFAULT_URL };

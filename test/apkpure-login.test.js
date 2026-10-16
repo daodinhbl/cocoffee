@@ -19,13 +19,13 @@ test('login page shows the APKPure card and its QR code is served', async (t) =>
   const html = await (await fx.client().get('/admin/login')).text();
   assert.match(html, /href="https:\/\/apkpure\.com\/p\/com\.tasotek\.fnb"/);
   assert.match(html, /\/download\/apkpure\/qr\.svg/);
-  assert.match(html, /\/brand\/app-icon\.png/);
+  assert.match(html, /\/brand\/co-coffee\.png/);
   assert.match(html, /APKPure/);
   assert.match(html, /rel="noopener noreferrer"/);
   const qr = await fetch(`${fx.base}/download/apkpure/qr.svg`);
   assert.equal(qr.status, 200);
   assert.match(qr.headers.get('content-type'), /image\/svg\+xml/);
   assert.match(await qr.text(), /<svg/);
-  const icon = await fetch(`${fx.base}/brand/app-icon.png`);
+  const icon = await fetch(`${fx.base}/brand/co-coffee.png`);
   assert.equal(icon.status, 200);
 });
