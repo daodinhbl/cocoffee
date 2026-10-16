@@ -46,7 +46,7 @@
     .field:focus-within { border-color: #1E3A8A; box-shadow: 0 0 0 3px rgba(30,58,138,.14); }
     .field label { display: block; padding: 10px 14px 0; font-size: 12px; line-height: 1; letter-spacing: .12em; text-transform: uppercase; color: #5B6475; }
     .field input { display: block; width: 100%; height: 42px; padding: 2px 14px 8px; border: 0; border-radius: 6px; background: transparent; font: inherit; font-size: 17px; color: #16181A; }
-    .field input:focus, .field input:focus-visible { outline: none; }
+    .field input:focus, .field input:focus-visible { outline: 2px solid transparent; outline-offset: -2px; }   /* transparent, not none: forced-colors (Windows High Contrast) paints it, the navy halo on .field does the work elsewhere */
     .field input:-webkit-autofill { -webkit-box-shadow: 0 0 0 1000px #fff inset; -webkit-text-fill-color: #16181A; }
     .field-pw input { padding-right: 56px; }
     #pw-toggle .i-off { display: none; }
@@ -62,7 +62,7 @@
   <div class="lg:grid lg:min-h-screen lg:grid-cols-[1.05fr_minmax(0,1fr)]">
 
     <!-- Brand panel (laptop/desktop) -->
-    <section class="panel relative hidden overflow-hidden text-navy-50 lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:justify-between lg:self-start lg:px-14 lg:py-12 xl:px-20" aria-hidden="true">
+    <section class="panel relative hidden overflow-hidden text-navy-50 lg:flex lg:min-h-screen lg:flex-col lg:justify-between lg:gap-10 lg:px-14 lg:py-12 xl:px-20" aria-hidden="true">
       <div class="ring -right-40 -top-40 h-[560px] w-[560px]"></div>
       <div class="ring -bottom-32 left-8 h-[360px] w-[360px]"></div>
       <div class="pointer-events-none absolute inset-6 rounded-lg border border-white/15"></div>
