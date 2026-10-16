@@ -20,6 +20,7 @@ const routes = require('./src/routes');
 const adminRoutes = require('./src/routes/adminRoutes');
 const mediaRoutes = require('./src/routes/mediaRoutes');
 const downloadRoutes = require('./src/routes/downloadRoutes');
+const kyThuatRoutes = require('./src/routes/kyThuatRoutes');
 const viewHelpers = require('./src/utils/viewHelpers');
 const { adminSecurity } = require('./src/middlewares/adminSecurity');
 const appRelease = require('./src/services/appRelease');
@@ -66,6 +67,9 @@ app.get('/health', async (_req, res) => {
 // Apps for staff phones (public; see routes/downloadRoutes.js): Android landing page, APK, manifest and QR code;
 // iOS landing page (/download/ios -> TestFlight / App Store link) and its QR code.
 app.use('/download', downloadRoutes);
+
+// Technical-service QR page (public): finished jobs + request form; printed QR codes point here (routes/kyThuatRoutes.js).
+app.use('/ky-thuat', kyThuatRoutes);
 
 // Product introduction page (public; linked from the login page "Xem thêm").
 app.get('/gioi-thieu', adminSecurity, (_req, res) => res.render('landing', { shopName: env.business.shopName, appDownload: appRelease.loginCard(), contact: env.contact }));

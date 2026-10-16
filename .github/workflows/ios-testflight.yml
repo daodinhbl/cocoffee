@@ -63,6 +63,7 @@ jobs:
 
     steps:
       - name: Check that the signing secrets are configured
+        working-directory: .   # runs before checkout, so mobile/ does not exist yet
         run: |
           missing=0
           for name in APPSTORE_ISSUER_ID APPSTORE_KEY_ID APPSTORE_API_PRIVATE_KEY APPLE_TEAM_ID; do
