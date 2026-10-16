@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Heli cần micro để nghe câu hỏi bằng giọng nói của bạn.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Heli dùng nhận dạng giọng nói để chuyển lời bạn nói thành văn bản.</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>tel</string>
