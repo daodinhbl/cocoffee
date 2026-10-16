@@ -3,6 +3,7 @@ const { adminSecurity } = require('../middlewares/adminSecurity');
 const rateLimit = require('../middlewares/rateLimit');
 const appRelease = require('../services/appRelease');
 const iosApp = require('../services/iosApp');
+const apkpure = require('../services/apkpure');
 const iosRelease = require('../services/iosRelease');
 const env = require('../config/env');
 const { formatShopTime } = require('../utils/text');
@@ -94,6 +95,20 @@ async function sendQr(req, res, next, pagePath) {
 }
 
 router.get('/qr.svg', pageLimit, (req, res, next) => sendQr(req, res, next, '/download'));
+
+// QR code of the app's APKPure page (a third row of the app card on the login page).
+router.get('/apkpure/qr.svg', pageLimit, async (req, res, next) => {
+  try {
+    const svg = await appRelease.qrSvg(apkpure.url());
+    res.set({
+      'Content-Type': 'image/svg+xml; charset=utf-8',
+      'Cache-Control': 'public, max-age=3600',
+      'X-Content-Type-Options': 'nosniff',
+      'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'",
+    });
+    res.send(svg);
+  } catch (err) { next(err); }
+});
 
 router.get('/ios', pageLimit, adminSecurity, async (req, res, next) => {
   try {

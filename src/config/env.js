@@ -51,6 +51,7 @@ module.exports = {
   // iOS app for staff iPhones/iPads: TestFlight public link or App Store page, used while nothing is set in
   // Web Admin > Cài đặt > Ứng dụng iOS (see services/iosApp.js).
   iosAppUrl: optional('IOS_APP_URL'),
+  apkpureUrl: optional('APKPURE_URL'),          // optional override of the APKPure page shown on the login page (services/apkpure.js)
   // Where Web Admin > Sao lưu keeps its .sql.gz files. A redeploy replaces the app folder, so the default is a
   // sibling folder OUTSIDE it (<app>/../cocoffee-backups); backupService falls back to <app>/backups (with a
   // warning) when that folder cannot be created. Set BACKUP_DIR to choose another place.
@@ -98,6 +99,14 @@ module.exports = {
     draftTtlMinutes: int('ZALO_DRAFT_TTL_MINUTES', 30),
     apiBase: 'https://openapi.zalo.me',
     oauthUrl: 'https://oauth.zaloapp.com/v4/oa/access_token',
+  },
+
+  // Facebook Messenger consultation bot (docs/facebook-messenger.md). Off until the page token AND app secret are set.
+  facebook: {
+    pageAccessToken: optional('FB_PAGE_ACCESS_TOKEN'),
+    appSecret: optional('FB_APP_SECRET'),            // signs every webhook call (X-Hub-Signature-256)
+    verifyToken: optional('FB_VERIFY_TOKEN'),        // any string you choose; typed into the webhook form on developers.facebook.com
+    graphVersion: optional('FB_GRAPH_VERSION', 'v21.0'),
   },
 
   // PayOn (NextPay) QR payments: every value can also be entered in Web Admin > Cài đặt; the environment wins.
