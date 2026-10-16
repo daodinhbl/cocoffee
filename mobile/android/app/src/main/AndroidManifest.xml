@@ -3,6 +3,8 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <!-- New-order notifications (Android 13+ asks the user once) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Heli voice assistant: the microphone, only while the Heli screen is open (asked when the mic button is first pressed) -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <application
         android:label="${appName}"
         android:allowBackup="false"
@@ -46,6 +48,10 @@
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
+        <!-- Android 11+: lets speech_to_text find the device's speech recognition service -->
+        <intent>
+            <action android:name="android.speech.RecognitionService"/>
+        </intent>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>

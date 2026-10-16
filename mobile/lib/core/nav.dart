@@ -39,6 +39,7 @@ const navGroups = <NavGroup>[
     NavItem(key: 'zalo', label: 'Zalo OA', icon: Icons.chat_rounded, route: '/zalo', adminOnly: true),
   ]),
   NavGroup('Hệ thống', [
+    NavItem(key: 'heli', label: 'Trợ lý Heli', icon: Icons.mic_rounded, route: '/heli'),
     NavItem(key: 'settings', label: 'Cài đặt', icon: Icons.tune_rounded, route: '/settings'),
     NavItem(key: 'sync', label: 'Đồng bộ ngoại tuyến', icon: Icons.cloud_sync_rounded, route: '/sync'),
   ]),
