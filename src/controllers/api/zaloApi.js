@@ -4,7 +4,10 @@ const chatbotInfo = require('../../services/zalo/chatbotInfo');
 const { BANKS } = require('../../services/vietQr');
 const zaloPage = require('../admin/zalo');
 
-/** Zalo monitor of the app (admin). The Bot Token itself is entered on the Web Admin only. */
+/**
+ * Zalo screen of the app (admin). The Bot Token can be entered here too (PUT /zalo/bot-token); it is write-only:
+ * checked with Zalo, stored on the server, and never sent back, shown, logged or put in an error message.
+ */
 
 /** GET /api/admin/zalo -> { connection (no secrets, no token hint), stats, events, drafts, failed, chatbot, banks } */
 async function overview(_req, res) {
@@ -41,4 +44,14 @@ async function registerWebhook(_req, res) {
   res.json({ ok: true, message: r.message });
 }
 
-module.exports = { overview, saveDebtRecipient, saveChatbotInfo, registerWebhook };
+/**
+ * PUT /api/admin/zalo/bot-token { token } -> { ok, message }. The Web Admin form's logic (admin/zalo.js storeBotToken):
+ * format check, getMe with Zalo, store (+ webhook secret), register the webhook. Not under idempotency(): that
+ * middleware would keep the response, and nothing about the token may be kept anywhere but app_settings.
+ */
+async function saveBotToken(req, res) {
+  const { message } = await zaloPage.storeBotToken(req.body.token, req.user.id);
+  res.json({ ok: true, message });
+}
+
+module.exports = { overview, saveDebtRecipient, saveChatbotInfo, registerWebhook, saveBotToken };

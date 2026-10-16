@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../features/auth/change_password_screen.dart';
 import '../features/auth/login_screen.dart';
+import '../features/bom/bom_screen.dart';
 import '../features/customers/customer_detail_screen.dart';
 import '../features/customers/customers_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
@@ -22,6 +23,7 @@ import '../features/reports/reports_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/sync/sync_screen.dart';
 import '../features/tables/tables_screen.dart';
+import '../features/zalo/zalo_screen.dart';
 import 'session.dart';
 import 'widgets/app_shell.dart';
 
@@ -111,6 +113,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(parentNavigatorKey: _rootKey, path: '/tables', builder: (_, _) => const TablesScreen()),
       GoRoute(parentNavigatorKey: _rootKey, path: '/menu', builder: (_, _) => const MenuScreen()),
+      GoRoute(parentNavigatorKey: _rootKey, path: '/bom', builder: (_, _) => const BomScreen()),
+      GoRoute(parentNavigatorKey: _rootKey, path: '/zalo', builder: (_, _) => const ZaloScreen()),
       GoRoute(parentNavigatorKey: _rootKey, path: '/customers', builder: (_, _) => const CustomersScreen()),
       GoRoute(parentNavigatorKey: _rootKey, path: '/customers/:id', builder: (_, s) => CustomerDetailScreen(id: _id(s))),
       GoRoute(parentNavigatorKey: _rootKey, path: '/settings', builder: (_, _) => const SettingsScreen()),

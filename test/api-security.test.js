@@ -86,7 +86,8 @@ test('API security', async (t) => {
       ['POST', '/api/admin/customers/5/collect'], ['POST', '/api/admin/customers/5/adjust'],
       ['GET', '/api/admin/menu'], ['GET', '/api/admin/bom'], ['PUT', '/api/admin/products/1/image'], ['DELETE', '/api/admin/inventory/1/image'],
       ['GET', '/api/admin/zalo'], ['PUT', '/api/admin/zalo/debt-recipient'], ['PUT', '/api/admin/zalo/chatbot-info'], ['POST', '/api/admin/zalo/register-webhook'],
-      ['GET', '/api/admin/settings'], ['PUT', '/api/admin/settings/printer'], ['GET', '/api/admin/users'], ['POST', '/api/admin/users'],
+      ['GET', '/api/admin/settings'], ['PUT', '/api/admin/settings/printer'], ['PUT', '/api/admin/settings/ios-app'], ['PUT', '/api/admin/settings/payon'],
+      ['POST', '/api/admin/settings/payon/test'], ['POST', '/api/admin/settings/payon/ip'], ['GET', '/api/admin/users'], ['POST', '/api/admin/users'],
       ['PUT', '/api/admin/users/2/password'], ['PUT', '/api/admin/users/1/active'], ['GET', '/api/admin/does-not-exist'],
       ['GET', '/api/tables?all=1'], ['GET', '/api/inventory?all=1'], ['GET', '/api/inventory/1'], ['GET', '/api/inventory/purchases'],
     ];

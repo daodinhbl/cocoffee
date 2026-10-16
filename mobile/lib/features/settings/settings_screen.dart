@@ -5,6 +5,7 @@ import '../../core/session.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common.dart';
 import '../menu/form_sheet.dart';
+import 'integrations_cards.dart';
 import 'settings_models.dart';
 import 'settings_sections.dart';
 
@@ -51,6 +52,8 @@ class SettingsScreen extends ConsumerWidget {
               if (admin) ...[
                 const SizedBox(height: 16),
                 const _PrinterSection(),
+                const SizedBox(height: 16),
+                const IntegrationsSection(),
                 const SizedBox(height: 24),
                 const UsersSection(),
               ],

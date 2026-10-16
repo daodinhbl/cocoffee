@@ -396,7 +396,7 @@ test('API endpoints for the app', async (t) => {
 
   await t.test('GET /api/admin/settings, PUT /api/admin/settings/printer', async () => {
     let r = await get('/api/admin/settings');
-    assert.deepEqual(Object.keys(r.body).sort(), ['config', 'printer', 'shop_name']);
+    assert.deepEqual(Object.keys(r.body).sort(), ['config', 'ios_app', 'payon', 'printer', 'shop_name']);
     assert.equal(typeof r.body.shop_name, 'string');
     assert.deepEqual(Object.keys(r.body.config).sort(), ['allowNegativeStock', 'draftTtlMinutes', 'publicBaseUrl', 'receiptImage', 'sessionHours', 'timezone', 'verifySignature']);
     assert.equal(r.body.config.publicBaseUrl, 'https://cafe.example.test');

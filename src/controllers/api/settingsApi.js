@@ -2,14 +2,22 @@ const env = require('../../config/env');
 const userModel = require('../../models/userModel');
 const userService = require('../../services/userService');
 const printerSettings = require('../../services/printerSettings');
+const iosApp = require('../../services/iosApp');
+const payon = require('../admin/payon');
 const { systemConfig } = require('../../services/settingsService');
 const v = require('../../utils/validate');
 
-/** Settings screen of the app (admin): printer, read-only configuration, staff accounts. */
+/** Settings screen of the app (admin): printer, iOS download link, PayOn, read-only configuration, staff accounts. */
 
-/** GET /api/admin/settings -> { printer, config, shop_name } (shop_name: SHOP_NAME, shown read-only like the web page) */
+/**
+ * GET /api/admin/settings -> { printer, config, shop_name, ios_app, payon }
+ *   shop_name: SHOP_NAME, shown read-only like the web page
+ *   ios_app: { url (stored), link ({kind,label,action,url}|null: what is in force), fallback (IOS_APP_URL), app }
+ *   payon: { config (no secret values: only set/hint flags), banks (saved by the last connection test), ipnUrl }
+ */
 async function get(_req, res) {
-  res.json({ printer: await printerSettings.get(), config: systemConfig(), shop_name: env.business.shopName });
+  const [printer, ios, px] = await Promise.all([printerSettings.get(), iosApp.view(), payon.settingsPanel()]);
+  res.json({ printer, config: systemConfig(), shop_name: env.business.shopName, ios_app: ios, payon: px });
 }
 
 const PRINTER_FIELDS = ['paperMm', 'autoPrint', 'copies', 'printerName', 'shopAddress', 'shopPhone', 'footer', 'showVat', 'vatRate'];
@@ -33,6 +41,34 @@ async function savePrinter(req, res) {
   body.showVat = formFlag(body.showVat, 'showVat');
   await printerSettings.save(body, req.user.id);
   res.json({ printer: await printerSettings.get() });
+}
+
+/** PUT /api/admin/settings/ios-app { url } ('' clears it; only https TestFlight / App Store links) -> { ios_app } */
+async function saveIosApp(req, res) {
+  await iosApp.save(req.body || {}, req.user.id);
+  res.json({ ios_app: await iosApp.view() });
+}
+
+/**
+ * PUT /api/admin/settings/payon { env, appId, merchantId, authUser, authPass, secretKey, bankCode, expireMinutes, enabled }
+ * Same rules as the web form: a blank secret keeps the stored one, values locked by the environment are not copied,
+ * switching on needs the full connection set and a QR bank from the saved list. -> { message, payon }
+ */
+async function savePayon(req, res) {
+  const r = await payon.saveSettings({ body: { ...(req.body || {}) }, user: req.user });
+  res.json({ message: r.message, payon: await payon.settingsPanel() });
+}
+
+/** POST /api/admin/settings/payon/test: calls PayOn with the saved keys and saves its QR bank list -> { message, payon } */
+async function testPayon(req, res) {
+  const r = await payon.testConnection({ user: req.user });
+  res.json({ message: r.message, payon: await payon.settingsPanel() });
+}
+
+/** POST /api/admin/settings/payon/ip: the address PayOn sees our calls come from -> { message } */
+async function payonIp(_req, res) {
+  const r = await payon.showServerIp();
+  res.json({ message: r.message });
 }
 
 const publicUser = (u) => ({ id: u.id, username: u.username, full_name: u.full_name, role: u.role, is_active: u.is_active, created_at: u.created_at ?? null });
@@ -62,4 +98,4 @@ async function setActive(req, res) {
   res.json({ ok: true });
 }
 
-module.exports = { get, savePrinter, listUsers, createUser, resetPassword, setActive };
+module.exports = { get, savePrinter, saveIosApp, savePayon, testPayon, payonIp, listUsers, createUser, resetPassword, setActive };

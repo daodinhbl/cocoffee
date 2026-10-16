@@ -41,9 +41,14 @@ router.get('/zalo/status', shell.status);
 router.put('/zalo/debt-recipient', zalo.saveDebtRecipient);
 router.put('/zalo/chatbot-info', zalo.saveChatbotInfo);
 router.post('/zalo/register-webhook', zalo.registerWebhook);
+router.put('/zalo/bot-token', zalo.saveBotToken);                                   // write-only secret: no idempotency() (it would store the response)
 
 router.get('/settings', settings.get);
 router.put('/settings/printer', settings.savePrinter);
+router.put('/settings/ios-app', settings.saveIosApp);
+router.put('/settings/payon', settings.savePayon);
+router.post('/settings/payon/test', settings.testPayon);
+router.post('/settings/payon/ip', settings.payonIp);
 router.get('/users', settings.listUsers);
 router.post('/users', settings.createUser);
 router.put('/users/:id/password', settings.resetPassword);

@@ -61,6 +61,9 @@ async function page(_req, res) {
   }, { conn, stats, events, drafts, failed, chatbot, banks: BANKS });
 }
 
+/** Zalo's reason without the "Zalo Bot x failed: " prefix, and never containing [token] (some APIs echo what they were sent). */
+const zaloReason = (err, token) => String(err.message).replace(/^Zalo Bot \w+ failed: /, '').split(token).join('…');
+
 /**
  * Zalo Bot Platform: getMe + setWebhook from the server itself, with the token from the environment, so the
  * owner never has to copy the token anywhere else. Zalo test-calls the webhook right away and reports back.
@@ -78,7 +81,7 @@ async function registerWebhook() {
     me = await zaloBot.getMe();
     result = await zaloBot.setWebhook(url, secret);
   } catch (err) {
-    throw new AppError(502, 'ZALO_BOT_API', `Zalo từ chối: ${err.message.replace(/^Zalo Bot \w+ failed: /, '')}`);
+    throw new AppError(502, 'ZALO_BOT_API', `Zalo từ chối: ${zaloReason(err, cfg.botToken)}`);
   }
   const v = result.verification || {};
   if (v.ok !== false) await webhookGuard.remember(url, secret);
@@ -91,19 +94,38 @@ async function registerWebhook() {
   };
 }
 
-/** Save the Bot Token typed in the admin (checked with getMe first), then register the webhook. */
-async function saveBotToken(req) {
-  const token = typeof req.body.botToken === 'string' ? req.body.botToken.trim() : '';
-  if (!/^[A-Za-z0-9:_\-.]{10,200}$/.test(token)) throw new AppError(400, 'VALIDATION', 'Bot Token không hợp lệ: dán đúng chuỗi token lấy ở bot.zaloplatforms.com.');
+const BOT_TOKEN_FORMAT = /^[A-Za-z0-9:_\-.]{10,200}$/;
+
+/**
+ * Check a Bot Token with Zalo (getMe), store it (a webhook secret is generated once), then register the webhook.
+ * The one implementation behind the Web Admin form (saveBotToken) and PUT /api/admin/zalo/bot-token of the app.
+ * The token is secret: it is never put into a message, a log line or a response, only into app_settings.
+ * @returns {Promise<{ message: string }>}
+ */
+async function storeBotToken(rawToken, userId) {
+  const token = typeof rawToken === 'string' ? rawToken.trim() : '';
+  if (!BOT_TOKEN_FORMAT.test(token)) throw new AppError(400, 'VALIDATION', 'Bot Token không hợp lệ: dán đúng chuỗi token lấy ở bot.zaloplatforms.com.');
   if (env.zalo.botToken) throw new AppError(409, 'ENV_TOKEN', 'Token đang được đặt trong hPanel (ZALO_BOT_TOKEN); sửa ở đó.');
   try {
     await zaloBot.getMe(token);
   } catch (err) {
-    throw new AppError(400, 'ZALO_BOT_API', `Zalo không chấp nhận token này: ${err.message.replace(/^Zalo Bot \w+ failed: /, '')}`);
+    throw new AppError(400, 'ZALO_BOT_API', `Zalo không chấp nhận token này: ${zaloReason(err, token)}`);
   }
-  await zaloConfig.saveBotToken(token, req.user.id);
-  const reg = await registerWebhook();
-  return { message: `Đã lưu Bot Token. ${reg.message}`, to: '/admin/zalo' };
+  await zaloConfig.saveBotToken(token, userId);
+  let reg;
+  try {
+    reg = await registerWebhook();
+  } catch (err) {
+    if (!(err instanceof AppError)) throw err;
+    throw new AppError(err.status, err.code, `Đã lưu Bot Token, nhưng chưa đăng ký được webhook. ${err.message}`, err.details);
+  }
+  return { message: `Đã lưu Bot Token. ${reg.message}` };
+}
+
+/** Save the Bot Token typed in the admin (checked with getMe first), then register the webhook. */
+async function saveBotToken(req) {
+  const { message } = await storeBotToken(req.body.botToken, req.user.id);
+  return { message, to: '/admin/zalo' };
 }
 
 async function saveDebtRecipient(req) {
@@ -121,4 +143,4 @@ async function saveChatbotInfo(req) {
   return { message: 'Đã lưu nội dung trả lời tự động.', to: '/admin/zalo' };
 }
 
-module.exports = { page, connection, registerWebhook, saveBotToken, saveDebtRecipient, saveChatbotInfo, resendReceipt: orders.resendReceipt };
+module.exports = { page, connection, registerWebhook, storeBotToken, saveBotToken, saveDebtRecipient, saveChatbotInfo, resendReceipt: orders.resendReceipt };

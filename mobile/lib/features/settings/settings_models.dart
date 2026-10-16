@@ -91,20 +91,134 @@ class SystemConfig {
   final String sessionHours;
 }
 
-class AdminSettings {
-  const AdminSettings({required this.printer, required this.config});
+/// "Ứng dụng iOS": the TestFlight / App Store link /download/ios and the login-page QR lead to
+/// (GET /api/admin/settings -> ios_app { url, link {kind,label,action,url}|null, fallback, app {name,bundleId,minIos} }).
+class IosAppSetting {
+  const IosAppSetting({required this.url, required this.linkLabel, required this.fallbackUrl, required this.appName});
 
-  /// GET /api/admin/settings -> { printer, config }.
+  factory IosAppSetting.fromJson(Map<String, dynamic> j) {
+    Map<String, dynamic>? map(Object? v) => v is Map ? Map<String, dynamic>.from(v) : null;
+    final link = map(j['link']);
+    final fallback = map(j['fallback']);
+    return IosAppSetting(
+      url: _str(j['url']),
+      linkLabel: link == null ? null : _str(link['label']),
+      fallbackUrl: fallback == null ? null : _str(fallback['url']),
+      appName: _str(map(j['app'])?['name']).isEmpty ? 'POS Tasotek' : _str(map(j['app'])?['name']),
+    );
+  }
+
+  /// What is stored (the form value); empty when only IOS_APP_URL, or nothing, is set.
+  final String url;
+
+  /// 'TestFlight' / 'App Store' while a link is in force, null when the page says "sắp có".
+  final String? linkLabel;
+
+  /// IOS_APP_URL from the environment, used while [url] is empty.
+  final String? fallbackUrl;
+  final String appName;
+}
+
+/// One QR bank PayOn offered at the last connection test.
+class PayonBank {
+  const PayonBank({required this.code, required this.name});
+  final String code;
+  final String name;
+}
+
+/// "Thanh toán QR (PayOn / NextPay)": GET /api/admin/settings -> payon { config, banks, ipnUrl }. Secrets never come
+/// back: only whether they are set and their last characters.
+class PayonSettings {
+  const PayonSettings({
+    required this.enabled,
+    required this.ready,
+    required this.complete,
+    required this.env,
+    required this.baseUrl,
+    required this.appId,
+    required this.merchantId,
+    required this.authUser,
+    required this.authPassSet,
+    required this.authPassHint,
+    required this.secretKeySet,
+    required this.secretKeyHint,
+    required this.bankCode,
+    required this.bankName,
+    required this.expireMinutes,
+    required this.lockedFields,
+    required this.banks,
+    required this.ipnUrl,
+  });
+
+  factory PayonSettings.fromJson(Map<String, dynamic> j) {
+    Map<String, dynamic> map(Object? v) => v is Map ? Map<String, dynamic>.from(v) : <String, dynamic>{};
+    final c = map(j['config']);
+    final from = map(c['fromEnv']);
+    return PayonSettings(
+      enabled: _bool(c['enabled']),
+      ready: _bool(c['ready']),
+      complete: _bool(c['complete']),
+      env: _str(c['env']) == 'production' ? 'production' : 'sandbox',
+      baseUrl: _str(c['baseUrl']),
+      appId: _str(c['appId']),
+      merchantId: _str(c['merchantId']),
+      authUser: _str(c['authUser']),
+      authPassSet: _bool(c['authPassSet']),
+      authPassHint: _str(c['authPassHint']),
+      secretKeySet: _bool(c['secretKeySet']),
+      secretKeyHint: _str(c['secretKeyHint']),
+      bankCode: _str(c['bankCode']),
+      bankName: _str(c['bankName']),
+      expireMinutes: _int(c['expireMinutes'], 15).clamp(3, 60),
+      lockedFields: {for (final e in from.entries) if (_bool(e.value)) e.key},
+      banks: [
+        for (final b in (j['banks'] is List ? j['banks'] as List : const []))
+          if (b is Map && b['code'] != null) PayonBank(code: _str(b['code']), name: _str(b['name'])),
+      ],
+      ipnUrl: _str(j['ipnUrl']),
+    );
+  }
+
+  final bool enabled;
+  final bool ready;
+  final bool complete;
+  final String env;
+  final String baseUrl;
+  final String appId;
+  final String merchantId;
+  final String authUser;
+  final bool authPassSet;
+  final String authPassHint;
+  final bool secretKeySet;
+  final String secretKeyHint;
+  final String bankCode;
+  final String bankName;
+  final int expireMinutes;
+
+  /// Keys the server takes from the environment (hPanel): env, appId, merchantId, authUser, authPass, secretKey.
+  final Set<String> lockedFields;
+  final List<PayonBank> banks;
+  final String ipnUrl;
+}
+
+class AdminSettings {
+  const AdminSettings({required this.printer, required this.config, this.iosApp, this.payon});
+
+  /// GET /api/admin/settings -> { printer, config, shop_name, ios_app, payon } (the last two are missing on older servers).
   factory AdminSettings.fromJson(Map<String, dynamic> res) {
     Map<String, dynamic> map(Object? v) => v is Map ? Map<String, dynamic>.from(v) : <String, dynamic>{};
     return AdminSettings(
       printer: PrinterSettings.fromJson(map(res['printer'])),
       config: SystemConfig.fromJson(map(res['config']), shopName: res['shop_name'] ?? res['shopName']),
+      iosApp: res['ios_app'] is Map ? IosAppSetting.fromJson(map(res['ios_app'])) : null,
+      payon: res['payon'] is Map ? PayonSettings.fromJson(map(res['payon'])) : null,
     );
   }
 
   final PrinterSettings printer;
   final SystemConfig config;
+  final IosAppSetting? iosApp;
+  final PayonSettings? payon;
 }
 
 /// userModel.list() row: { id, username, full_name, role, is_active, created_at }.

@@ -31,12 +31,12 @@ const navGroups = <NavGroup>[
   ]),
   NavGroup('Kho & Định mức', [
     NavItem(key: 'inventory', label: 'Nguyên liệu', icon: Icons.inventory_2_rounded, route: '/inventory'),
-    NavItem(key: 'bom', label: 'Công thức (BOM)', icon: Icons.science_rounded, route: '/bom', adminOnly: true, webPath: '/admin/bom-recipes'),
+    NavItem(key: 'bom', label: 'Công thức (BOM)', icon: Icons.science_rounded, route: '/bom', adminOnly: true),
     NavItem(key: 'receiving', label: 'Nhập kho', icon: Icons.upload_rounded, route: '/receiving', adminOnly: true),
   ]),
   NavGroup('Phân tích', [
     NavItem(key: 'reports', label: 'Báo cáo', icon: Icons.bar_chart_rounded, route: '/reports', adminOnly: true),
-    NavItem(key: 'zalo', label: 'Zalo OA', icon: Icons.chat_rounded, route: '/zalo', adminOnly: true, webPath: '/admin/zalo'),
+    NavItem(key: 'zalo', label: 'Zalo OA', icon: Icons.chat_rounded, route: '/zalo', adminOnly: true),
   ]),
   NavGroup('Hệ thống', [
     NavItem(key: 'settings', label: 'Cài đặt', icon: Icons.tune_rounded, route: '/settings'),
