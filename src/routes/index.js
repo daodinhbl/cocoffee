@@ -3,8 +3,7 @@ const { requireAuth, requireRole } = require('../middlewares/auth');
 const rateLimit = require('../middlewares/rateLimit');
 const idempotency = require('../middlewares/idempotency');
 const zaloWebhookRoutes = require('../webhooks/zalo/zaloWebhookRoutes');
-const facebookRoutes = require('../webhooks/facebook/facebookRoutes');
-const payonRoutes =require('../webhooks/payon/payonRoutes');
+const payonRoutes = require('../webhooks/payon/payonRoutes');
 const apiAdminRoutes = require('./apiAdminRoutes');
 const heliRoutes = require('./heliRoutes');
 
@@ -21,8 +20,7 @@ const admin = requireRole('admin');
 
 // ---- public ---------------------------------------------------------------
 router.use('/payon', payonRoutes);                                          // POST /api/payon/ipn (PayOn notification, checksum-verified, no JWT)
-router.use('/facebook', facebookRoutes);                                  // /api/facebook/webhook (Messenger bot; signature-verified, no JWT)
-router.use('/zalo', zaloWebhookRoutes);                                  // POST /api/zalo/webhook (signature-verified, no JWT)
+router.use('/zalo', zaloWebhookRoutes);                                   // POST /api/zalo/webhook (signature-verified, no JWT)
 router.post('/auth/login', rateLimit({ windowMs: 15 * 60 * 1000, max: 60 }), rateLimit({ windowMs: 15 * 60 * 1000, max: 8, key: rateLimit.accountKey }), auth.login);
 
 // ---- everything below needs a bearer token ----------------------------------

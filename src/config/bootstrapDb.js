@@ -194,20 +194,6 @@ UPGRADES.push(
      created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
      PRIMARY KEY (id)
    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
-  // Leads from the public technical-service QR page (routes/kyThuatRoutes.js, models/leadModel.js).
-  `CREATE TABLE IF NOT EXISTS service_leads (
-     id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
-     name        VARCHAR(120) NOT NULL,
-     phone       VARCHAR(20)  NOT NULL,
-     need        VARCHAR(40)  NOT NULL,
-     source      VARCHAR(30)  NOT NULL DEFAULT 'qr',
-     note        VARCHAR(500) NULL,
-     status      ENUM('new','contacted','won','lost') NOT NULL DEFAULT 'new',
-     created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-     PRIMARY KEY (id),
-     KEY idx_leads_phone (phone, created_at),
-     KEY idx_leads_status (status, created_at)
-   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
 );
 
 /** Columns added to existing tables: [table, column, ALTER statement]. MySQL 8 has no ADD COLUMN IF NOT EXISTS. */
