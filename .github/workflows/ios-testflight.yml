@@ -184,7 +184,14 @@ jobs:
           </dict>
           </plist>
           EOF
-          xcodebuild -exportArchive \n            -archivePath build/ios/Runner.xcarchive \n            -exportPath build/ios/adhoc \n            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions-adhoc.plist" \n            -allowProvisioningUpdates \n            -authenticationKeyPath "$KEY_FILE" \n            -authenticationKeyID "$APPSTORE_KEY_ID" \n            -authenticationKeyIssuerID "$APPSTORE_ISSUER_ID"
+          xcodebuild -exportArchive \
+            -archivePath build/ios/Runner.xcarchive \
+            -exportPath build/ios/adhoc \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions-adhoc.plist" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$KEY_FILE" \
+            -authenticationKeyID "$APPSTORE_KEY_ID" \
+            -authenticationKeyIssuerID "$APPSTORE_ISSUER_ID"
           IPA="$(ls build/ios/adhoc/*.ipa | head -n 1)"
           FILE="POS-Tasotek-${VERSION_NAME}-${BUILD_NUMBER}.ipa"
           mv "$IPA" "build/ios/adhoc/$FILE"
