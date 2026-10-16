@@ -123,7 +123,7 @@ jobs:
             --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER" \
             --dart-define=PLAY_STORE=true
 
-      - name: Archive (Apple-managed signing through the API key)
+      - name: Archive (unsigned; signed at export with the Apple-managed Distribution cert, so no registered device is needed)
         run: |
           xcodebuild archive \
             -workspace ios/Runner.xcworkspace \
@@ -136,7 +136,7 @@ jobs:
             -authenticationKeyID "$APPSTORE_KEY_ID" \
             -authenticationKeyIssuerID "$APPSTORE_ISSUER_ID" \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
-            CODE_SIGN_STYLE=Automatic
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO
 
       - name: Export the .ipa
         run: |
