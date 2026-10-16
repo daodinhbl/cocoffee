@@ -109,6 +109,15 @@ module.exports = {
     graphVersion: optional('FB_GRAPH_VERSION', 'v21.0'),
   },
 
+  // Heli voice assistant (/api/heli/*): the OpenAI key lives only on the server, the app never sees it. Off until the key is set.
+  heli: {
+    apiKey: optional('OPENAI_API_KEY'),
+    model: optional('OPENAI_MODEL', 'gpt-4o-mini'),
+    sttModel: optional('STT_MODEL', 'gpt-4o-mini-transcribe'),
+    ttsModel: optional('TTS_MODEL', 'gpt-4o-mini-tts'),
+    ttsVoice: optional('TTS_VOICE', 'nova'),
+  },
+
   // PayOn (NextPay) QR payments: every value can also be entered in Web Admin > Cài đặt; the environment wins.
   payon: {
     env: optional('PAYON_ENV'),                    // 'sandbox' | 'production'

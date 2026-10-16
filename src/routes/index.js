@@ -5,6 +5,7 @@ const idempotency = require('../middlewares/idempotency');
 const zaloWebhookRoutes = require('../webhooks/zalo/zaloWebhookRoutes');
 const payonRoutes = require('../webhooks/payon/payonRoutes');
 const apiAdminRoutes = require('./apiAdminRoutes');
+const heliRoutes = require('./heliRoutes');
 
 const auth = require('../controllers/authController');
 const tables = require('../controllers/tableController');
@@ -67,6 +68,8 @@ router.put('/orders/:id/items', orders.replaceItems);
 router.post('/orders/:id/pay', idempotency(), orders.pay);                              // debt settlement: admin only (orderService)
 router.post('/orders/:id/cancel', idempotency(), orders.cancel);
 router.post('/orders/:id/resend-receipt', orders.resendReceipt);
+
+router.use('/heli', heliRoutes);                                          // voice assistant; the database tool is admin-only inside services/heli/agent.js
 
 // ---- management screens: admins only, guarded once ----------------------------
 router.use('/admin', admin, apiAdminRoutes);
