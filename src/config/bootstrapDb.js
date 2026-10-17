@@ -498,4 +498,25 @@ async function ensureSchemaUpgrades() {
   }
 }
 
-module.exports = { bootstrapIfEmpty, ensureSchemaUpgrades };
+/**
+ * A site built from a schema-only database (SEED_DEMO off) has no account to sign in with. When the users table is empty and
+ * BOOTSTRAP_ADMIN_PASSWORD (>= 10 characters) is set, create the first admin from BOOTSTRAP_ADMIN_USER (default "admin").
+ * Never overwrites anything and never throws.
+ */
+async function ensureFirstAdmin() {
+  const { pool } = require('./db');
+  const pw = env.db.bootstrapAdminPassword;
+  if (!pw || pw.length < 10) return 'skipped';
+  try {
+    const [[{ n }]] = await pool.query('SELECT COUNT(*) AS n FROM users');
+    if (Number(n) > 0) return 'skipped';
+    await pool.query("INSERT INTO users (username, password_hash, full_name, role) VALUES (?, ?, 'Quản trị viên', 'admin')", [env.db.bootstrapAdminUser, bcrypt.hashSync(pw, 12)]);
+    logger.info(`First admin account "${env.db.bootstrapAdminUser}" created from BOOTSTRAP_ADMIN_PASSWORD`);
+    return 'created';
+  } catch (err) {
+    logger.error('First admin account not created', err);
+    return 'failed';
+  }
+}
+
+module.exports = { bootstrapIfEmpty, ensureSchemaUpgrades, ensureFirstAdmin };

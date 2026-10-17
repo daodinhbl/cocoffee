@@ -8,7 +8,7 @@ const helmet = require('helmet');
 
 const env = require('./src/config/env');
 const { pool } = require('./src/config/db');
-const { bootstrapIfEmpty, ensureSchemaUpgrades } = require('./src/config/bootstrapDb');
+const { bootstrapIfEmpty, ensureSchemaUpgrades, ensureFirstAdmin } = require('./src/config/bootstrapDb');
 const { ensureMenuSeed, ensureMenuAliases } = require('./src/config/menuSeed');
 const { ensureMenuPhotos } = require('./src/config/menuPhotos');
 const productModel = require('./src/models/productModel');
@@ -109,9 +109,12 @@ async function start() {
     if (bootstrap === 'applied') productModel.invalidateCatalog();
     await ensureSchemaUpgrades();                       // additive tables for older databases; never throws
     if (require('./src/services/tenantService').enabled()) await require('./src/models/tenantModel').ensureMasterSchema().catch((err) => logger.error('Tenant registry tables failed', err));   // shops + their databases (main DB only)
+    await ensureFirstAdmin();                           // empty users table + BOOTSTRAP_ADMIN_PASSWORD: the first admin account; never throws
+    if (env.db.seedMenu) {
     await ensureMenuSeed();                             // printed menu, once per database; never throws
     await ensureMenuAliases();                          // how customers really order it ("đen đá", "cf muối"), once; never throws
     await ensureMenuPhotos();                           // shipped public/menu photos for items without one; never throws
+    }
     require('./src/services/taxExportService').startWorker();   // builds the tax books queued from the web / app, one at a time
     require('./src/services/rollupService').startScheduler();   // 02:30 rebuild of the last days' revenue / expense rollups (fallback to the hPanel cron job)
     backupService.startScheduler();                     // automatic database backups (Admin > Sao lưu); never throws
