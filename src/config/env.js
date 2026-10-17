@@ -72,6 +72,8 @@ module.exports = {
     // First-boot setup for hosts without SQL import (see src/config/bootstrapDb.js). Both default off.
     autoBootstrap: bool('AUTO_BOOTSTRAP_DB', false),
     seedDemo: bool('SEED_DEMO', false),
+    installWizard: bool('INSTALL_WIZARD', true),           // a database without accounts shows /cai-dat (WordPress-style first-run setup)
+    installToken: optional('INSTALL_TOKEN'),              // when set, the setup form asks for it (so a stranger cannot claim a fresh site)
     seedMenu: bool('SEED_MENU', true),                    // false: a new shop on its own site starts with an empty menu (no CoCoffee menu / aliases / photos)
     bootstrapAdminUser: optional('BOOTSTRAP_ADMIN_USER', 'admin'),
     // Replaces the factory admin/admin password during the first-boot seed, so a public site is never

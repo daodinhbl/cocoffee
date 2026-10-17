@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Cài đặt · Tasotek FnB</title>
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <style>
+    :root { --navy: #172554; --navy2: #1E3A8A; --milk: #FAF8F5; --line: #E8E3DA; --bad: #B91C1C; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--milk); color: #1f1f1f; font: 16px/1.55 "Times New Roman", Times, serif; }
+    header { background: var(--navy); color: #fff; padding: 1.4rem 1rem; text-align: center; }
+    header h1 { margin: 0; font-size: 1.5rem; }
+    header p { margin: .25rem 0 0; color: #CBD5E1; }
+    main { max-width: 34rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+    form { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 1.25rem; }
+    h2 { color: var(--navy2); font-size: 1.05rem; margin: 1.2rem 0 .4rem; }
+    h2:first-child { margin-top: 0; }
+    label.f { display: block; font-weight: 600; margin: .8rem 0 .25rem; }
+    input[type=text], input[type=email], input[type=password] { width: 100%; padding: .6rem .7rem; border: 1px solid #D6CFC3; border-radius: 6px; font: inherit; background: #fff; }
+    input:focus-visible { outline: 2px solid var(--navy2); outline-offset: 1px; }
+    input[aria-invalid="true"] { border-color: var(--bad); }
+    .hint { font-size: .88rem; color: #6b6b6b; margin: .25rem 0 0; }
+    .err { background: #FEE2E2; color: var(--bad); border-radius: 6px; padding: .6rem .8rem; margin-bottom: 1rem; }
+    .warn { background: #FEF3C7; border-radius: 8px; padding: 1rem; }
+    .opt { display: flex; gap: .7rem; align-items: flex-start; border: 1px solid var(--line); border-radius: 8px; padding: .7rem .8rem; margin: .5rem 0; cursor: pointer; }
+    .opt:has(input:checked) { border-color: var(--navy2); background: #EFF3FF; }
+    .opt input { margin-top: .3rem; }
+    .opt b { display: block; }
+    .opt span { font-size: .9rem; color: #555; }
+    button { width: 100%; margin-top: 1.3rem; padding: .8rem; border: 0; border-radius: 8px; background: var(--navy2); color: #fff; font: 700 1.05rem "Times New Roman", serif; cursor: pointer; }
+    button:hover { background: var(--navy); }
+    .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Cài đặt lần đầu</h1>
+  <p>Tạo tài khoản chủ quán và chọn dữ liệu ban đầu</p>
+</header>
+<main>
+<% if (noTables) { %>
+  <p class="warn">Database chưa có bảng nào. Đặt biến <code>AUTO_BOOTSTRAP_DB=true</code> rồi khởi động lại ứng dụng (hoặc nhập <code>database/schema.sql</code>), sau đó tải lại trang này.</p>
+<% } else { %>
+  <form method="post" action="/cai-dat" autocomplete="off" novalidate>
+    <% if (error) { %><div class="err" role="alert"><%= error %></div><% } %>
+    <h2>1. Quán</h2>
+    <label class="f" for="shopName">Tên quán</label>
+    <input id="shopName" name="shopName" type="text" maxlength="80" required value="<%= values.shopName || '' %>" <%- field === 'shopName' ? 'aria-invalid="true"' : '' %>>
+
+    <h2>2. Tài khoản chủ quán</h2>
+    <label class="f" for="fullName">Họ và tên</label>
+    <input id="fullName" name="fullName" type="text" maxlength="100" required value="<%= values.fullName || '' %>" <%- field === 'fullName' ? 'aria-invalid="true"' : '' %>>
+    <label class="f" for="username">Tên đăng nhập</label>
+    <input id="username" name="username" type="text" maxlength="30" required autocapitalize="none" spellcheck="false" value="<%= values.username || '' %>" <%- field === 'username' ? 'aria-invalid="true"' : '' %>>
+    <label class="f" for="email">Email (không bắt buộc)</label>
+    <input id="email" name="email" type="email" maxlength="100" value="<%= values.email || '' %>" <%- field === 'email' ? 'aria-invalid="true"' : '' %>>
+    <label class="f" for="password">Mật khẩu</label>
+    <input id="password" name="password" type="password" minlength="10" maxlength="72" required autocomplete="new-password" <%- field === 'password' ? 'aria-invalid="true"' : '' %>>
+    <p class="hint">Ít nhất 10 ký tự.</p>
+    <label class="f" for="password2">Nhập lại mật khẩu</label>
+    <input id="password2" name="password2" type="password" minlength="10" maxlength="72" required autocomplete="new-password" <%- field === 'password2' ? 'aria-invalid="true"' : '' %>>
+
+    <h2>3. Dữ liệu ban đầu</h2>
+    <label class="opt"><input type="radio" name="data" value="blank" <%= values.data !== 'sample' ? 'checked' : '' %>><div><b>Trống</b><span>Chưa có món, nguyên liệu hay bàn nào. Bạn tự thêm trong trang quản lý.</span></div></label>
+    <label class="opt"><input type="radio" name="data" value="sample" <%= values.data === 'sample' ? 'checked' : '' %>><div><b>Dữ liệu mẫu</b><span>Thực đơn quán cà phê (đồ uống, nước đóng chai, thuốc lá), nguyên liệu, công thức, 10 bàn và từ khóa gọi món. Giá và định mức chỉ để tham khảo, hãy sửa lại cho đúng quán của bạn.</span></div></label>
+
+    <% if (needsToken) { %>
+      <h2>4. Mã cài đặt</h2>
+      <label class="f" for="token">Mã cài đặt (INSTALL_TOKEN)</label>
+      <input id="token" name="token" type="password" required autocomplete="off" <%- field === 'token' ? 'aria-invalid="true"' : '' %>>
+      <p class="hint">Mã do người quản trị máy chủ đặt, để người lạ không chiếm được trang mới.</p>
+    <% } %>
+
+    <button type="submit">Cài đặt</button>
+  </form>
+<% } %>
+</main>
+</body>
+</html>

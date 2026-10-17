@@ -69,6 +69,7 @@ async function start() {
   const byName = (u) => current(USERS.find((x) => x.username === u));
   mock.method(userModel, 'findByUsername', async (u) => byName(u));
   mock.method(userModel, 'findById', async (id) => { const u = current(USERS.find((x) => x.id === Number(id))); return u ? publicUser(u) : null; });
+  mock.method(userModel, 'count', async () => USERS.length);
   mock.method(userModel, 'list', async () => USERS.map(publicUser));
   mock.method(userModel, 'create', rec('user.create', 99));
   mock.method(userModel, 'setPassword', rec('user.setPassword', (id, hash) => { hashes.set(Number(id), hash); }));

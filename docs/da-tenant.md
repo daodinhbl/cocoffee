@@ -33,3 +33,7 @@ Trang đăng ký chạy ở **fnb.tasotek-giaiphapso.com** (website Hostinger ri
 - Chưa có gói cước, thanh toán, xác minh email, quản trị tổng (dùng `scripts/tenant.js`).
 - Tên miền phụ của quán mới đăng ký xong dùng được ngay nếu DNS wildcard đã có.
 - Chưa chạy thử trên MySQL thật (máy này không có MySQL cục bộ); phần tạo schema/tài khoản được kiểm tra qua test giả lập, cần chạy thử bằng một database trống thật trước khi mở đăng ký.
+
+## Trang cài đặt lần đầu `/cai-dat` (kiểu WordPress)
+Database đã có bảng nhưng chưa có tài khoản nào thì cả trang web chuyển về `/cai-dat` (API trả 503 `NOT_INSTALLED`, `/health` vẫn mở). Chủ quán nhập tên quán, họ tên, tên đăng nhập, mật khẩu và chọn dữ liệu **trống** hoặc **mẫu** (10 bàn, nguyên liệu, công thức từ `database/seed.sql` không kèm tài khoản admin/admin, cộng thực đơn CoCoffee). Cài xong trang tự đóng. `INSTALL_TOKEN` (tùy chọn) là mã phải nhập để người lạ không chiếm được site mới; `INSTALL_WIZARD=false` tắt hẳn.
+Site mới: tạo database trống, đặt `AUTO_BOOTSTRAP_DB=true` (tạo bảng lúc khởi động) và **không** đặt `BOOTSTRAP_ADMIN_PASSWORD` / `SEED_DEMO`, rồi mở site để chạy trình cài đặt. Trước khi cài, thực đơn mẫu không bị nạp tự động.

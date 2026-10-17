@@ -2,6 +2,12 @@ const { pool } = require('../config/db');
 
 const db = (conn) => conn || pool;
 
+/** Number of accounts; throws when the users table does not exist yet. */
+async function count(conn) {
+  const [[{ n }]] = await db(conn).query('SELECT COUNT(*) AS n FROM users');
+  return Number(n);
+}
+
 async function findByUsername(username, conn) {
   const [rows] = await db(conn).query('SELECT * FROM users WHERE username = ? LIMIT 1', [username]);
   return rows[0] || null;
@@ -44,4 +50,4 @@ async function countActiveAdmins(conn) {
   return rows[0].n;
 }
 
-module.exports = { findByUsername, findById, create, setPassword, list, setActive, countActiveAdmins };
+module.exports = { count, findByUsername, findById, create, setPassword, list, setActive, countActiveAdmins };

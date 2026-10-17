@@ -22,6 +22,8 @@ const mediaRoutes = require('./src/routes/mediaRoutes');
 const downloadRoutes = require('./src/routes/downloadRoutes');
 const kyThuatRoutes = require('./src/routes/kyThuatRoutes');
 const signupRoutes = require('./src/routes/signupRoutes');
+const installRoutes = require('./src/routes/installRoutes');
+const { installGate } = require('./src/middlewares/installGate');
 const { tenantResolver } = require('./src/middlewares/tenant');
 const viewHelpers = require('./src/utils/viewHelpers');
 const { adminSecurity } = require('./src/middlewares/adminSecurity');
@@ -49,6 +51,10 @@ app.use(express.json({
 
 // Express 5 leaves req.body undefined when there is no body; controllers expect an object.
 app.use((req, _res, next) => { if (req.body === undefined) req.body = {}; next(); });
+
+// First-run setup: while the database has no account, everything but /cai-dat, /health and the static assets leads there.
+app.use(installGate);
+app.use('/cai-dat', installRoutes);
 
 // Photos uploaded from the admin (stored in MySQL, see services/imageStore.js).
 app.use('/media', mediaRoutes);
@@ -110,7 +116,7 @@ async function start() {
     await ensureSchemaUpgrades();                       // additive tables for older databases; never throws
     if (require('./src/services/tenantService').enabled()) await require('./src/models/tenantModel').ensureMasterSchema().catch((err) => logger.error('Tenant registry tables failed', err));   // shops + their databases (main DB only)
     await ensureFirstAdmin();                           // empty users table + BOOTSTRAP_ADMIN_PASSWORD: the first admin account; never throws
-    if (env.db.seedMenu) {
+    if (env.db.seedMenu && await require('./src/services/installService').isInstalled()) {   // before the setup wizard has run, the owner still chooses blank or sample data
     await ensureMenuSeed();                             // printed menu, once per database; never throws
     await ensureMenuAliases();                          // how customers really order it ("đen đá", "cf muối"), once; never throws
     await ensureMenuPhotos();                           // shipped public/menu photos for items without one; never throws

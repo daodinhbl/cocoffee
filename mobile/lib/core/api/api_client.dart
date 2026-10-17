@@ -81,6 +81,8 @@ String vietnameseFor(String code, String? serverMessage, Object? details) {
       return 'Chỉ đơn Zalo đã hoàn tất mới có bill Zalo.';
     case 'NOT_PRINTABLE':
       return 'Đơn này chưa in được hóa đơn.';
+    case 'NOT_INSTALLED':
+      return 'Máy chủ chưa được cài đặt. Mở địa chỉ máy chủ trên trình duyệt để hoàn tất cài đặt.';
     case 'BAD_JSON':
       return 'Dữ liệu gửi lên không hợp lệ.';
     case 'PAYLOAD_TOO_LARGE':
