@@ -23,7 +23,7 @@ Bản Android giữ nguyên quy trình cũ (`scripts\build-apk.ps1`, `scripts\bu
 3. Build number = số lần chạy workflow (+ offset). Version lấy từ `mobile/pubspec.yaml` (`version: 1.4.0+5` → 1.4.0).
 4. Khoảng 10–15 phút sau, build xuất hiện trong App Store Connect → TestFlight (chờ Apple xử lý thêm vài phút).
 
-Workflow chạy `flutter analyze` và `flutter test` trước khi build. Biến `PLAY_STORE=true` được bật để tắt bộ tự cập nhật APK (Apple không cho app tự cập nhật).
+Workflow chạy `flutter analyze` và `flutter test` trước khi build. Bộ tự cập nhật (OTA) tự quyết định lúc chạy: bản **ad-hoc** (có `embedded.mobileprovision`) tự kiểm tra `/download/ios/manifest.json` và mở trình cài đặt của Apple khi có version mới hơn; bản TestFlight/App Store không bao giờ tự cập nhật (Apple cấm).
 
 ## Secrets cần khai báo (GitHub → Settings → Secrets and variables → Actions)
 
@@ -50,7 +50,7 @@ Workflow chỉ chạy khi bấm tay hoặc đẩy tag `ios-v*`; không chạy tr
 |---|---|
 | flutter_secure_storage, shared_preferences, path_provider, sqflite, connectivity_plus, url_launcher, dio, intl | Hỗ trợ |
 | flutter_local_notifications | Hỗ trợ (đã bổ sung cấu hình iOS) |
-| ota_update | **Chỉ Android.** Không gây lỗi build; code đã chặn bằng `Platform.isAndroid`, và iOS build dùng `PLAY_STORE=true` |
+| ota_update | **Chỉ Android.** iOS không dùng plugin này: bản ad-hoc mở liên kết `itms-services://` bằng `url_launcher`; trên iOS chỉ so sánh tên phiên bản (1.6.0 so với 1.7.0), vì build number do CI đặt |
 
 ## CHECKLIST việc phải tự làm bằng tay
 

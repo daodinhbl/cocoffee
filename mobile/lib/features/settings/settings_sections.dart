@@ -507,7 +507,7 @@ class AppInfoCard extends ConsumerWidget {
           title: Text('Phiên bản ứng dụng'),
           trailing: Text(kAppVersion, style: TextStyle(fontFeatures: tabular)),
         ),
-        if (!kPlayStore) ...[
+        if (kSelfUpdate) ...[
         const Divider(),
         ListTile(
           contentPadding: EdgeInsets.zero,

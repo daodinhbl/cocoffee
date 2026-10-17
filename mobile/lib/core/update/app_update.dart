@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ota_update/ota_update.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../features/settings/settings_models.dart';
 import '../notify/new_order_watcher.dart';
@@ -16,9 +17,55 @@ import '../session.dart';
 /// updater is off and the Settings row is hidden.
 const kPlayStore = bool.fromEnvironment('PLAY_STORE');
 
+/// True for the ad-hoc iOS build (installed from the shop's /download/ios page). Such a build carries
+/// embedded.mobileprovision next to its executable; App Store / TestFlight builds do not, and Apple forbids those from
+/// updating themselves, so the updater stays off there.
+final bool kIosAdHoc = _isIosAdHoc();
+
+bool _isIosAdHoc() {
+  if (!Platform.isIOS) return false;
+  try {
+    return File('${File(Platform.resolvedExecutable).parent.path}/embedded.mobileprovision').existsSync();
+  } catch (_) {
+    return false;
+  }
+}
+
+/// Whether this build may offer in-app updates: Android outside Google Play, iOS only the ad-hoc build.
+final bool kSelfUpdate = Platform.isIOS ? kIosAdHoc : !kPlayStore;
+
+/// 1.10.2 > 1.9.9; missing parts count as 0. Used where only the version name is comparable (iOS build numbers come
+/// from CI run numbers, not from pubspec).
+bool versionNameIsNewer(String candidate, String current) {
+  List<int> parts(String v) => v.split('.').map((p) => int.tryParse(p.replaceAll(RegExp(r'[^0-9].*'), '')) ?? 0).toList();
+  final a = parts(candidate), b = parts(current);
+  for (var i = 0; i < (a.length > b.length ? a.length : b.length); i++) {
+    final x = i < a.length ? a[i] : 0, y = i < b.length ? b[i] : 0;
+    if (x != y) return x > y;
+  }
+  return false;
+}
+
 /// The build the server offers (GET /download/manifest.json, written by scripts/publish-apk.js).
 class AppRelease {
-  const AppRelease({required this.versionName, required this.versionCode, required this.size, required this.sha256, required this.url});
+  const AppRelease({required this.versionName, required this.versionCode, required this.size, required this.sha256, required this.url, this.installUrl});
+
+  /// iOS ad-hoc manifest (GET /download/ios/manifest.json). The itms-services link is rebuilt from the signed-in server,
+  /// never taken from the response, so a tampered manifest cannot point the installer elsewhere.
+  static AppRelease? tryParseIos(Object? json, String serverUrl) {
+    if (json is! Map) return null;
+    final name = json['version_name'];
+    if (name is! String || name.isEmpty) return null;
+    final code = json['version_code'];
+    return AppRelease(
+      versionName: name,
+      versionCode: code is num ? code.toInt() : 0,
+      size: json['size'] is num ? (json['size'] as num).toInt() : 0,
+      sha256: '',
+      url: '$serverUrl/download/ios/app.ipa',
+      installUrl: 'itms-services://?action=download-manifest&url=${Uri.encodeComponent('$serverUrl/download/ios/manifest.plist')}',
+    );
+  }
 
   /// Null when the manifest is not usable. The download always comes from the server the app is signed in to
   /// (the manifest's own absolute URL can be http behind the host's proxy).
@@ -42,24 +89,28 @@ class AppRelease {
   final String sha256;
   final String url;
 
-  bool get isNewer => versionCode > kAppBuild;
-  String get label => versionName.isEmpty ? '#$versionCode' : '$versionName ($versionCode)';
+  /// Set only for an iOS release: the link that opens Apple's installer.
+  final String? installUrl;
+
+  bool get isNewer => installUrl != null ? versionNameIsNewer(versionName, kAppVersion.split(' ').first) : versionCode > kAppBuild;
+  String get label => installUrl != null ? versionName : (versionName.isEmpty ? '#$versionCode' : '$versionName ($versionCode)');
   String get sizeLabel => size > 0 ? '${(size / 1048576).toStringAsFixed(1)} MB' : '';
 }
 
 /// Off under `flutter test` (no network, no native installer); tests may override it.
-final updateCheckEnabledProvider = Provider<bool>((_) => !kPlayStore && !Platform.environment.containsKey('FLUTTER_TEST'));
+final updateCheckEnabledProvider = Provider<bool>((_) => kSelfUpdate && !Platform.environment.containsKey('FLUTTER_TEST'));
 
 /// Asks the server for the newest build; resolves to it only when it is newer than the installed one.
 /// Any failure (offline, no release published) resolves to null: a missing update is never an error screen.
 /// Invalidate it to check again.
 final updateCheckProvider = FutureProvider<AppRelease?>((ref) async {
-  if (!ref.watch(updateCheckEnabledProvider) || !Platform.isAndroid) return null;
+  if (!ref.watch(updateCheckEnabledProvider) || !(Platform.isAndroid || Platform.isIOS)) return null;
   final server = ref.watch(serverUrlProvider);
+  final ios = Platform.isIOS;
   try {
     final res = await Dio(BaseOptions(connectTimeout: const Duration(seconds: 8), receiveTimeout: const Duration(seconds: 8)))
-        .get<dynamic>('$server/download/manifest.json', options: Options(headers: {'Cache-Control': 'no-cache'}));
-    final release = AppRelease.tryParse(res.data, server);
+        .get<dynamic>(ios ? '$server/download/ios/manifest.json' : '$server/download/manifest.json', options: Options(headers: {'Cache-Control': 'no-cache'}));
+    final release = ios ? AppRelease.tryParseIos(res.data, server) : AppRelease.tryParse(res.data, server);
     return release != null && release.isNewer ? release : null;
   } catch (_) {
     return null;
@@ -67,8 +118,57 @@ final updateCheckProvider = FutureProvider<AppRelease?>((ref) async {
 });
 
 /// Dialog that downloads [release], checks its SHA-256 and hands it to Android's installer.
-Future<void> showUpdateDialog(BuildContext context, AppRelease release) =>
-    showDialog<void>(context: context, barrierDismissible: false, builder: (_) => _UpdateDialog(release: release));
+Future<void> showUpdateDialog(BuildContext context, AppRelease release) => showDialog<void>(
+    context: context,
+    barrierDismissible: release.installUrl != null,
+    builder: (_) => release.installUrl != null ? _IosUpdateDialog(release: release) : _UpdateDialog(release: release));
+
+/// iOS: Apple's installer does the download and replaces the app in place (the app closes while it installs).
+class _IosUpdateDialog extends StatefulWidget {
+  const _IosUpdateDialog({required this.release});
+  final AppRelease release;
+
+  @override
+  State<_IosUpdateDialog> createState() => _IosUpdateDialogState();
+}
+
+class _IosUpdateDialogState extends State<_IosUpdateDialog> {
+  String? _error;
+
+  Future<void> _install() async {
+    try {
+      final ok = await launchUrl(Uri.parse(widget.release.installUrl!), mode: LaunchMode.externalApplication);
+      if (ok && mounted) {
+        Navigator.of(context).pop();
+        return;
+      }
+      if (mounted) setState(() => _error = 'Không mở được trình cài đặt. Hãy mở trang tải của quán bằng Safari và bấm "Cài đặt trực tiếp".');
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Không mở được trình cài đặt. Hãy mở trang tải của quán bằng Safari và bấm "Cài đặt trực tiếp".');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final r = widget.release;
+    return AlertDialog(
+      title: const Text('Có bản cập nhật mới'),
+      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Phiên bản ${r.label}${r.sizeLabel.isEmpty ? '' : ' · ${r.sizeLabel}'}\nĐang dùng: $kAppVersion'),
+        const SizedBox(height: 12),
+        const Text('iPhone sẽ hỏi xác nhận cài đặt. Ứng dụng đóng lại trong lúc cập nhật; mở lại sau khi biểu tượng tải xong.'),
+        if (_error != null) ...[
+          const SizedBox(height: 12),
+          Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+        ],
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Để sau')),
+        FilledButton(onPressed: _install, child: const Text('Cập nhật')),
+      ],
+    );
+  }
+}
 
 class _UpdateDialog extends StatefulWidget {
   const _UpdateDialog({required this.release});

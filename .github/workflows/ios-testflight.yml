@@ -117,7 +117,8 @@ jobs:
           echo "Building $VERSION_NAME ($BUILD_NUMBER) for $BUNDLE_ID"
 
       - name: Configure the iOS build (Flutter)
-        # PLAY_STORE=true switches the in-app APK updater off; Apple forbids apps that update themselves.
+        # No PLAY_STORE flag: the app decides at run time. The ad-hoc build (embedded.mobileprovision present) updates itself from
+        # /download/ios; TestFlight / App Store builds have no such file and never offer in-app updates (Apple forbids them).
         run: |
           flutter build ios --config-only --release --no-codesign \
             --build-name "$VERSION_NAME" --build-number "$BUILD_NUMBER" \

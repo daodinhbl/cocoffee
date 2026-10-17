@@ -172,6 +172,15 @@ test('iOS app download', async (t) => {
     assert.ok(xml.includes(`<string>https://cafe.example.test/download/ios/app.ipa?v=${sha.slice(0, 12)}</string>`), 'the .ipa URL carries the checksum prefix');
     assert.match(xml, /<string>https:\/\/cafe\.example\.test\/brand\/apple-touch-icon\.png<\/string>/);
 
+    const info = await get('/download/ios/manifest.json');
+    assert.equal(info.status, 200);
+    assert.equal(info.headers.get('cache-control'), 'no-cache');
+    const infoJson = await info.json();
+    assert.equal(infoJson.version_name, '1.4.0');
+    assert.equal(infoJson.bundle_id, 'com.tasotek.fnb');
+    assert.equal(infoJson.size, 2 * 1024 * 1024);
+    assert.equal(infoJson.install_url, 'itms-services://?action=download-manifest&url=https%3A%2F%2Fcafe.example.test%2Fdownload%2Fios%2Fmanifest.plist');
+
     const ipa = await get('/download/ios/app.ipa?v=abc');
     assert.equal(ipa.status, 200);
     assert.equal(ipa.headers.get('content-type'), 'application/octet-stream');
@@ -200,6 +209,7 @@ test('iOS app download', async (t) => {
       iosRelease.invalidate();
     }
     assert.equal((await get('/download/ios/manifest.plist')).status, 404);
+    assert.equal((await get('/download/ios/manifest.json')).status, 404);
     assert.equal((await get('/download/ios/app.ipa')).status, 404);
     assert.match(await loginPage(), /sắp có/);
   });

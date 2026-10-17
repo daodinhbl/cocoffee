@@ -128,6 +128,27 @@ router.get('/ios', pageLimit, adminSecurity, async (req, res, next) => {
 
 router.get('/ios/qr.svg', pageLimit, (req, res, next) => sendQr(req, res, next, '/download/ios'));
 
+// In-app update check of the ad-hoc iOS build (the Android twin is /manifest.json): the app compares version_name and, on
+// "Cập nhật", opens install_url in Safari's installer (itms-services), which replaces the app in place.
+router.get('/ios/manifest.json', pageLimit, (req, res) => {
+  const r = iosRelease.current();
+  if (!r) return res.status(404).json({ error: { code: 'NO_RELEASE', message: 'Chưa có bản cài đặt iOS nào.' } });
+  const base = appRelease.baseUrl(req);
+  res.set('Cache-Control', 'no-cache');
+  return res.json({
+    app_name: r.app_name,
+    bundle_id: r.bundle_id,
+    version_name: r.version_name,
+    version_code: r.version_code,
+    min_ios: r.min_ios,
+    size: r.size,
+    sha256: r.sha256,
+    built_at: r.built_at,
+    install_url: iosRelease.installUrl(base),
+    page: `${base}/download/ios`,
+  });
+});
+
 router.get('/ios/manifest.plist', pageLimit, (req, res) => {
   const r = iosRelease.current();
   if (!r) return res.status(404).type('text').send('Chưa có bản cài đặt iOS nào.');
