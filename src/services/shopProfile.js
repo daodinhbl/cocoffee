@@ -1,4 +1,5 @@
 const env = require('../config/env');
+const tenantContext = require('../config/tenantContext');
 const settingsModel = require('../models/settingsModel');
 const logger = require('../utils/logger');
 const { AppError } = require('../utils/httpError');
@@ -30,11 +31,23 @@ const FIELDS = [
   ['businessLine', 'Ngành nghề kinh doanh', 120, 'text'],
 ];
 
-let lastLoad = 0;
+const lastLoads = new Map();      // per shop (tenant key)
+const tenantProfiles = new Map(); // tenant key -> effective profile of a non-default shop
+
+// env.business is what the rest of the app reads. For the default shop it is the plain object; a tenant's request sees
+// its own saved profile laid over it, so one shop's name / address / tax code never shows on another shop's receipts.
+const baseBusiness = env.business;
+env.business = new Proxy(baseBusiness, {
+  get(target, prop) {
+    const own = tenantProfiles.get(tenantContext.key());
+    return own && prop in own ? own[prop] : target[prop];
+  },
+});
 
 function envDefaults() {
   return {
-    name: process.env.SHOP_NAME || 'CoCoffee', address: process.env.SHOP_ADDRESS || '', phone: process.env.SHOP_PHONE || '', email: process.env.SHOP_EMAIL || '',
+    name: (tenantContext.current() && tenantContext.current().name) || process.env.SHOP_NAME || 'CoCoffee',
+    address: tenantContext.current() ? '' : process.env.SHOP_ADDRESS || '', phone: tenantContext.current() ? '' : process.env.SHOP_PHONE || '', email: tenantContext.current() ? '' : process.env.SHOP_EMAIL || '',
     legalName: '', ownerName: '', taxCode: '', regNo: '', businessLine: 'Dịch vụ ăn uống (quán cà phê)', declarationPeriod: 'quarter',
   };
 }
@@ -63,11 +76,13 @@ async function get() {
 async function apply() {
   try {
     const { effective: p } = await get();
-    Object.assign(env.business, {
+    const fields = {
       shopName: p.name, address: p.address, phone: p.phone, email: p.email,
       legalName: p.legalName, ownerName: p.ownerName, taxCode: p.taxCode, regNo: p.regNo, businessLine: p.businessLine, declarationPeriod: p.declarationPeriod,
-    });
-    lastLoad = Date.now();
+    };
+    if (tenantContext.current()) tenantProfiles.set(tenantContext.key(), fields);
+    else Object.assign(baseBusiness, fields);
+    lastLoads.set(tenantContext.key(), Date.now());
   } catch (err) {
     logger.warn('Shop profile not applied', err);
   }
@@ -75,7 +90,8 @@ async function apply() {
 
 /** Cheap call for the request path: re-reads at most every 30 s. */
 async function refresh() {
-  if (Date.now() - lastLoad > REFRESH_MS) { lastLoad = Date.now(); await apply(); }
+  const k = tenantContext.key();
+  if (Date.now() - (lastLoads.get(k) || 0) > REFRESH_MS) { lastLoads.set(k, Date.now()); await apply(); }
 }
 
 async function save(body, userId) {

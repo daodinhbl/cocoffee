@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const env = require('../config/env');
+const tenantContext = require('../config/tenantContext');
 const userModel = require('../models/userModel');
 
 /**
@@ -43,7 +44,7 @@ const sessionHours = () => {
 function startSession(res, user, { mustChangePassword = false } = {}) {
   const hours = sessionHours();
   const token = jwt.sign(
-    { sub: user.id, role: user.role, csrf: crypto.randomBytes(18).toString('hex'), mcp: mustChangePassword ? 1 : 0, pws: pwStamp(user.password_hash) },
+    { sub: user.id, tid: tenantContext.key(), role: user.role, csrf: crypto.randomBytes(18).toString('hex'), mcp: mustChangePassword ? 1 : 0, pws: pwStamp(user.password_hash) },
     env.jwt.secret,
     { algorithm: 'HS256', audience: AUDIENCE, expiresIn: `${hours}h` }
   );
@@ -80,7 +81,7 @@ async function loadSession(req, res, next) {
   if (token) {
     try {
       const p = jwt.verify(token, env.jwt.secret, { algorithms: ['HS256'], audience: AUDIENCE });
-      const user = await userModel.findById(p.sub);
+      const user = (p.tid || 0) === tenantContext.key() ? await userModel.findById(p.sub) : null;   // a session of another shop is no session here
       if (user && user.is_active && STAFF_ROLES.includes(user.role) && p.pws === user.pw_stamp) {
         req.user = user;
         req.session = { csrf: p.csrf, mustChangePassword: p.mcp === 1 };

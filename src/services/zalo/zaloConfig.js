@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const env = require('../../config/env');
+const tenantContext = require('../../config/tenantContext');
 const settingsModel = require('../../models/settingsModel');
 const logger = require('../../utils/logger');
 const { AppError } = require('../../utils/httpError');
@@ -12,7 +13,7 @@ const { AppError } = require('../../utils/httpError');
  */
 const PREFIX = 'zalo.';
 const TTL_MS = 30 * 1000;
-let cache = null;
+const caches = new Map();   // per shop (tenant)
 
 async function readStored() {
   try {
@@ -24,6 +25,7 @@ async function readStored() {
 }
 
 async function get() {
+  const cache = caches.get(tenantContext.key());
   if (cache && cache.until > Date.now()) return cache.value;
   const stored = await readStored();
   const botToken = env.zalo.botToken || stored[`${PREFIX}botToken`] || '';
@@ -39,11 +41,11 @@ async function get() {
     debtOwnerChatId: stored[PREFIX + 'debtOwnerChatId'] || '',
     debtOwnerChatType: stored[PREFIX + 'debtOwnerChatType'] === 'group' ? 'group' : 'user',
   };
-  cache = { value, until: Date.now() + TTL_MS };
+  caches.set(tenantContext.key(), { value, until: Date.now() + TTL_MS });
   return value;
 }
 
-const invalidate = () => { cache = null; };
+const invalidate = () => { caches.delete(tenantContext.key()); };
 
 /** Save the bot token from the admin screen; a webhook secret is generated once if none exists. */
 async function saveBotToken(token, userId) {

@@ -1,12 +1,13 @@
 const { pool } = require('../config/db');
+const tenantContext = require('../config/tenantContext');
 const { normalize } = require('../utils/text');
 
 const db = (conn) => conn || pool;
 
 // ---- catalog cache used by the Zalo parser (hit on every chat message) -----------------
 const CACHE_TTL_MS = 60 * 1000;
-let catalogCache = { at: 0, rows: null };
-const invalidateCatalog = () => { catalogCache = { at: 0, rows: null }; };
+const catalogCaches = new Map();           // per shop (tenant) - a shop never sees another shop's menu
+const invalidateCatalog = () => { catalogCaches.delete(tenantContext.key()); };
 
 async function list({ categoryId, activeOnly = true } = {}, conn) {
   const where = [];
@@ -185,6 +186,7 @@ async function getStockSpecs(productIds, conn) {
 
 /** Active products + normalized keywords for the chatbot matcher (cached 60s). */
 async function listForMatching(conn) {
+  const catalogCache = catalogCaches.get(tenantContext.key()) || { at: 0, rows: null };
   if (catalogCache.rows && Date.now() - catalogCache.at < CACHE_TTL_MS) return catalogCache.rows;
   const [rows] = await db(conn).query(
     `SELECT p.id, p.name, p.price, c.name AS category_name, c.sort_order,
@@ -200,7 +202,7 @@ async function listForMatching(conn) {
     id: r.id, name: r.name, price: r.price, category_name: r.category_name,
     keywords: new Set([normalize(r.name), ...(r.keywords ? r.keywords.split('\n') : [])]),
   }));
-  catalogCache = { at: Date.now(), rows: catalog };
+  catalogCaches.set(tenantContext.key(), { at: Date.now(), rows: catalog });
   return catalog;
 }
 

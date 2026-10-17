@@ -21,6 +21,8 @@ const adminRoutes = require('./src/routes/adminRoutes');
 const mediaRoutes = require('./src/routes/mediaRoutes');
 const downloadRoutes = require('./src/routes/downloadRoutes');
 const kyThuatRoutes = require('./src/routes/kyThuatRoutes');
+const signupRoutes = require('./src/routes/signupRoutes');
+const { tenantResolver } = require('./src/middlewares/tenant');
 const viewHelpers = require('./src/utils/viewHelpers');
 const { adminSecurity } = require('./src/middlewares/adminSecurity');
 const appRelease = require('./src/services/appRelease');
@@ -33,6 +35,9 @@ Object.assign(app.locals, viewHelpers);          // icon, money, pct, num, badge
 app.disable('x-powered-by');
 app.set('trust proxy', 1);                     // Apache/LiteSpeed in front of Passenger
 app.use(helmet());
+
+// Multi-shop mode (TENANT_BASE_DOMAIN set): <slug>.<base domain> runs inside that shop's own database. Otherwise a no-op.
+app.use(tenantResolver);
 
 // JSON for Zalo webhooks + POS API. `verify` keeps the untouched body string: the
 // X-ZEvent-Signature hash is computed over the raw bytes, not over re-serialized JSON.
@@ -53,7 +58,8 @@ app.use(express.static(path.join(__dirname, 'public'), { index: false, redirect:
 
 // The domain root is what people type: send them to the Web Admin (it redirects to login when signed out).
 // Machine checks use /health.
-app.get('/', (_req, res) => res.redirect(302, '/admin/dashboard'));
+// On the sign-up platform (TENANT_BASE_DOMAIN set) the main host's front door is the shop sign-up page.
+app.get('/', (req, res) => res.redirect(302, require('./src/services/tenantService').enabled() && !req.tenant ? '/dang-ky' : '/admin/dashboard'));
 app.get('/health', async (_req, res) => {
   try {
     await pool.query('SELECT 1');
@@ -67,6 +73,9 @@ app.get('/health', async (_req, res) => {
 // Apps for staff phones (public; see routes/downloadRoutes.js): Android landing page, APK, manifest and QR code;
 // iOS landing page (/download/ios -> TestFlight / App Store link) and its QR code.
 app.use('/download', downloadRoutes);
+
+// Shop sign-up (main site only; needs TENANT_BASE_DOMAIN): /dang-ky.
+app.use('/dang-ky', signupRoutes);
 
 // Technical-service QR page (public): finished jobs + request form; printed QR codes point here (routes/kyThuatRoutes.js).
 app.use('/ky-thuat', kyThuatRoutes);
@@ -99,6 +108,7 @@ async function start() {
     bootstrap = await bootstrapIfEmpty();               // never throws; logs its own outcome
     if (bootstrap === 'applied') productModel.invalidateCatalog();
     await ensureSchemaUpgrades();                       // additive tables for older databases; never throws
+    if (require('./src/services/tenantService').enabled()) await require('./src/models/tenantModel').ensureMasterSchema().catch((err) => logger.error('Tenant registry tables failed', err));   // shops + their databases (main DB only)
     await ensureMenuSeed();                             // printed menu, once per database; never throws
     await ensureMenuAliases();                          // how customers really order it ("đen đá", "cf muối"), once; never throws
     await ensureMenuPhotos();                           // shipped public/menu photos for items without one; never throws

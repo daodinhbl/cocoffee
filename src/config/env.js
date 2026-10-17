@@ -103,6 +103,15 @@ module.exports = {
     oauthUrl: 'https://oauth.zaloapp.com/v4/oa/access_token',
   },
 
+  // Multi-shop (tenant) mode, docs/da-tenant.md. Off until TENANT_BASE_DOMAIN is set: then <slug>.<base domain> is a shop
+  // with its own database, and the main site (defaultSlug) keeps the database in DB_*.
+  tenancy: {
+    baseDomain: optional('TENANT_BASE_DOMAIN').toLowerCase().replace(/^\.+|\.+$/g, ''),   // e.g. tasotek-giaiphapso.com
+    defaultSlug: optional('TENANT_DEFAULT_SLUG', 'cocoffee').toLowerCase(),               // cocoffee.<base> = the main shop
+    secret: optional('TENANT_SECRET'),                                                    // encrypts tenant DB passwords (falls back to a key derived from the JWT secret)
+    signupOpen: bool('TENANT_SIGNUP_OPEN', true),
+  },
+
   // Facebook Messenger consultation bot (docs/facebook-messenger.md). Off until the page token AND app secret are set.
   facebook: {
     pageAccessToken: optional('FB_PAGE_ACCESS_TOKEN'),

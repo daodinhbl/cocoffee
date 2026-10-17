@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const env = require('../config/env');
+const tenantContext = require('../config/tenantContext');
 const { pwStamp } = require('../utils/passwordStamp');
 
 /**
@@ -15,7 +16,7 @@ const ISSUER = 'cocoffee';
 /** user must carry password_hash (the findByUsername row, with the new hash after a password change). */
 function issue(user, { mustChangePassword = false } = {}) {
   return jwt.sign(
-    { sub: user.id, role: user.role, pws: pwStamp(user.password_hash), mcp: mustChangePassword ? 1 : 0 },
+    { sub: user.id, tid: tenantContext.key(), role: user.role, pws: pwStamp(user.password_hash), mcp: mustChangePassword ? 1 : 0 },
     env.jwt.secret,
     { algorithm: 'HS256', audience: AUDIENCE, issuer: ISSUER, expiresIn: env.jwt.expiresIn }
   );

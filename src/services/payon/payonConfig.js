@@ -1,4 +1,5 @@
 const env = require('../../config/env');
+const tenantContext = require('../../config/tenantContext');
 const settingsModel = require('../../models/settingsModel');
 const logger = require('../../utils/logger');
 const { AppError } = require('../../utils/httpError');
@@ -16,7 +17,7 @@ const URLS = {
   production: 'https://sdk.payon.vn/v1/merchant',
 };
 const SECRET_FIELDS = ['authPass', 'secretKey'];
-let cache = null;
+const caches = new Map();   // per shop (tenant)
 
 /** @returns {Promise<{values:object, ok:boolean}>} ok=false when the database could not be read */
 async function readStored() {
@@ -34,6 +35,7 @@ const hint = (v) => (v ? `…${String(v).slice(-4)}` : '');
  * @param {{fresh?: boolean}} [opts] fresh: skip the cache (another worker may have saved new settings meanwhile)
  */
 async function get({ fresh = false } = {}) {
+  const cache = caches.get(tenantContext.key());
   if (!fresh && cache && cache.until > Date.now()) return cache.value;
   const { values: stored, ok } = await readStored();
   const pick = (envValue, key) => envValue || stored[PREFIX + key] || '';
@@ -53,11 +55,11 @@ async function get({ fresh = false } = {}) {
   };
   value.complete = Boolean(value.appId && /^\d+$/.test(value.merchantId) && value.authUser && value.authPass && value.secretKey);
   value.ready = value.enabled && value.complete && Boolean(value.bankCode);
-  cache = ok ? { value, until: Date.now() + TTL_MS } : null;      // a failed read is never kept: the next call asks the database again
+  if (ok) caches.set(tenantContext.key(), { value, until: Date.now() + TTL_MS }); else caches.delete(tenantContext.key());      // a failed read is never kept: the next call asks the database again
   return value;
 }
 
-const invalidate = () => { cache = null; };
+const invalidate = () => { caches.delete(tenantContext.key()); };
 
 /** What the admin page may show: no secret values. */
 async function view() {

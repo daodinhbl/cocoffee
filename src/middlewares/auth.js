@@ -1,6 +1,7 @@
 const { AppError } = require('../utils/httpError');
 const userModel = require('../models/userModel');
 const apiToken = require('../services/apiToken');
+const tenantContext = require('../config/tenantContext');
 
 // While the token says "must change password" (mcp), only these paths (relative to /api) answer.
 const MCP_ALLOWED = new Set(['/auth/me', '/auth/change-password']);
@@ -21,6 +22,7 @@ async function requireAuth(req, _res, next) {
   } catch (_) {
     throw new AppError(401, 'UNAUTHORIZED', 'Invalid or expired token');
   }
+  if ((payload.tid || 0) !== tenantContext.key()) throw new AppError(401, 'UNAUTHORIZED', 'Invalid or expired token');   // issued by another shop
   const user = await userModel.findById(payload.sub);
   if (!user || !user.is_active) throw new AppError(401, 'UNAUTHORIZED', 'Account disabled');
   if (typeof payload.pws !== 'string' || payload.pws !== user.pw_stamp) throw new AppError(401, 'UNAUTHORIZED', 'Invalid or expired token');

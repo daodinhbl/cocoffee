@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Đăng ký thành công · Tasotek FnB</title>
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <style>
+    body { margin: 0; background: #FAF8F5; color: #1f1f1f; font: 16px/1.6 "Times New Roman", Times, serif; }
+    main { max-width: 34rem; margin: 0 auto; padding: 2.5rem 1rem 3rem; text-align: center; }
+    h1 { color: #172554; font-size: 1.6rem; }
+    .box { background: #fff; border: 1px solid #E8E3DA; border-radius: 10px; padding: 1.2rem; margin: 1.2rem 0; word-break: break-all; }
+    .btn { display: inline-block; background: #1E3A8A; color: #fff; text-decoration: none; padding: .75rem 1.4rem; border-radius: 8px; font-weight: 700; }
+    .wait { background: #FEF3C7; border-radius: 8px; padding: 1rem; text-align: left; }
+  </style>
+</head>
+<body>
+<main>
+<% if (shop.status === 'active') { %>
+  <h1>Quán “<%= name %>” đã sẵn sàng</h1>
+  <p>Địa chỉ của quán:</p>
+  <div class="box"><b><%= shop.url %></b></div>
+  <p>Đăng nhập bằng tên đăng nhập và mật khẩu bạn vừa tạo.</p>
+  <a class="btn" href="<%= shop.url %>/admin/login">Vào trang quản lý</a>
+<% } else { %>
+  <h1>Đã nhận đăng ký quán “<%= name %>”</h1>
+  <div class="box"><b><%= shop.url %></b></div>
+  <p class="wait">Tài khoản đã được lưu và đang chờ cấp cơ sở dữ liệu riêng cho quán. Khi xong, địa chỉ trên sẽ mở được và bạn đăng nhập bằng tên đăng nhập, mật khẩu vừa tạo.</p>
+<% } %>
+  <p><a href="/dang-ky">Đăng ký quán khác</a></p>
+</main>
+</body>
+</html>

@@ -22,6 +22,7 @@ const suppliers = require('../controllers/admin/suppliers');
 const receipts = require('../controllers/admin/receipts');
 const expenses = require('../controllers/admin/expenses');
 const tax = require('../controllers/admin/tax');
+const tenants = require('../controllers/admin/tenants');
 const customers = require('../controllers/admin/customers');
 const payon = require('../controllers/admin/payon');
 const backup = require('../controllers/admin/backup');
@@ -69,6 +70,7 @@ router.post('/inventory/import', requireAdmin, requireCsrfHeader, (req, res, nex
 )), inventory.importXlsx);
 
 router.use(requireAdmin, requireCsrf);
+router.use((req, res, next) => { res.locals.tenantAdmin = require('../services/tenantService').enabled() && !req.tenant; next(); });   // sidebar: "Đăng ký quán" on the main shop only
 
 router.get('/', (_req, res) => res.redirect(302, '/admin/dashboard'));
 router.get('/dashboard', dashboard.dashboard);
@@ -139,6 +141,10 @@ router.post('/expense-categories/:id', act(expenses.updateCategory));
 router.get('/receipts', receipts.list);
 router.get('/receipts/:id', receipts.detail);
 router.post('/receipts/:id/pay', act(receipts.pay));
+router.get('/tenants', tenants.page);
+router.post('/tenants/databases', act(tenants.addDb));
+router.post('/tenants/:id/provision', act(tenants.provision));
+router.post('/tenants/:id/status', act(tenants.setStatus));
 router.get('/suppliers', suppliers.page);
 router.post('/suppliers', act(suppliers.create));
 router.get('/suppliers/:id', suppliers.detail);

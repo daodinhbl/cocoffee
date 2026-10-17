@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Đăng ký quán · Tasotek FnB</title>
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <style>
+    :root { --navy: #172554; --navy2: #1E3A8A; --milk: #FAF8F5; --line: #E8E3DA; --bad: #B91C1C; --good: #047857; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--milk); color: #1f1f1f; font: 16px/1.55 "Times New Roman", Times, serif; }
+    header { background: var(--navy); color: #fff; padding: 1.4rem 1rem; text-align: center; }
+    header h1 { margin: 0; font-size: 1.5rem; }
+    header p { margin: .25rem 0 0; color: #CBD5E1; }
+    main { max-width: 34rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+    form { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 1.25rem; }
+    h2 { color: var(--navy2); font-size: 1.05rem; margin: 1.2rem 0 .4rem; }
+    h2:first-child { margin-top: 0; }
+    label { display: block; font-weight: 600; margin: .8rem 0 .25rem; }
+    input { width: 100%; padding: .6rem .7rem; border: 1px solid #D6CFC3; border-radius: 6px; font: inherit; background: #fff; }
+    input:focus-visible { outline: 2px solid var(--navy2); outline-offset: 1px; }
+    input[aria-invalid="true"] { border-color: var(--bad); }
+    .hint { font-size: .88rem; color: #6b6b6b; margin: .25rem 0 0; }
+    .sub { display: flex; align-items: center; gap: .4rem; }
+    .sub input { flex: 1 1 auto; min-width: 0; }
+    .sub span { color: #6b6b6b; white-space: nowrap; font-size: .95rem; }
+    #slug-msg { min-height: 1.3em; font-size: .9rem; margin: .25rem 0 0; }
+    #slug-msg.ok { color: var(--good); } #slug-msg.no { color: var(--bad); }
+    .err { background: #FEE2E2; color: var(--bad); border-radius: 6px; padding: .6rem .8rem; margin-bottom: 1rem; }
+    button { width: 100%; margin-top: 1.3rem; padding: .8rem; border: 0; border-radius: 8px; background: var(--navy2); color: #fff; font: 700 1.05rem "Times New Roman", serif; cursor: pointer; }
+    button:hover { background: var(--navy); }
+    .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+    .closed { background: #FEF3C7; border-radius: 8px; padding: 1rem; }
+    footer { text-align: center; color: #6b6b6b; font-size: .9rem; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Đăng ký quán của bạn</h1>
+  <p>Hệ thống bán hàng, kho và công nợ cho quán F&amp;B — mỗi quán một địa chỉ riêng</p>
+</header>
+<main>
+<% if (!open) { %>
+  <p class="closed">Đăng ký quán mới đang tạm đóng. Vui lòng quay lại sau hoặc liên hệ quản trị hệ thống.</p>
+<% } else { %>
+  <form method="post" action="/dang-ky" autocomplete="off" novalidate>
+    <% if (error) { %><div class="err" role="alert"><%= error %></div><% } %>
+    <h2>1. Quán</h2>
+    <label for="name">Tên quán</label>
+    <input id="name" name="name" maxlength="80" required value="<%= values.name || '' %>" <%- field === 'name' ? 'aria-invalid="true"' : '' %>>
+    <label for="slug">Địa chỉ riêng của quán</label>
+    <div class="sub">
+      <input id="slug" name="slug" maxlength="30" required inputmode="url" autocapitalize="none" spellcheck="false" placeholder="vi-du-quan-ca-phe" value="<%= values.slug || '' %>" <%- field === 'slug' ? 'aria-invalid="true"' : '' %> data-check="/dang-ky/kiem-tra">
+      <span>.<%= baseDomain %></span>
+    </div>
+    <p id="slug-msg" aria-live="polite"></p>
+    <p class="hint">3-30 ký tự: chữ thường không dấu, số và dấu gạch ngang.</p>
+
+    <h2>2. Chủ quán</h2>
+    <label for="ownerName">Họ và tên</label>
+    <input id="ownerName" name="ownerName" maxlength="80" required value="<%= values.ownerName || '' %>" <%- field === 'ownerName' ? 'aria-invalid="true"' : '' %>>
+    <label for="email">Email</label>
+    <input id="email" name="email" type="email" maxlength="120" required value="<%= values.email || '' %>" <%- field === 'email' ? 'aria-invalid="true"' : '' %>>
+    <label for="phone">Số điện thoại (không bắt buộc)</label>
+    <input id="phone" name="phone" type="tel" maxlength="20" value="<%= values.phone || '' %>" <%- field === 'phone' ? 'aria-invalid="true"' : '' %>>
+
+    <h2>3. Tài khoản quản trị</h2>
+    <label for="username">Tên đăng nhập</label>
+    <input id="username" name="username" maxlength="30" required autocapitalize="none" spellcheck="false" value="<%= values.username || '' %>" <%- field === 'username' ? 'aria-invalid="true"' : '' %>>
+    <label for="password">Mật khẩu</label>
+    <input id="password" name="password" type="password" minlength="10" maxlength="72" required autocomplete="new-password" <%- field === 'password' ? 'aria-invalid="true"' : '' %>>
+    <p class="hint">Ít nhất 10 ký tự.</p>
+    <label for="password2">Nhập lại mật khẩu</label>
+    <input id="password2" name="password2" type="password" minlength="10" maxlength="72" required autocomplete="new-password" <%- field === 'password2' ? 'aria-invalid="true"' : '' %>>
+
+    <div class="hp" aria-hidden="true"><label for="website">Để trống</label><input id="website" name="website" tabindex="-1" autocomplete="off"></div>
+    <button type="submit">Tạo quán</button>
+  </form>
+  <footer>Đã có quán? Mở địa chỉ riêng của quán và đăng nhập ở <code>/admin</code>.</footer>
+<% } %>
+</main>
+<script src="/signup/signup.js" defer></script>
+</body>
+</html>
