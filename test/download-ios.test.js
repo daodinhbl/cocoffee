@@ -117,6 +117,17 @@ test('iOS app download', async (t) => {
     assert.match(login, /iPhone \/ iPad · POS Tasotek <span[^>]*>TestFlight</);
     assert.doesNotMatch(login, /sắp có/);
     assert.doesNotMatch(login, /\son[a-z]+="/i);
+    // the row goes straight to TestFlight: link + QR of the link itself, not of /download/ios
+    assert.match(login, new RegExp(`href="${escapeRe(TF)}" target="_blank" rel="noopener noreferrer"`));
+    assert.match(login, /src="\/download\/ios\/app-qr\.svg"/);
+    assert.doesNotMatch(login, /src="\/download\/ios\/qr\.svg"|href="\/download\/ios"/);
+    assert.match(login, /Mở trong TestFlight/);
+    const appQr = await get('/download/ios/app-qr.svg');
+    assert.equal(appQr.status, 200);
+    assert.match(appQr.headers.get('content-type'), /^image\/svg\+xml/);
+    const appQrSvg = await appQr.text();
+    assert.match(appQrSvg, /^<svg/);
+    assert.notEqual(appQrSvg, await text('/download/ios/qr.svg'), 'encodes the link, not the page');
   });
 
   await t.test('an App Store link changes the wording; clearing the field puts the page back to "coming soon"', async () => {
@@ -134,6 +145,7 @@ test('iOS app download', async (t) => {
     assert.match(await (await admin.get('/admin/settings')).text(), /Đã bỏ liên kết tải ứng dụng iOS/);
     assert.doesNotMatch(await text('/download/ios'), /id="ios-link"/);
     assert.match(await loginPage(), /sắp có/);
+    assert.equal((await get('/download/ios/app-qr.svg')).status, 404, 'no link, no QR of it');
   });
 
   await t.test('an ad-hoc build published with publish-ipa.js: direct install on the page, manifest.plist, app.ipa, login row', async () => {
@@ -191,15 +203,19 @@ test('iOS app download', async (t) => {
 
     assert.match(await loginPage(), /iPhone \/ iPad · POS Tasotek <span[^>]*>v1\.4\.0 nội bộ</);
 
-    // a TestFlight link on top: the page keeps direct install first and offers the link to unregistered devices
+    // a TestFlight link on top: it works on any iPhone, so it comes first; the direct install stays for registered devices
     const { c: admin } = await fx.login('boss');
     const token = await fx.csrfOf(admin, '/admin/settings');
     await admin.post('/admin/settings/ios-app', { _csrf: token, _back: '/admin/settings', url: TF });
     const both = await text('/download/ios');
-    assert.match(both, /id="ios-install"/);
-    assert.match(both, /Máy chưa đăng ký\?/);
     assert.match(both, new RegExp(`id="ios-link" href="${escapeRe(TF)}"`));
-    assert.match(await loginPage(), /hoặc cài qua TestFlight/);
+    assert.match(both, /Máy đã đăng ký với quản trị viên\?/);
+    assert.match(both, /id="ios-install" href="itms-services:/);
+    assert.ok(both.includes(`id="ios-download" href="/download/ios/app.ipa?v=${sha.slice(0, 12)}"`));
+    assert.ok(both.indexOf('id="ios-link"') < both.indexOf('id="ios-install"'), 'the link section comes before the ad-hoc one');
+    const loginBoth = await loginPage();
+    assert.match(loginBoth, /iPhone \/ iPad · POS Tasotek <span[^>]*>TestFlight</, 'the link wins over the ad-hoc build on the login row');
+    assert.match(loginBoth, new RegExp(`href="${escapeRe(TF)}"`));
     await admin.post('/admin/settings/ios-app', { _csrf: token, _back: '/admin/settings', url: '' });
 
     } finally {

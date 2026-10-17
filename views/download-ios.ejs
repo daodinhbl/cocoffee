@@ -29,8 +29,9 @@
 </head>
 <body class="steam min-h-full bg-navy-50 font-sans text-gray-900 antialiased">
   <main class="mx-auto flex min-h-screen w-full max-w-lg flex-col px-4 py-8 sm:py-12">
-    <%# Three states, most direct first: an ad-hoc build published in releases/ios/ (installs over the air on registered
-        devices), a TestFlight / App Store link set in Cài đặt, or neither. `release`/`installUrl` come from
+    <%# Three states: a TestFlight / App Store link set in Cài đặt (works on any iPhone, so it comes first; an ad-hoc
+        build is then the alternative for registered devices), only an ad-hoc build published in releases/ios/
+        (installs over the air on registered devices), or neither. `release`/`installUrl` come from
         services/iosRelease.js, `app` from services/iosApp.js (routes/downloadRoutes.js). %>
     <% const step = (n) => `<span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-navy-100 text-xs font-semibold text-navy-800">${n}</span>`; %>
     <% const serverLine = `Khi đăng nhập, kiểm tra địa chỉ máy chủ trong ứng dụng là <code class="font-mono text-navy-700">${host}</code> (đổi được ngay trên màn hình đăng nhập của ứng dụng).`; %>
@@ -43,7 +44,7 @@
       </div>
     </header>
 
-    <% if (release) { %>
+    <% if (release && !app) { %>
       <section class="mt-6 rounded-xl border border-navy-200 bg-white p-6 shadow-[0_10px_30px_-12px_rgba(30,58,138,.25)]" aria-labelledby="ota-title">
         <h2 id="ota-title" class="sr-only">Cài đặt trực tiếp</h2>
         <dl class="grid grid-cols-3 gap-3 text-center">
@@ -82,13 +83,6 @@
         </ol>
         <p class="mt-4 text-xs text-gray-500">Chỉ cài được trên máy đã đăng ký với quản trị viên (Apple cho tối đa 100 máy mỗi năm). Nếu iOS báo <b>Không thể cài đặt</b>, máy này chưa được đăng ký: gửi UDID cho quản trị viên và chờ bản tiếp theo. Cập nhật: quét lại mã QR và cài đè, dữ liệu đăng nhập giữ nguyên. Bản nội bộ dùng được 1 năm kể từ ngày phát hành.</p>
       </section>
-
-      <% if (app) { %>
-        <section class="mt-6 rounded-xl border border-navy-200 bg-white p-5 text-sm text-gray-700" aria-labelledby="alt-title">
-          <h2 id="alt-title" class="text-base font-semibold text-navy-800">Máy chưa đăng ký?</h2>
-          <p class="mt-1">Cài qua <%= app.label %>: <a id="ios-link" href="<%= app.url %>" rel="noopener" class="font-semibold text-navy-700 hover:underline"><%= app.action %></a><% if (app.kind === 'testflight') { %> (cần ứng dụng <a href="https://apps.apple.com/app/testflight/id899247664" rel="noopener" class="font-semibold text-navy-700 hover:underline">TestFlight</a> của Apple)<% } %>.</p>
-        </section>
-      <% } %>
     <% } else if (app) { %>
       <section class="mt-6 rounded-xl border border-navy-200 bg-white p-6 shadow-[0_10px_30px_-12px_rgba(30,58,138,.25)]" aria-labelledby="dl-title">
         <h2 id="dl-title" class="sr-only">Cài đặt</h2>
@@ -132,6 +126,17 @@
         </ol>
         <p class="mt-4 text-xs text-gray-500"><% if (app.kind === 'testflight') { %>Cập nhật: TestFlight tự báo khi có bản mới; mỗi bản thử nghiệm dùng được 90 ngày, sau đó cài bản mới từ chính TestFlight.<% } else { %>Cập nhật: App Store tự cập nhật ứng dụng như mọi ứng dụng khác.<% } %></p>
       </section>
+
+      <% if (release) { %>
+        <%# The ad-hoc build for devices whose UDID is in the profile: no TestFlight app needed, Safari installs it. %>
+        <section class="mt-6 rounded-xl border border-navy-200 bg-white p-5 text-sm text-gray-700" aria-labelledby="alt-title">
+          <h2 id="alt-title" class="text-base font-semibold text-navy-800">Máy đã đăng ký với quản trị viên?</h2>
+          <p class="mt-1">Cài thẳng bản nội bộ <%= release.version_name %> (<%= release.sizeLabel %>) mà không cần TestFlight: mở trang này bằng <b>Safari</b> rồi nhấn
+            <a id="ios-install" href="<%= installUrl %>" class="font-semibold text-navy-700 hover:underline">Cài đặt trực tiếp</a>,
+            hoặc <a id="ios-download" href="/download/ios/app.ipa?v=<%= release.sha256.slice(0, 12) %>" download="<%= release.downloadName %>" class="font-semibold text-navy-700 hover:underline">tải tệp .ipa</a> để cài qua máy tính.</p>
+          <p class="mt-1 text-xs text-gray-500">Phát hành <%= release.builtAtLabel %> · tệp <code class="font-mono"><%= release.downloadName %></code>. Máy chưa đăng ký sẽ báo <b>Không thể cài đặt</b>: dùng <%= app.label %> ở trên.</p>
+        </section>
+      <% } %>
     <% } else { %>
       <section class="mt-6 rounded-xl border border-navy-200 bg-white p-6 shadow-[0_10px_30px_-12px_rgba(30,58,138,.25)]" aria-labelledby="dl-title">
         <h2 id="dl-title" class="sr-only">Cài đặt</h2>

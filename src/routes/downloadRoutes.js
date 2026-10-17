@@ -19,7 +19,8 @@ const { formatShopTime } = require('../utils/text');
  * The iOS app cannot be sideloaded by the public, so its page links out (services/iosApp.js) and, for registered test
  * devices, offers the ad-hoc build in releases/ios/ over the air (services/iosRelease.js):
  *   GET /download/ios                landing page for iPhone/iPad: direct install when a build is published, else the link
- *   GET /download/ios/qr.svg         QR code of that page (the iOS row of the app card on the login page)
+ *   GET /download/ios/qr.svg         QR code of that page (the iOS row of the login page while no link is set)
+ *   GET /download/ios/app-qr.svg     QR code of the TestFlight / App Store link (the iOS row once the link is set)
  *   GET /download/ios/manifest.plist what Apple's installer reads (itms-services); names the .ipa URL
  *   GET /download/ios/app.ipa        the ad-hoc build (stable URL; the saved file name carries the version)
  */
@@ -127,6 +128,23 @@ router.get('/ios', pageLimit, adminSecurity, async (req, res, next) => {
 });
 
 router.get('/ios/qr.svg', pageLimit, (req, res, next) => sendQr(req, res, next, '/download/ios'));
+
+// QR code of the TestFlight / App Store link itself (the iOS row of the login page once the link is set): one scan,
+// straight into TestFlight. 404 while no link is set.
+router.get('/ios/app-qr.svg', pageLimit, async (req, res, next) => {
+  try {
+    const link = await iosApp.get();
+    if (!link) return res.status(404).type('text/plain').send('Not found');
+    const svg = await appRelease.qrSvg(link.url);
+    res.set({
+      'Content-Type': 'image/svg+xml; charset=utf-8',
+      'Cache-Control': 'public, max-age=300',
+      'X-Content-Type-Options': 'nosniff',
+      'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'",
+    });
+    return res.send(svg);
+  } catch (err) { return next(err); }
+});
 
 // In-app update check of the ad-hoc iOS build (the Android twin is /manifest.json): the app compares version_name and, on
 // "Cập nhật", opens install_url in Safari's installer (itms-services), which replaces the app in place.
