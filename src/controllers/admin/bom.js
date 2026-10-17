@@ -28,14 +28,60 @@ async function pageData() {
   };
 }
 
-async function page(_req, res) {
+const PAGE_SIZE = 20;                       // rows per page on /admin/bom-recipes
+const fold = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
+
+/**
+ * ?tab=drinks|retail &q= &cat=<category id> &missing=1 &page= : one tab at a time, filtered on the server and
+ * paged by 20 (like Nguyên liệu). Links keep the filters; changing the tab resets them.
+ */
+async function page(req, res) {
   const { drinks, retail, categories, stats, catalog } = await pageData();
+  const tab = req.query.tab === 'retail' ? 'retail' : 'drinks';
+  const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 40) : '';
+  const missing = tab === 'drinks' && req.query.missing === '1';
+  const base = tab === 'retail' ? retail : drinks;
+
+  const catCounts = new Map();
+  base.forEach((r) => catCounts.set(r.category_id, (catCounts.get(r.category_id) || 0) + 1));
+  const catChips = categories.filter((c) => catCounts.has(c.id)).map((c) => ({ id: c.id, name: c.name, n: catCounts.get(c.id) }));
+  const cat = catChips.some((c) => String(c.id) === String(req.query.cat)) ? Number(req.query.cat) : 0;
+
+  const term = fold(q);
+  const matching = base
+    .filter((r) => !cat || r.category_id === cat)
+    .filter((r) => !missing || !r.ingredients.length)
+    .filter((r) => !term || fold(`${r.name} ${r.sku} ${r.ingredients.map((g) => g.name).join(' ')}`).includes(term));
+  const total = matching.length;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const pageNo = Math.min(pages, Math.max(1, parseInt(req.query.page, 10) || 1));
+
+  const url = (t, f) => {
+    const p = new URLSearchParams();
+    if (t !== 'drinks') p.set('tab', t);
+    if (f.cat) p.set('cat', f.cat);
+    if (f.missing) p.set('missing', '1');
+    if (f.q) p.set('q', f.q);
+    if (f.page > 1) p.set('page', f.page);
+    const s = p.toString();
+    return `/admin/bom-recipes${s ? `?${s}` : ''}`;
+  };
+  // link to another tab / category / missing toggle, keeping the other filters (a new tab starts clean)
+  const tabUrl = (t, o = {}) => (o.reset
+    ? url(t, {})
+    : url(t, { cat: o.cat !== undefined ? o.cat : cat, missing: o.missing !== undefined ? o.missing : missing, q }));
+  const pageUrl = (n) => url(tab, { cat, missing, q, page: n });
 
   await render(res, 'bom_recipes', {
     title: 'Quản lý định mức (BOM)', activeMenu: 'bom',
     breadcrumbs: [{ label: 'Kho & Định mức', href: '#' }, { label: 'Công thức (BOM)' }],
   }, {
-    drinks, retail, categories, stats,
+    rows: matching.slice((pageNo - 1) * PAGE_SIZE, pageNo * PAGE_SIZE),
+    tab, q, cat, missing, catChips, tabRows: base.length,
+    counts: { drinks: drinks.length, retail: retail.length },
+    total, page: pageNo, pages, pageSize: PAGE_SIZE, pageUrl, tabUrl,
+    stats: { ...stats, low: drinks.concat(retail).filter((r) => r.margin < 55).length },
+    categories,
     catalog: { drink: catalog },
   });
 }

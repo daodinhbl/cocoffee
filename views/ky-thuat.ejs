@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Dịch vụ kỹ thuật · <%= contact.name || shopName %></title>
+  <meta name="description" content="Sửa chữa, bảo trì điện nước; lắp camera, nhà thông minh, năng lượng mặt trời tại Bảo Lộc.">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; background: #FAF8F5; color: #1f1f1f; font: 16px/1.55 "Times New Roman", Times, serif; }
+    main { max-width: 40rem; margin: 0 auto; padding: 1.25rem 1rem 3rem; }
+    h1 { color: #172554; font-size: 1.7rem; line-height: 1.2; margin: .25rem 0 .5rem; }
+    h2 { color: #1E3A8A; font-size: 1.2rem; margin: 2rem 0 .6rem; }
+    .lead { font-size: 1.05rem; margin: 0 0 1rem; }
+    .muted { color: #6b6b6b; font-size: .9rem; }
+    .badge { display: inline-block; background: #172554; color: #fff; border-radius: 999px; padding: .15rem .7rem; font-size: .85rem; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; list-style: none; padding: 0; margin: 0; }
+    .grid li { background: #fff; border: 1px solid #e6e0d6; border-radius: .6rem; padding: .7rem .8rem; }
+    .grid b { display: block; color: #172554; }
+    .offer { background: #172554; color: #fff; border-radius: .8rem; padding: 1rem 1.1rem; margin: 1.2rem 0; }
+    .offer b { font-size: 1.1rem; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: .7rem; }
+    figure { margin: 0; background: #fff; border: 1px solid #e6e0d6; border-radius: .6rem; overflow: hidden; }
+    figure img { display: block; width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
+    figcaption { padding: .5rem .7rem .7rem; font-size: .9rem; }
+    figcaption b { display: block; color: #172554; }
+    form { background: #fff; border: 1px solid #e6e0d6; border-radius: .8rem; padding: 1rem; }
+    label { display: block; font-weight: bold; margin: .8rem 0 .25rem; }
+    input, select, textarea { width: 100%; font: inherit; padding: .65rem .7rem; border: 1px solid #b9b2a4; border-radius: .45rem; background: #fff; }
+    input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible { outline: 3px solid #1E3A8A; outline-offset: 2px; }
+    button { width: 100%; margin-top: 1rem; padding: .85rem; font: inherit; font-weight: bold; color: #fff; background: #1E3A8A; border: 0; border-radius: .5rem; cursor: pointer; }
+    .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+    .alert { border-radius: .5rem; padding: .7rem .9rem; margin: 0 0 1rem; }
+    .alert.ok { background: #e7f5e9; border: 1px solid #8cc79a; }
+    .alert.err { background: #fdeaea; border: 1px solid #e29a9a; }
+    .call { display: block; text-align: center; margin-top: .8rem; padding: .8rem; border: 2px solid #1E3A8A; border-radius: .5rem; color: #1E3A8A; font-weight: bold; text-decoration: none; }
+  </style>
+</head>
+<body>
+<main>
+  <span class="badge"><%= contact.name || shopName %></span>
+  <h1>Nhà hỏng điện nước? Kỹ thuật tới trong ngày.</h1>
+  <p class="lead">Sửa chữa, bảo trì điện nước dân dụng và công nghiệp; lắp camera an ninh, nhà thông minh, điện mặt trời. Làm tại Bảo Lộc và vùng lân cận.</p>
+
+  <% if (sent) { %>
+    <div class="alert ok" role="status"><b>Đã nhận yêu cầu.</b> Bên mình sẽ gọi hoặc nhắn Zalo cho bạn sớm nhất có thể.</div>
+  <% } %>
+
+  <div class="offer">
+    <b>Kiểm tra điện nước miễn phí</b><br>
+    Đo rò điện, kiểm tra áp lực nước và tủ điện cho khách của quán. Chỉ tính phí khi bạn đồng ý sửa chữa.
+  </div>
+
+  <h2>Dịch vụ</h2>
+  <ul class="grid">
+    <li><b>Điện nước</b>Sửa chữa, bảo trì, lắp đặt</li>
+    <li><b>Điện công nghiệp</b>Tủ điện, đi dây, bảo trì định kỳ</li>
+    <li><b>Camera an ninh</b>Thi công, xem từ điện thoại</li>
+    <li><b>Nhà thông minh</b>Đèn, công tắc, cảnh sáng</li>
+    <li><b>Điện mặt trời</b>Khảo sát, lắp đặt, bảo trì</li>
+    <li><b>Gói bảo trì</b>Kiểm tra định kỳ, ưu tiên xử lý</li>
+  </ul>
+
+  <% if (projects.length) { %>
+    <h2>Công trình đã làm</h2>
+    <div class="cards">
+      <% projects.forEach((p) => { %>
+        <figure>
+          <img src="<%= p.photo %>" alt="<%= p.title %>" loading="lazy">
+          <figcaption><b><%= p.title %></b><%= p.place %><% if (p.note) { %><br><span class="muted"><%= p.note %></span><% } %></figcaption>
+        </figure>
+      <% }) %>
+    </div>
+  <% } %>
+
+  <h2 id="yeu-cau">Để lại thông tin, bên mình liên hệ lại</h2>
+  <% if (error) { %><div class="alert err" role="alert"><%= error %></div><% } %>
+  <form method="post" action="/ky-thuat/lead">
+    <input type="hidden" name="src" value="<%= src %>">
+    <div class="hp" aria-hidden="true"><label>Website <input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>
+
+    <label for="name">Họ tên</label>
+    <input id="name" name="name" required maxlength="120" autocomplete="name" value="<%= form.name || '' %>">
+
+    <label for="phone">Số điện thoại</label>
+    <input id="phone" name="phone" type="tel" inputmode="tel" required maxlength="20" autocomplete="tel" placeholder="09xx xxx xxx" value="<%= form.phone || '' %>">
+
+    <label for="need">Bạn cần gì?</label>
+    <select id="need" name="need">
+      <% Object.entries(needs).forEach(([k, v]) => { %><option value="<%= k %>" <%= form.need === k ? 'selected' : '' %>><%= v %></option><% }) %>
+    </select>
+
+    <label for="note">Mô tả ngắn (không bắt buộc)</label>
+    <textarea id="note" name="note" rows="3" maxlength="500"><%= form.note || '' %></textarea>
+
+    <button type="submit">Gửi yêu cầu</button>
+    <p class="muted">Số điện thoại chỉ dùng để liên hệ về yêu cầu này, không chia sẻ cho bên khác.</p>
+  </form>
+
+  <% if (contact.phone) { %><a class="call" href="tel:<%= String(contact.phone).replace(/[^0-9+]/g, '') %>">Gọi ngay <%= contact.phone %></a><% } %>
+  <p class="muted"><%= [contact.address, contact.hours].filter(Boolean).join(' · ') %></p>
+</main>
+</body>
+</html>

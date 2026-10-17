@@ -4,6 +4,7 @@
  * on an ephemeral port. `calls` records what the controllers asked the models to do.
  */
 process.env.FNB_NO_LISTEN = '1';
+process.env.RECEIPT_PDF_ENABLED = 'false';          // tests must not write receipt PDFs into the repo
 process.env.DB_NAME ||= 'x'; process.env.DB_USER ||= 'x'; process.env.DB_PASSWORD ||= 'x';
 process.env.ZALO_BOT_TOKEN = ''; process.env.BOT_WEBHOOK_SECRET = ''; process.env.ZALO_MODE = '';   // ignore a developer .env
 process.env.PUBLIC_BASE_URL = 'https://cafe.example.test';   // a developer .env may enable it; tests opt in explicitly
@@ -79,6 +80,8 @@ async function start() {
   mock.method(orderModel, 'count', async () => 60);
   mock.method(orderModel, 'breakdown', async () => ({ all: 60, draft: 2, open: 1, completed: 50, cancelled: 7, unpaid: 3, revenue: 4000000, unpaidAmount: 237000, openAmount: 79000 }));
   mock.method(orderModel, 'getItems', async () => ORDER.items);
+  mock.method(orderModel, 'paidTotal', async () => 0);
+  mock.method(orderModel, 'paidByMethod', async () => []);
   mock.method(orderModel, 'getPayments', async () => [{ id: 1, method: 'cash', amount: 79000, reference: null, paid_at: NOW, received_by_name: 'Thu Ngân' }]);
   mock.method(orderModel, 'getById', async () => ORDER);
   mock.method(orderModel, 'getFullByIds', async (ids) => ids.map(() => ORDER));
@@ -100,6 +103,101 @@ async function start() {
     { id: 2, code: 'B02', name: 'Bàn 2', status: 'available', current_order_id: null },
   ]);
   mock.method(tableModel, 'getById', async (id) => ({ id, status: id === 1 ? 'serving' : 'available', is_active: 1 }));
+  mock.method(tableModel, 'mergedInto', async () => []);
+  const supplierModel = require('../../src/models/supplierModel');
+  const purchaseModel = require('../../src/models/purchaseModel');
+  const SUPPLIER = { id: 1, name: 'NCC A', phone: '0909 111 222', address: 'Chợ đầu mối', tax_code: '', note: '', is_active: 1, receipts: 2, purchased: 1000000, paid: 600000, debt: 400000, last_at: NOW, created_at: NOW };
+  const RECEIPT = { id: 5, receipt_code: 'PN261017-00005', supplier_id: 1, supplier_name: 'NCC A', doc_no: 'HD-1', note: null, total: 1000000, paid: 600000, debt: 400000, created_at: NOW, user_name: 'Chủ Quán', line_count: 2 };
+  mock.method(supplierModel, 'list', async () => [SUPPLIER]);
+  mock.method(supplierModel, 'count', async () => 1);
+  mock.method(supplierModel, 'options', async () => [{ id: 1, name: 'NCC A' }]);
+  mock.method(supplierModel, 'getById', async (id) => (id === 1 || id === 2 ? { ...SUPPLIER, id } : null));
+  mock.method(supplierModel, 'findByName', async () => null);
+  mock.method(supplierModel, 'create', rec('supplier.create', 2));
+  mock.method(supplierModel, 'update', rec('supplier.update'));
+  mock.method(supplierModel, 'totals', async () => ({ suppliers: 1, purchased: 1000000, paid: 600000, debt: 400000, inDebt: 1 }));
+  mock.method(purchaseModel, 'insertReceipt', rec('receipt.insert', 5));
+  mock.method(purchaseModel, 'getReceipt', async (id) => (id === 5 ? RECEIPT : null));
+  mock.method(purchaseModel, 'insertLine', rec('receipt.line'));
+  mock.method(purchaseModel, 'setTotals', rec('receipt.totals'));
+  mock.method(purchaseModel, 'addPaid', rec('receipt.addPaid'));
+  mock.method(purchaseModel, 'insertPayment', rec('receipt.payment', 1));
+  mock.method(purchaseModel, 'listReceipts', async () => [RECEIPT]);
+  mock.method(purchaseModel, 'countReceipts', async () => ({ n: 1, total: 1000000, paid: 600000 }));
+  mock.method(purchaseModel, 'getLines', async () => [
+    { id: 1, receipt_id: 5, inventory_item_id: 1, item_name: 'Cà phê rang xay', unit: 'g', pack_label: 'kg', pack_qty: 2, pack_factor: 1000, pack_price: 280000, quantity: 2000, unit_cost: 280, line_total: 560000 },
+    { id: 2, receipt_id: 5, inventory_item_id: 3, item_name: 'Ly nhựa + nắp', unit: 'pcs', pack_label: null, pack_qty: 500, pack_factor: 1, pack_price: 880, quantity: 500, unit_cost: 880, line_total: 440000 },
+  ]);
+  mock.method(purchaseModel, 'receiptPayments', async () => [{ id: 1, amount: 600000, method: 'cash', note: 'Trả khi nhập hàng', paid_at: NOW, user_name: 'Chủ Quán' }]);
+  mock.method(purchaseModel, 'supplierPayments', async () => [{ id: 1, amount: 600000, method: 'cash', note: 'Trả khi nhập hàng', paid_at: NOW, receipt_id: 5, receipt_code: 'PN261017-00005', user_name: 'Chủ Quán' }]);
+  const expenseModel = require('../../src/models/expenseModel');
+  const CATS = [
+    { id: 1, code: 'nguyen-vat-lieu', name: 'Nguyên vật liệu & hàng hóa', tax_treatment: 'deductible', ledger_code: null, sort_order: 1, is_system: 1, is_active: 1, uses: 3 },
+    { id: 2, code: 'thue-mat-bang', name: 'Thuê mặt bằng', tax_treatment: 'deductible', ledger_code: 'TMB', sort_order: 4, is_system: 1, is_active: 1, uses: 1 },
+    { id: 3, code: 'thiet-bi', name: 'Mua thiết bị, dụng cụ', tax_treatment: 'capex', ledger_code: null, sort_order: 8, is_system: 1, is_active: 1, uses: 0 },
+  ];
+  const EXP = [
+    { id: 21, expense_date: '2026-10-05', category_id: 2, category_name: 'Thuê mặt bằng', tax_treatment: 'deductible', amount: 8000000, vat_included: 0, payee: 'Chủ nhà', supplier_id: null, purchase_receipt_id: null, receipt_code: null, doc_no: 'PC-01', note: 'Tháng 10', receipt_media_id: 7, source: 'manual', status: 'posted', void_reason: null, created_at: NOW, user_name: 'Chủ Quán', receipt_sha256: 'ab' },
+    { id: 22, expense_date: '2026-10-17', category_id: 1, category_name: 'Nguyên vật liệu & hàng hóa', tax_treatment: 'deductible', amount: 1000000, vat_included: 0, payee: 'NCC A', supplier_id: 1, purchase_receipt_id: 5, receipt_code: 'PN261017-00005', doc_no: 'HD-1', note: 'Phiếu nhập PN261017-00005', receipt_media_id: null, source: 'purchase', status: 'posted', void_reason: null, created_at: NOW, user_name: 'Chủ Quán', receipt_sha256: null },
+  ];
+  const taxModel = require('../../src/models/taxModel');
+  const TAXCATS = [
+    { id: 1, code: 'fnb_service', name: 'Dịch vụ ăn uống', sort_order: 1, is_active: 1 },
+    { id: 2, code: 'goods_distribution', name: 'Bán hàng hóa nguyên trạng', sort_order: 2, is_active: 1 },
+    { id: 3, code: 'none', name: 'Không chịu thuế', sort_order: 3, is_active: 1 },
+  ];
+  const EXPORT = { id: 11, kind: 'bundle', period_from: '2026-07-01', period_to: '2026-09-30', status: 'done', attempts: 1, file_name: '11-so-thue_2026-07-01_2026-09-30.xlsx', file_bytes: 20480, error: null, requested_by: 1, user_name: 'Chủ Quán', created_at: NOW, started_at: NOW, finished_at: NOW, expires_at: NOW };
+  mock.method(taxModel, 'categories', async () => TAXCATS);
+  mock.method(taxModel, 'rates', async () => [{ id: 1, category_id: 1, code: 'fnb_service', category_name: 'Dịch vụ ăn uống', effective_from: '2026-01-01', effective_to: null, vat_rate: 0.03, pit_rate: 0.015, legal_basis: 'Mặc định' }]);
+  mock.method(taxModel, 'ratesOn', async () => new Map([[1, { vat: 0.03, pit: 0.015 }], [2, { vat: 0.01, pit: 0.005 }], [3, { vat: 0, pit: 0 }]]));
+  mock.method(taxModel, 'addRate', rec('tax.addRate'));
+  mock.method(taxModel, 'orderLines', async () => []);
+  mock.method(taxModel, 'setLineTax', rec('tax.setLineTax'));
+  mock.method(taxModel, 'bumpRevenue', rec('tax.bumpRevenue'));
+  mock.method(taxModel, 'bumpExpense', rec('tax.bumpExpense'));
+  mock.method(taxModel, 'lockedCovering', async () => null);
+  mock.method(taxModel, 'revenueByCategory', async () => [
+    { categoryId: 1, lines: 4000, gross: 405000000, discount: 5000000, net: 400000000, vat: 12000000, pit: 6000000 },
+    { categoryId: 2, lines: 900, gross: 100000000, discount: 0, net: 100000000, vat: 1000000, pit: 500000 },
+  ]);
+  mock.method(taxModel, 'revenueTotal', async () => 300000000);
+  mock.method(taxModel, 'expenseByTreatment', async () => ({ deductible: 80000000, non_deductible: 2000000, capex: 3500000 }));
+  mock.method(taxModel, 'monthly', async () => [{ month: '2026-08', revenue: 150000000, expenses: 25000000 }, { month: '2026-09', revenue: 170000000, expenses: 28000000 }]);
+  mock.method(taxModel, 'revenueRows', async () => [
+    { day: '2026-09-01', categoryId: 1, lines: 40, gross: 1500000, discount: 20000, net: 1480000, vat: 44400, pit: 22200 },
+    { day: '2026-09-01', categoryId: 2, lines: 5, gross: 100000, discount: 0, net: 100000, vat: 1000, pit: 500 },
+  ]);
+  mock.method(taxModel, 'getPeriod', async () => null);
+  mock.method(taxModel, 'periods', async () => []);
+  mock.method(taxModel, 'lockPeriod', rec('tax.lock'));
+  mock.method(taxModel, 'unlockPeriod', rec('tax.unlock', 1));
+  mock.method(taxModel, 'setFiled', rec('tax.filed'));
+  mock.method(taxModel, 'insertExport', rec('export.insert', 11));
+  mock.method(taxModel, 'getExport', async (id) => (id === 11 ? EXPORT : null));
+  mock.method(taxModel, 'listExports', async () => [EXPORT]);
+  mock.method(taxModel, 'findOpenExport', async () => null);
+  mock.method(taxModel, 'claimNextExport', async () => null);
+  mock.method(taxModel, 'finishExport', rec('export.finish'));
+  mock.method(taxModel, 'failExport', rec('export.fail'));
+  mock.method(taxModel, 'requeueStale', async () => 0);
+  mock.method(taxModel, 'expiredExports', async () => []);
+  mock.method(taxModel, 'clearExportFile', rec('export.clear'));
+  mock.method(expenseModel, 'listCategories', async () => CATS);
+  mock.method(expenseModel, 'getCategory', async (id) => CATS.find((c) => c.id === Number(id)) || null);
+  mock.method(expenseModel, 'categoryByCode', async (code) => CATS.find((c) => c.code === code) || null);
+  mock.method(expenseModel, 'createCategory', rec('expcat.create', 9));
+  mock.method(expenseModel, 'updateCategory', rec('expcat.update'));
+  mock.method(expenseModel, 'list', async () => EXP);
+  mock.method(expenseModel, 'totals', async () => ({ n: 2, amount: 9000000, purchases: 1000000, manual: 8000000, deductible: 9000000 }));
+  mock.method(expenseModel, 'byCategory', async () => [{ id: 2, name: 'Thuê mặt bằng', amount: 8000000, n: 1 }, { id: 1, name: 'Nguyên vật liệu & hàng hóa', amount: 1000000, n: 1 }]);
+  mock.method(expenseModel, 'getById', async (id) => EXP.find((e) => e.id === Number(id)) || null);
+  mock.method(expenseModel, 'insert', rec('expense.insert', 21));
+  mock.method(expenseModel, 'update', rec('expense.update'));
+  mock.method(expenseModel, 'setCategoryAndNote', rec('expense.setCat'));
+  mock.method(expenseModel, 'setReceipt', rec('expense.setReceipt'));
+  mock.method(expenseModel, 'voidExpense', rec('expense.void'));
+  mock.method(expenseModel, 'findBySha', async () => null);
+  mock.method(purchaseModel, 'unpaidReceipts', async () => [{ id: 5, receipt_code: 'PN261017-00005', total: 1000000, paid: 600000 }]);
   mock.method(tableModel, 'create', rec('table.create', 5));
   mock.method(tableModel, 'update', rec('table.update'));
 
@@ -143,6 +241,7 @@ async function start() {
   mock.method(productModel, 'setRecipe', rec('product.setRecipe'));
   mock.method(productModel, 'setAliases', rec('product.setAliases'));
   mock.method(productModel, 'setImage', rec('product.setImage'));
+  mock.method(productModel, 'setTaxCategory', rec('product.setTax'));
   mock.method(categoryModel, 'list', async () => CATEGORIES);
   mock.method(categoryModel, 'create', rec('category.create', 3));
   mock.method(categoryModel, 'update', rec('category.update'));

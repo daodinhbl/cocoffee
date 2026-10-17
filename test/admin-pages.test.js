@@ -210,7 +210,7 @@ test('admin pages', async (t) => {
     const recv = await admin.post('/admin/receiving', { _csrf: token, _back: '/admin/receiving', inventory_item_id: '1', quantity: '1000', unit_cost: '300', note: 'NCC B' });
     assert.equal(recv.headers.get('location'), '/admin/receiving');
     const [, itemId, qty, cost, meta] = called('inventory.receive')[0].args;
-    assert.deepEqual([itemId, qty, cost, meta.userId, meta.note], [1, 1000, 300, 1, 'NCC B']);
+    assert.deepEqual([itemId, qty, cost, meta.userId, meta.note], [1, 1000, 300, 1, 'PN261017-00005 · NCC B']);
     assert.match(await (await admin.get('/admin/receiving')).text(), /Đã nhập kho/);
 
     reset();
@@ -352,7 +352,7 @@ test('admin pages', async (t) => {
     assert.equal(called('table.create').length, 0);
   });
 
-  await t.test('POS: checkout creates + pays; a failed payment cancels the new order; hold needs a table', async () => {
+  await t.test('POS: checkout creates + pays; a failed payment cancels the new order; hold works without a table', async () => {
     const { c } = await fx.login('thungan', PASSWORD);
     const html = await (await c.get('/admin/pos')).text();
     const tok = /"csrf":"([0-9a-f]+)"/.exec(html)[1];
@@ -393,7 +393,10 @@ test('admin pages', async (t) => {
     r = await c.postJson('/admin/pos/checkout', { _csrf: tok, items, method: 'bitcoin' });
     assert.equal((await r.json()).ok, false);
     r = await c.postJson('/admin/pos/hold', { _csrf: tok, items });
-    assert.match((await r.json()).message, /Chọn bàn/);
+    j = await r.json();
+    assert.equal(j.ok, true, 'the web POS can save a takeaway order without a table (đơn tạm)');
+    assert.ok(Array.isArray(j.temps));
+    reset();
     r = await c.postJson('/admin/pos/hold', { _csrf: tok, table_id: 2, items });
     assert.equal((await r.json()).ok, true);
     assert.equal(called('order.createPos').length, 1);
@@ -575,7 +578,9 @@ test('admin pages', async (t) => {
     try {
       j = await (await c.get('/admin/pos/orders/42')).json();
       assert.equal(j.ok, true);
-      assert.deepEqual(j.order.items, [{ productId: 1, qty: 2 }, { productId: 2, qty: 1 }]);
+      assert.deepEqual(j.order.items.map((i) => [i.productId, i.qty]), [[1, 2], [2, 1]]);
+      assert.equal(j.order.prepaid, 0);
+      assert.deepEqual(j.order.merged, []);
     } finally {
       orderService.getWithItems = original;
     }

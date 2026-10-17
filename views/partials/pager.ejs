@@ -1,0 +1,44 @@
+<%
+  /* Pagination bar. Locals: page, pages, total, pageSize, pageUrl(n), unit (default "bản ghi"). */
+  const from = (page - 1) * pageSize + 1;
+  const to = Math.min(total, page * pageSize);
+  const unitText = locals.unit || 'bản ghi';
+%>
+<% if (total > 0) { %>
+  <%
+    const btn = 'inline-flex h-10 min-w-10 items-center justify-center rounded-lg border px-3 text-sm';
+    const idle = 'border-milk-200 bg-white text-dark hover:border-navy-accent hover:text-navy-accent';
+    const off = 'cursor-not-allowed border-milk-200 bg-milk-50 text-milk-500 opacity-60';
+    const wide = [...new Set([1, 2, page - 1, page, page + 1, pages - 1, pages])].filter((n) => n >= 1 && n <= pages).sort((a, b) => a - b);
+  %>
+  <nav aria-label="Phân trang" class="mt-4 flex flex-col items-center justify-between gap-3 rounded-xl border border-milk-200 bg-white px-4 py-3 sm:flex-row">
+    <p class="text-sm text-milk-500">
+      Hiển thị <b class="tnum text-dark"><%= from %>–<%= to %></b> trong <b class="tnum text-dark"><%= total %></b> <%= unitText %>
+      <span class="hidden sm:inline">· <%= pageSize %> <%= unitText %>/trang</span>
+    </p>
+    <% if (pages > 1) { %>
+    <div class="flex flex-wrap items-center justify-center gap-1.5">
+      <% if (page > 1) { %>
+        <a href="<%= pageUrl(1) %>" aria-label="Trang đầu" class="<%= btn %> <%= idle %>">«</a>
+        <a href="<%= pageUrl(page - 1) %>" rel="prev" class="<%= btn %> <%= idle %>">‹ Trước</a>
+      <% } else { %>
+        <span aria-disabled="true" class="<%= btn %> <%= off %>">«</span>
+        <span aria-disabled="true" class="<%= btn %> <%= off %>">‹ Trước</span>
+      <% } %>
+      <% wide.forEach((n, i) => { %>
+        <% if (i > 0 && n - wide[i - 1] > 1) { %><span class="px-1 text-milk-500" aria-hidden="true">…</span><% } %>
+        <a href="<%= pageUrl(n) %>" <%- n === page ? 'aria-current="page"' : '' %>
+           class="<%= btn %> font-mono tnum <%= n === page ? 'border-navy bg-navy font-bold text-white' : idle %>"><%= n %></a>
+      <% }) %>
+      <% if (page < pages) { %>
+        <a href="<%= pageUrl(page + 1) %>" rel="next" class="<%= btn %> <%= idle %>">Sau ›</a>
+        <a href="<%= pageUrl(pages) %>" aria-label="Trang cuối" class="<%= btn %> <%= idle %>">»</a>
+      <% } else { %>
+        <span aria-disabled="true" class="<%= btn %> <%= off %>">Sau ›</span>
+        <span aria-disabled="true" class="<%= btn %> <%= off %>">»</span>
+      <% } %>
+    </div>
+    <p class="text-sm text-milk-500">Trang <b class="tnum text-dark"><%= page %></b> / <b class="tnum text-dark"><%= pages %></b></p>
+    <% } %>
+  </nav>
+<% } %>

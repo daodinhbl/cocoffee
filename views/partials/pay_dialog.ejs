@@ -1,0 +1,36 @@
+<%
+  const { input, label, btnPrimary, btnSecondary, btnGhost, sheet, grabber } = ui;
+%>
+<!-- Dialog: pay a supplier (oldest receipts first, or the one receipt given by receipt_id) -->
+<dialog id="pay-dialog" aria-labelledby="pay-title" class="max-w-md <%= sheet %>">
+  <form method="post" action="#" class="flex flex-col">
+    <%- include('../partials/csrf') %>
+    <input type="hidden" name="_back" value="<%= locals.backTo || '' %>" data-back>
+    <%- grabber %>
+    <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4">
+      <h2 id="pay-title" data-dialog-title class="text-lg font-semibold">Trả nợ</h2>
+      <button type="button" data-modal-close aria-label="Đóng" class="<%= btnGhost %>"><%- icon('x', 'h-5 w-5') %></button>
+    </div>
+    <div class="space-y-4 px-4 py-4 sm:px-6 sm:py-5">
+      <div>
+        <label for="pay-amount" class="<%= label %>">Số tiền trả (đ)</label>
+        <input id="pay-amount" name="amount" type="number" min="1" step="any" required inputmode="decimal" class="<%= input %> text-right font-mono text-lg font-bold">
+        <p class="mt-1 text-xs text-gray-500">Trả từ phiếu cũ nhất trước. Mặc định là toàn bộ số còn nợ.</p>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label for="pay-method" class="<%= label %>">Hình thức</label>
+          <select id="pay-method" name="method" class="<%= input %>"><option value="cash">Tiền mặt</option><option value="transfer">Chuyển khoản</option><option value="other">Khác</option></select>
+        </div>
+        <div>
+          <label for="pay-note" class="<%= label %>">Ghi chú</label>
+          <input id="pay-note" name="note" maxlength="255" class="<%= input %>" autocomplete="off">
+        </div>
+      </div>
+    </div>
+    <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-4 py-3 max-sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
+      <button type="button" data-modal-close class="<%= btnSecondary %> max-sm:flex-1">Hủy</button>
+      <button type="submit" class="<%= btnPrimary %> max-sm:flex-[2]">Ghi nhận thanh toán</button>
+    </div>
+  </form>
+</dialog>

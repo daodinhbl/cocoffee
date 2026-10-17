@@ -36,3 +36,6 @@ mobile/ios/Pods/
 mobile/ios/.symlinks/
 mobile/ios/Flutter/ephemeral/
 mobile/ios/build/
+
+# Tax books built by the export worker (TAX_EXPORT_DIR)
+/exports/

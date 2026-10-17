@@ -1,0 +1,195 @@
+<%
+  const { input, label, btnPrimary, btnSecondary, btnGhost, sheet, grabber } = ui;
+  const card = 'rounded-xl border border-milk-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,.04)]';
+  const offset = (page - 1) * pageSize;
+  const periodText = all ? 'Tất cả thời gian' : (from && to ? (from === monthStart && to === today ? 'Tháng này' : `${from} → ${to}`) : (from ? `Từ ${from}` : `Đến ${to}`));
+  const hasFilter = q || categoryId || source || showVoid;
+  const treatmentBadge = { deductible: ['Được trừ', 'good'], non_deductible: ['Không được trừ', 'neutral'], capex: ['Thiết bị', 'info'] };
+  const top = split.slice(0, 6);
+  const topMax = top.length ? top[0].amount : 0;
+  const quick = (a, b) => linkTo({ all: false, from: a, to: b });
+%>
+<div class="flex flex-wrap items-end justify-between gap-4">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight text-navy-darker sm:text-2xl">Sổ chi phí</h1>
+    <p class="mt-1 max-w-2xl text-sm text-gray-500">Mọi khoản chi của quán: tiền hàng nhập (tự ghi từ phiếu nhập kho) và chi phí khác như thuê mặt bằng, lương, điện nước — kèm ảnh chứng từ. Mỗi danh mục có cách xử lý thuế riêng để làm báo cáo thuế.</p>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    <a href="/admin/expense-categories" class="<%= btnSecondary %>">Danh mục</a>
+    <button type="button" data-modal-open="#expense-dialog" data-action="/admin/expenses" data-title="Thêm khoản chi" data-fill="<%= safeJson({ expense_date: today }) %>" class="<%= btnPrimary %>"><%- icon('plus', 'h-4 w-4') %> Thêm khoản chi</button>
+  </div>
+</div>
+
+<section aria-label="Tóm tắt" class="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+  <div class="<%= card %> px-4 py-3"><p class="text-xs font-medium uppercase tracking-wide text-gray-500">Tổng chi phí</p><p class="mt-1 text-2xl font-semibold tnum text-navy-darker"><%= money(sums.amount) %></p><p class="text-xs text-milk-500"><%= periodText %> · <%= sums.n %> khoản</p></div>
+  <div class="<%= card %> px-4 py-3"><p class="text-xs font-medium uppercase tracking-wide text-gray-500">Tiền hàng nhập</p><p class="mt-1 text-2xl font-semibold tnum text-navy-darker"><%= money(sums.purchases) %></p><p class="text-xs text-milk-500">Tự ghi từ phiếu nhập kho</p></div>
+  <div class="<%= card %> px-4 py-3"><p class="text-xs font-medium uppercase tracking-wide text-gray-500">Chi phí khác</p><p class="mt-1 text-2xl font-semibold tnum text-navy-darker"><%= money(sums.manual) %></p><p class="text-xs text-milk-500">Nhập tay</p></div>
+  <div class="<%= card %> px-4 py-3"><p class="text-xs font-medium uppercase tracking-wide text-gray-500">Được trừ khi tính thuế</p><p class="mt-1 text-2xl font-semibold tnum text-emerald-700"><%= money(sums.deductible) %></p><p class="text-xs text-milk-500">Theo cách xử lý của danh mục</p></div>
+</section>
+
+<% if (top.length) { %>
+<section class="<%= card %> mt-4 p-4" aria-labelledby="split-h">
+  <h2 id="split-h" class="text-sm font-semibold text-navy-darker">Chi phí theo danh mục <span class="font-normal text-gray-500">(<%= all ? 'tất cả thời gian' : 'cùng kỳ' %>)</span></h2>
+  <ul class="mt-3 grid gap-x-6 gap-y-2 sm:grid-cols-2">
+    <% top.forEach((c) => { %>
+      <li>
+        <a href="<%= linkTo({ cat: c.id }) %>" class="block rounded-lg px-1 py-1 hover:bg-milk-50">
+          <span class="flex justify-between text-sm"><span class="truncate"><%= c.name %></span><span class="font-mono font-semibold tnum"><%= money(c.amount) %></span></span>
+          <span class="mt-1 block h-1.5 rounded-full bg-milk-100"><span class="block h-1.5 rounded-full bg-navy" style="width: <%= topMax ? Math.max(3, Math.round(c.amount / topMax * 100)) : 0 %>%"></span></span>
+        </a>
+      </li>
+    <% }) %>
+  </ul>
+</section>
+<% } %>
+
+<section class="mt-6" aria-label="Bộ lọc">
+  <form method="get" action="/admin/expenses" class="<%= card %> grid grid-cols-12 gap-3 p-3 sm:p-4">
+    <div class="col-span-12 sm:col-span-6 lg:col-span-3">
+      <label for="x-q" class="<%= label %>">Tìm</label>
+      <input id="x-q" name="q" type="search" value="<%= q %>" placeholder="Người nhận, ghi chú, số chứng từ…" class="<%= input %>" autocomplete="off">
+    </div>
+    <div class="col-span-12 sm:col-span-6 lg:col-span-3">
+      <label for="x-cat" class="<%= label %>">Danh mục</label>
+      <select id="x-cat" name="cat" class="<%= input %>"><option value="">Tất cả</option><% categories.forEach((c) => { %><option value="<%= c.id %>" <%= c.id === categoryId ? 'selected' : '' %>><%= c.name %></option><% }) %></select>
+    </div>
+    <div class="col-span-6 lg:col-span-2"><label for="x-from" class="<%= label %>">Từ ngày</label><input id="x-from" name="from" type="date" value="<%= all ? '' : from %>" class="<%= input %>"></div>
+    <div class="col-span-6 lg:col-span-2"><label for="x-to" class="<%= label %>">Đến ngày</label><input id="x-to" name="to" type="date" value="<%= all ? '' : to %>" class="<%= input %>"></div>
+    <div class="col-span-12 flex items-end gap-2 lg:col-span-2">
+      <select name="src" class="<%= input %>" aria-label="Nguồn"><option value="">Mọi nguồn</option><option value="manual" <%= source === 'manual' ? 'selected' : '' %>>Nhập tay</option><option value="purchase" <%= source === 'purchase' ? 'selected' : '' %>>Từ phiếu nhập</option></select>
+      <button type="submit" class="<%= btnPrimary %>">Lọc</button>
+    </div>
+    <div class="col-span-12 flex flex-wrap items-center gap-2 text-sm">
+      <span class="text-gray-500">Nhanh:</span>
+      <a href="<%= quick(today, today) %>" class="rounded-full border border-milk-200 px-3 py-1 hover:border-navy-accent">Hôm nay</a>
+      <a href="<%= quick(monthStart, today) %>" class="rounded-full border border-milk-200 px-3 py-1 hover:border-navy-accent">Tháng này</a>
+      <a href="<%= linkTo({ all: true }) %>" class="rounded-full border px-3 py-1 hover:border-navy-accent <%= all ? 'border-navy bg-navy text-white' : 'border-milk-200' %>">Tất cả</a>
+      <label class="ml-2 flex items-center gap-1.5"><input type="checkbox" name="void" value="1" <%= showVoid ? 'checked' : '' %> class="h-4 w-4 rounded border-gray-300 accent-blue-700"> Hiện khoản đã hủy</label>
+      <% if (hasFilter) { %><a href="/admin/expenses" class="ml-auto font-medium text-blue-700 hover:underline">Xóa bộ lọc</a><% } %>
+    </div>
+  </form>
+</section>
+
+<div class="<%= card %> mt-3 overflow-hidden">
+  <table class="rtable w-full border-collapse text-left text-sm lg:min-w-[900px]">
+    <caption class="sr-only">Sổ chi phí</caption>
+    <thead class="<%= ui.thead %>">
+      <tr>
+        <th scope="col" class="w-12 px-2 py-3 text-center sm:px-4">STT</th>
+        <th scope="col" class="px-4 py-3">Ngày</th>
+        <th scope="col" class="px-4 py-3">Danh mục</th>
+        <th scope="col" class="px-4 py-3">Người nhận / ghi chú</th>
+        <th scope="col" class="px-4 py-3 text-right">Số tiền</th>
+        <th scope="col" class="px-4 py-3">Chứng từ</th>
+        <th scope="col" class="px-4 py-3 text-right"><span class="sr-only">Hành động</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% rows.forEach((e, idx) => {
+           const stt = offset + idx + 1;
+           const isVoid = e.status === 'void';
+           const tb = treatmentBadge[e.tax_treatment] || ['', 'neutral'];
+           const fill = { expense_date: String(e.expense_date).slice(0, 10), category_id: e.category_id, amount: Number(e.amount), vat_included: Boolean(e.vat_included), payee: e.payee || '', doc_no: e.doc_no || '', note: e.note || '', image_url: e.receipt_media_id ? `/admin/expenses/${e.id}/receipt` : '' };
+      %>
+        <tr data-row class="border-b border-milk-200 last:border-b-0 <%= stt % 2 === 1 ? 'bg-blue-50/70 hover:bg-blue-100/70' : 'hover:bg-milk-50' %> <%= isVoid ? 'text-gray-400 line-through' : '' %>">
+          <td data-label="" class="rt-no px-2 py-3 text-center font-mono text-xs text-milk-500 tnum sm:px-4"><%= stt %></td>
+          <td data-label="" class="rt-title px-4 py-3 tnum"><%= String(e.expense_date).slice(0, 10).split('-').reverse().join('/') %></td>
+          <td data-label="Danh mục" class="px-4 py-3"><%= e.category_name %> <span class="no-underline"><%- badge(tb[0], tb[1]) %></span></td>
+          <td data-label="Người nhận" class="px-4 py-3">
+            <%= e.payee || '—' %>
+            <% if (e.source === 'purchase') { %> <a href="/admin/receipts/<%= e.purchase_receipt_id %>" class="text-xs font-semibold text-blue-700 no-underline hover:underline"><%= e.receipt_code || 'Phiếu nhập' %></a><% } %>
+            <% if (e.note || e.doc_no) { %><span class="block text-xs text-gray-500"><%= [e.doc_no && `HĐ ${e.doc_no}`, e.note].filter(Boolean).join(' · ') %></span><% } %>
+            <% if (isVoid) { %><span class="block text-xs no-underline text-red-600">Đã hủy: <%= e.void_reason %></span><% } %>
+          </td>
+          <td data-label="Số tiền" class="px-4 py-3 text-right font-mono font-semibold tnum"><%= money(e.amount) %></td>
+          <td data-label="Chứng từ" class="px-4 py-3">
+            <% if (e.receipt_media_id) { %>
+              <a href="/admin/expenses/<%= e.id %>/receipt" target="_blank" rel="noopener" class="inline-block no-underline" title="Xem ảnh chứng từ"><img src="/admin/expenses/<%= e.id %>/receipt" alt="Chứng từ" loading="lazy" width="40" height="40" class="h-10 w-10 rounded-lg object-cover ring-1 ring-milk-200"></a>
+            <% } else { %><span class="text-xs text-gray-400">Chưa có ảnh</span><% } %>
+          </td>
+          <td data-label="" class="rt-actions px-4 py-3 text-right no-underline">
+            <% if (!isVoid) { %>
+            <div class="inline-flex items-center gap-1">
+              <% if (e.source === 'purchase') { %>
+                <button type="button" class="<%= btnGhost %>" aria-label="Đổi danh mục" title="Đổi danh mục" data-modal-open="#expense-cat-dialog" data-action="/admin/expenses/<%= e.id %>" data-title="Danh mục khoản chi #<%= e.id %>" data-fill="<%= safeJson({ category_id: e.category_id, note: e.note || '' }) %>"><%- icon('pencil', 'h-4 w-4') %></button>
+              <% } else { %>
+                <button type="button" class="<%= btnGhost %>" aria-label="Sửa" title="Sửa" data-modal-open="#expense-dialog" data-action="/admin/expenses/<%= e.id %>" data-title="Sửa khoản chi #<%= e.id %>" data-fill="<%= safeJson(fill) %>"><%- icon('pencil', 'h-4 w-4') %></button>
+                <button type="button" class="<%= btnGhost %> hover:!bg-red-50 hover:!text-red-600" aria-label="Hủy khoản chi" title="Hủy" data-modal-open="#expense-void-dialog" data-action="/admin/expenses/<%= e.id %>/void" data-title="Hủy khoản chi #<%= e.id %> — <%= money(e.amount) %>"><%- icon('trash', 'h-4 w-4') %></button>
+              <% } %>
+            </div>
+            <% } %>
+          </td>
+        </tr>
+      <% }) %>
+      <% if (!rows.length) { %><tr data-empty><td colspan="7" data-label="" class="px-4 py-12 text-center text-sm text-gray-500"><%= hasFilter ? 'Không có khoản chi phù hợp.' : 'Chưa có khoản chi nào trong kỳ này. Bấm “Thêm khoản chi” hoặc lập phiếu nhập kho.' %></td></tr><% } %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/pager', { page, pages, total, pageSize, pageUrl, unit: 'khoản chi' }) %>
+
+<!-- Dialog: add / edit a manual expense (the photo is compressed in the browser) -->
+<dialog id="expense-dialog" aria-labelledby="expense-title" class="max-w-lg max-sm:h-[94dvh] <%= sheet %>">
+  <form method="post" action="/admin/expenses" class="flex max-h-[calc(100dvh-2rem)] flex-col max-sm:h-full max-sm:max-h-none">
+    <%- include('../partials/csrf') %>
+    <input type="hidden" name="_back" value="/admin/expenses">
+    <%- grabber %>
+    <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4">
+      <h2 id="expense-title" data-dialog-title class="text-lg font-semibold">Khoản chi</h2>
+      <button type="button" data-modal-close aria-label="Đóng" class="<%= btnGhost %>"><%- icon('x', 'h-5 w-5') %></button>
+    </div>
+    <div class="space-y-4 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+      <div class="grid grid-cols-2 gap-4">
+        <div><label for="e-date" class="<%= label %>">Ngày chi</label><input id="e-date" name="expense_date" type="date" required class="<%= input %>"></div>
+        <div><label for="e-amount" class="<%= label %>">Số tiền (đ)</label><input id="e-amount" name="amount" type="number" min="1" step="any" required inputmode="decimal" class="<%= input %> text-right font-mono font-bold"></div>
+      </div>
+      <div>
+        <label for="e-cat" class="<%= label %>">Danh mục</label>
+        <select id="e-cat" name="category_id" required class="<%= input %>"><% categories.forEach((c) => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %></select>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div><label for="e-payee" class="<%= label %>">Người nhận / nơi chi</label><input id="e-payee" name="payee" maxlength="120" class="<%= input %>" autocomplete="off" placeholder="VD: Chủ nhà, EVN"></div>
+        <div><label for="e-doc" class="<%= label %>">Số chứng từ</label><input id="e-doc" name="doc_no" maxlength="40" class="<%= input %>" autocomplete="off"></div>
+      </div>
+      <div><label for="e-note" class="<%= label %>">Ghi chú</label><input id="e-note" name="note" maxlength="255" class="<%= input %>" autocomplete="off"></div>
+      <label class="flex items-center gap-2 text-sm"><input type="hidden" name="vat_included" value="0"><input type="checkbox" name="vat_included" value="1" class="h-4 w-4 rounded border-gray-300 accent-blue-700"> Số tiền đã gồm VAT (có hóa đơn)</label>
+      <%- include('../partials/image_field', { fieldId: 'e-img', mode: 'receipt', title: 'Ảnh chứng từ', hint: 'Chụp hóa đơn / phiếu chi. Ảnh tự thu nhỏ (≤ 1600 px, ~300 KB) trước khi lưu; một ảnh chỉ dùng cho một khoản chi.' }) %>
+    </div>
+    <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-4 py-3 max-sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
+      <button type="button" data-modal-close class="<%= btnSecondary %> max-sm:flex-1">Hủy</button>
+      <button type="submit" class="<%= btnPrimary %> max-sm:flex-[2]">Lưu</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Dialog: category + note of an expense that came from a stock receipt -->
+<dialog id="expense-cat-dialog" aria-labelledby="expense-cat-title" class="max-w-md <%= sheet %>">
+  <form method="post" action="#" class="flex flex-col">
+    <%- include('../partials/csrf') %>
+    <input type="hidden" name="_back" value="/admin/expenses">
+    <input type="hidden" name="source" value="purchase">
+    <%- grabber %>
+    <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4"><h2 id="expense-cat-title" data-dialog-title class="text-lg font-semibold">Danh mục</h2><button type="button" data-modal-close aria-label="Đóng" class="<%= btnGhost %>"><%- icon('x', 'h-5 w-5') %></button></div>
+    <div class="space-y-4 px-4 py-4 sm:px-6 sm:py-5">
+      <p class="text-xs text-gray-500">Khoản chi này sinh từ phiếu nhập kho: số tiền theo phiếu, chỉ đổi được danh mục và ghi chú.</p>
+      <div><label for="ec-cat" class="<%= label %>">Danh mục</label><select id="ec-cat" name="category_id" class="<%= input %>"><% categories.forEach((c) => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %></select></div>
+      <div><label for="ec-note" class="<%= label %>">Ghi chú</label><input id="ec-note" name="note" maxlength="255" class="<%= input %>" autocomplete="off"></div>
+    </div>
+    <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-4 py-3 sm:px-6 sm:py-4"><button type="button" data-modal-close class="<%= btnSecondary %>">Hủy</button><button type="submit" class="<%= btnPrimary %>">Lưu</button></div>
+  </form>
+</dialog>
+
+<!-- Dialog: void -->
+<dialog id="expense-void-dialog" aria-labelledby="expense-void-title" class="max-w-md <%= sheet %>">
+  <form method="post" action="#" class="flex flex-col">
+    <%- include('../partials/csrf') %>
+    <input type="hidden" name="_back" value="/admin/expenses">
+    <%- grabber %>
+    <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4"><h2 id="expense-void-title" data-dialog-title class="text-lg font-semibold">Hủy khoản chi</h2><button type="button" data-modal-close aria-label="Đóng" class="<%= btnGhost %>"><%- icon('x', 'h-5 w-5') %></button></div>
+    <div class="space-y-3 px-4 py-4 sm:px-6 sm:py-5">
+      <p class="text-xs text-gray-500">Khoản chi không bị xóa: nó được đánh dấu đã hủy kèm lý do và không còn được cộng vào tổng.</p>
+      <div><label for="ev-reason" class="<%= label %>">Lý do hủy</label><input id="ev-reason" name="reason" required maxlength="255" class="<%= input %>" autocomplete="off"></div>
+    </div>
+    <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-4 py-3 sm:px-6 sm:py-4"><button type="button" data-modal-close class="<%= btnSecondary %>">Không</button><button type="submit" class="inline-flex h-10 items-center rounded bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700">Hủy khoản chi</button></div>
+  </form>
+</dialog>

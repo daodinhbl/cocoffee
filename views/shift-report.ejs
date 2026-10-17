@@ -1,0 +1,73 @@
+<%
+  const printable = paper === 58 ? 48 : 72;
+  const base = paper === 58 ? 9 : 10.5;
+  const at = (d) => new Date(d).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' });
+  const diff = Number(shift.difference);
+%><!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Chốt ca #<%= shift.id %></title>
+  <style>
+    @page { size: <%= paper %>mm auto; margin: 0; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body { font-family: "Times New Roman", Times, "Liberation Serif", Tinos, serif; font-size: <%= base %>pt; line-height: 1.3; color: #000; background: #e5e7eb; }
+    .paper { width: <%= paper %>mm; margin: 12px auto; padding: 4mm <%= (paper - printable) / 2 %>mm 6mm; background: #fff; box-shadow: 0 4px 16px rgba(0,0,0,.15); }
+    .center { text-align: center; }
+    .shop { font-size: <%= base + 5 %>pt; font-weight: bold; text-transform: uppercase; }
+    .title { margin: 3mm 0 1mm; font-size: <%= base + 3 %>pt; font-weight: bold; }
+    .rule { border: 0; border-top: 1px dashed #000; margin: 2mm 0; }
+    .row { display: flex; justify-content: space-between; gap: 2mm; }
+    .row > :last-child { text-align: right; white-space: nowrap; }
+    .b { font-weight: bold; }
+    .big { font-size: <%= base + 3 %>pt; font-weight: bold; }
+    .muted { font-size: <%= base - 1 %>pt; }
+    .sign { display: flex; justify-content: space-between; margin-top: 8mm; text-align: center; font-size: <%= base - 1 %>pt; }
+    .sign span { width: 45%; border-top: 1px solid #000; padding-top: 1mm; }
+    .bar { position: sticky; top: 0; display: flex; gap: 8px; justify-content: center; padding: 10px; background: #0f172a; }
+    .bar button { font: inherit; font-size: 14pt; min-height: 48px; padding: 0 20px; border: 0; border-radius: 10px; cursor: pointer; }
+    .bar .print { background: #fbbf24; color: #0f172a; font-weight: bold; }
+    @media print { body { background: #fff; } .paper { margin: 0; box-shadow: none; } .bar { display: none; } }
+  </style>
+</head>
+<body>
+  <div class="bar"><button type="button" class="print" id="btn-print">In phiếu chốt ca</button></div>
+  <main class="paper">
+    <div class="center shop"><%= shopName %></div>
+    <% if (taxCode) { %><div class="center muted">MST: <%= taxCode %></div><% } %>
+    <div class="center title">PHIẾU CHỐT CA #<%= shift.id %></div>
+    <div class="center muted"><%= at(shift.period_from) %> → <%= at(shift.period_to) %></div>
+    <div class="center muted">Thu ngân chốt ca: <%= shift.closed_by_name || '—' %></div>
+    <hr class="rule">
+    <div class="row"><span>Số đơn hoàn tất</span><span><%= shift.orders_count %></span></div>
+    <div class="row"><span>Đơn đã hủy</span><span><%= shift.cancelled_count %></span></div>
+    <div class="row b"><span>Doanh thu</span><span><%= money(shift.revenue) %></span></div>
+    <% if (Number(shift.discount_total) > 0) { %><div class="row"><span>Giảm giá đã cho</span><span><%= money(shift.discount_total) %></span></div><% } %>
+    <% if (Number(shift.unpaid_total) > 0) { %><div class="row"><span>Ghi nợ (chưa thu)</span><span><%= money(shift.unpaid_total) %></span></div><% } %>
+    <hr class="rule">
+    <div class="b">Tiền thu theo hình thức</div>
+    <div class="row"><span>Tiền mặt</span><span><%= money(shift.cash_total) %></span></div>
+    <div class="row"><span>Chuyển khoản</span><span><%= money(shift.transfer_total) %></span></div>
+    <div class="row"><span>Thẻ</span><span><%= money(shift.card_total) %></span></div>
+    <% if (Number(shift.other_total) !== 0) { %><div class="row"><span>Khác</span><span><%= money(shift.other_total) %></span></div><% } %>
+    <hr class="rule">
+    <div class="b">Đối chiếu tiền mặt</div>
+    <div class="row"><span>Tiền đầu ca</span><span><%= money(shift.opening_cash) %></span></div>
+    <div class="row"><span>+ Thu tiền mặt</span><span><%= money(shift.cash_total) %></span></div>
+    <div class="row b"><span>Tiền mặt phải có</span><span><%= money(shift.expected_cash) %></span></div>
+    <div class="row b"><span>Tiền mặt đếm được</span><span><%= money(shift.counted_cash) %></span></div>
+    <div class="row big"><span><%= diff === 0 ? 'Khớp' : diff > 0 ? 'Thừa' : 'Thiếu' %></span><span><%= diff === 0 ? '0' : money(Math.abs(diff)) %></span></div>
+    <% if (shift.note) { %><hr class="rule"><div class="muted">Ghi chú: <%= shift.note %></div><% } %>
+    <div class="sign"><span>Thu ngân</span><span>Quản lý</span></div>
+  </main>
+  <script nonce="<%= nonce %>">
+    (function () {
+      document.getElementById('btn-print').addEventListener('click', function () { window.print(); });
+      <% if (autoPrint) { %>window.addEventListener('load', function () { setTimeout(function () { window.print(); }, 150); });<% } %>
+    })();
+  </script>
+</body>
+</html>

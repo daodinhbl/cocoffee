@@ -98,6 +98,53 @@ async function insertPayment({ orderId, method, amount, reference = null, userId
   );
 }
 
+/** Money already received on the order (prepayments, minus refunds). */
+async function paidTotal(orderId, conn) {
+  const [rows] = await db(conn).query('SELECT COALESCE(SUM(amount), 0) AS s FROM payments WHERE order_id = ?', [orderId]);
+  return Number(rows[0].s);
+}
+
+/** Per payment method, the net amount received (for refunding a cancelled order). */
+async function paidByMethod(orderId, conn) {
+  const [rows] = await db(conn).query(
+    'SELECT method, COALESCE(SUM(amount), 0) AS amount FROM payments WHERE order_id = ? GROUP BY method HAVING SUM(amount) > 0',
+    [orderId]
+  );
+  return rows.map((r) => ({ method: r.method, amount: Number(r.amount) }));
+}
+
+/** Ghép bàn: payments taken on `fromId` now belong to `toId`. */
+async function movePayments(fromId, toId, conn) {
+  await db(conn).query('UPDATE payments SET order_id = ? WHERE order_id = ?', [toId, fromId]);
+}
+
+/** Moves every line of `fromId` onto `toId` (no totals recalculation: the caller does it). */
+async function moveAllItems(fromId, toId, conn) {
+  await db(conn).query('UPDATE order_items SET order_id = ? WHERE order_id = ?', [toId, fromId]);
+}
+
+/** Tách bàn: moves one line to another order. */
+async function moveItem(itemId, toId, conn) {
+  await db(conn).query('UPDATE order_items SET order_id = ? WHERE id = ?', [toId, itemId]);
+}
+
+/** Lowers a line to `quantity` (line_total follows). */
+async function setItemQuantity(itemId, quantity, conn) {
+  await db(conn).query('UPDATE order_items SET quantity = ?, line_total = unit_price * ? WHERE id = ?', [quantity, quantity, itemId]);
+}
+
+/** A copy of `item` with another quantity, on `toId`. */
+async function insertItemCopy(item, toId, quantity, conn) {
+  await db(conn).query(
+    'INSERT INTO order_items (order_id, product_id, product_name, unit_price, quantity, line_total, note) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [toId, item.product_id, item.product_name, item.unit_price, quantity, Number(item.unit_price) * quantity, item.note || null]
+  );
+}
+
+async function setNote(orderId, note, conn) {
+  await db(conn).query('UPDATE orders SET note = ? WHERE id = ?', [note ? String(note).slice(0, 255) : null, orderId]);
+}
+
 async function markReceipt(orderId, error, conn) {
   if (error) {
     await db(conn).query('UPDATE orders SET receipt_error = ? WHERE id = ?', [String(error).slice(0, 255), orderId]);
@@ -107,7 +154,7 @@ async function markReceipt(orderId, error, conn) {
 }
 
 /** WHERE clause shared by list() and count(). `q` matches the order code (LIKE wildcards escaped). */
-function buildFilter({ status, excludeStatuses, source, paymentStatus, tableId, from, to, q, updatedAfter } = {}) {
+function buildFilter({ status, excludeStatuses, source, paymentStatus, tableId, noTable, from, to, q, updatedAfter } = {}) {
   const where = [];
   const params = [];
   if (status) { where.push('o.status = ?'); params.push(status); }
@@ -115,6 +162,7 @@ function buildFilter({ status, excludeStatuses, source, paymentStatus, tableId, 
   if (source) { where.push('o.source = ?'); params.push(source); }
   if (paymentStatus) { where.push('o.payment_status = ?'); params.push(paymentStatus); }
   if (tableId) { where.push('o.table_id = ?'); params.push(tableId); }
+  if (noTable) where.push('o.table_id IS NULL');
   if (from) { where.push('o.created_at >= ?'); params.push(from); }
   if (to) { where.push('o.created_at < ?'); params.push(to); }
   if (q) { where.push("o.order_code LIKE ? ESCAPE '\\\\'"); params.push(`%${String(q).replace(/[\\%_]/g, '\\$&')}%`); }
@@ -226,5 +274,5 @@ async function summary(from, to, conn) {
 
 module.exports = {
   insert, getById, getItems, replaceItems, recalcTotals, setDiscount, setItemCogs, markCompleted, markPaid,
-  markCancelled, insertPayment, markReceipt, getFullByIds, getItemsByOrderIds, getPaymentsByOrderIds, list, count, getPayments, summary, breakdown,
+  markCancelled, insertPayment, paidTotal, paidByMethod, movePayments, moveAllItems, moveItem, setItemQuantity, insertItemCopy, setNote, markReceipt, getFullByIds, getItemsByOrderIds, getPaymentsByOrderIds, list, count, getPayments, summary, breakdown,
 };

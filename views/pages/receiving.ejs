@@ -1,71 +1,300 @@
 <%
-  const { input, label, btnPrimary } = ui;
+  const { input, label, btnPrimary, btnSecondary } = ui;
+  const card = 'rounded-xl border border-milk-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,.04)]';
+  const catalog = items.map((i) => ({
+    id: i.id, name: i.name, sku: i.sku, unit: i.unit, stock: Number(i.quantity_on_hand), cost: Number(i.avg_cost), group: i.group,
+    packName: i.pack_name || '', packSize: i.pack_size ? Number(i.pack_size) : 0,
+  }));
+  const groupName = Object.fromEntries(groups.map((g) => [g.code, g.label]));
 %>
-<div>
-  <h1 class="text-xl font-semibold tracking-tight sm:text-2xl">Nhập kho</h1>
-  <p class="mt-1 max-w-2xl text-sm text-gray-500">Ghi nhận hàng mới về. Giá vốn bình quân của mặt hàng được tính lại theo số lượng và đơn giá nhập, và là cơ sở tính giá vốn (COGS) của các đơn sau.</p>
+<div class="flex flex-wrap items-end justify-between gap-4">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight text-navy-darker sm:text-2xl">Nhập kho</h1>
+    <p class="mt-1 max-w-2xl text-sm text-gray-500">Một phiếu nhập gồm nhiều mặt hàng, ghi theo đơn vị mua (thùng, kg…) và tự chia ra đơn giá từng chai / gam. Giá vốn bình quân được tính lại theo đơn giá nhập, và là cơ sở tính giá vốn (COGS) của các đơn sau.</p>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    <a href="/admin/receipts" class="<%= btnSecondary %>">Lịch sử nhập</a>
+    <a href="/admin/suppliers" class="<%= btnSecondary %>">Nhà cung cấp</a>
+  </div>
 </div>
 
-<div class="mt-5 grid grid-cols-12 gap-4 sm:gap-6">
-  <section class="col-span-12 rounded border border-gray-200 p-5 lg:col-span-4" aria-labelledby="recv-title">
-    <h2 id="recv-title" class="text-base font-semibold">Phiếu nhập</h2>
-    <form method="post" action="/admin/receiving" class="mt-4 space-y-4" id="receive-form">
-      <%- include('../partials/csrf') %>
+<form method="post" action="/admin/receiving" id="receive-form" class="mt-5 grid grid-cols-12 gap-4 lg:gap-6">
+  <%- include('../partials/csrf') %>
+
+  <!-- Slip header + payment -->
+  <section class="<%= card %> col-span-12 p-4 sm:p-5 lg:col-span-4 lg:self-start" aria-labelledby="slip-title">
+    <h2 id="slip-title" class="text-base font-semibold text-navy-darker">Phiếu nhập</h2>
+    <div class="mt-4 space-y-4">
       <div>
-        <label for="r-item" class="<%= label %>">Nguyên liệu</label>
-        <select id="r-item" name="inventory_item_id" required class="<%= input %>">
-          <option value="">— chọn —</option>
-          <% items.forEach((i) => { %>
-            <option value="<%= i.id %>" <%= i.id === preselect ? 'selected' : '' %>><%= i.name %> (tồn <%= num(i.quantity_on_hand) %> <%= i.unit %>)</option>
-          <% }) %>
+        <label for="r-supplier" class="<%= label %>">Nhà cung cấp</label>
+        <select id="r-supplier" name="supplier_id" class="<%= input %>">
+          <option value="">— Mua lẻ, không công nợ —</option>
+          <% suppliers.forEach((s) => { %><option value="<%= s.id %>" <%= s.id === preSupplier ? 'selected' : '' %>><%= s.name %></option><% }) %>
         </select>
-      </div>
-      <div class="grid grid-cols-2 gap-4">
-        <div>
-          <label for="r-qty" class="<%= label %>">Số lượng</label>
-          <input id="r-qty" name="quantity" type="number" min="0.001" step="any" required inputmode="decimal" class="<%= input %> text-right font-mono">
-        </div>
-        <div>
-          <label for="r-cost" class="<%= label %>">Đơn giá nhập (đ / đơn vị)</label>
-          <input id="r-cost" name="unit_cost" type="number" min="0" step="any" required inputmode="decimal" class="<%= input %> text-right font-mono">
-        </div>
+        <input id="r-supplier-new" name="supplier_new" maxlength="120" class="<%= input %> mt-2" autocomplete="off" placeholder="Hoặc nhập tên nhà cung cấp mới">
       </div>
       <div>
-        <label for="r-note" class="<%= label %>">Ghi chú (nhà cung cấp, số hóa đơn…)</label>
+        <label for="r-doc" class="<%= label %>">Số hóa đơn / chứng từ</label>
+        <input id="r-doc" name="doc_no" maxlength="40" class="<%= input %>" autocomplete="off">
+      </div>
+      <div>
+        <label for="r-note" class="<%= label %>">Ghi chú</label>
         <input id="r-note" name="note" maxlength="255" class="<%= input %>" autocomplete="off">
       </div>
-      <button type="submit" class="<%= btnPrimary %> w-full">Nhập kho</button>
-    </form>
+    </div>
+
+    <fieldset id="pay-box" class="mt-5 space-y-2 border-t border-dashed border-milk-200 pt-4">
+      <legend class="<%= label %> !mb-1">Thanh toán</legend>
+      <label class="flex min-h-10 items-center gap-2 text-sm"><input type="radio" name="pay_mode" value="all" checked class="accent-blue-700"> Trả đủ ngay</label>
+      <label class="flex min-h-10 items-center gap-2 text-sm"><input type="radio" name="pay_mode" value="none" class="accent-blue-700"> Ghi nợ toàn bộ</label>
+      <label class="flex min-h-10 items-center gap-2 text-sm"><input type="radio" name="pay_mode" value="partial" class="accent-blue-700"> Trả một phần</label>
+      <div id="paid-partial" class="hidden">
+        <input id="r-paid" name="paid_amount" type="number" min="0" step="any" inputmode="decimal" placeholder="Số tiền trả ngay (đ)" class="<%= input %> text-right font-mono">
+      </div>
+      <select name="pay_method" class="<%= input %>" aria-label="Hình thức thanh toán">
+        <option value="cash">Tiền mặt</option><option value="transfer">Chuyển khoản</option><option value="other">Khác</option>
+      </select>
+      <p id="pay-retail" class="hidden text-xs text-gray-500">Mua lẻ (không chọn nhà cung cấp) được coi là đã trả đủ.</p>
+    </fieldset>
+
+    <dl class="mt-5 space-y-1.5 border-t border-dashed border-milk-200 pt-4 text-sm">
+      <div class="flex justify-between"><dt class="text-gray-500">Số mặt hàng</dt><dd class="font-semibold tnum" id="sum-lines">0</dd></div>
+      <div class="flex items-end justify-between pt-1"><dt class="font-semibold text-gray-600">Tổng tiền hàng</dt><dd class="text-2xl font-bold tnum text-navy-darker" id="sum-total">0đ</dd></div>
+      <div class="flex justify-between"><dt class="text-gray-500">Đã trả</dt><dd class="font-semibold tnum text-emerald-700" id="sum-paid">0đ</dd></div>
+      <div class="flex justify-between"><dt class="text-gray-500">Còn nợ nhà cung cấp</dt><dd class="font-semibold tnum" id="sum-debt">0đ</dd></div>
+    </dl>
+    <button type="submit" id="recv-submit" disabled class="<%= btnPrimary %> mt-4 w-full disabled:cursor-not-allowed disabled:opacity-50">Lưu phiếu nhập</button>
+    <p class="mt-2 text-center text-xs text-gray-500">Lưu một lần: tất cả dòng được ghi hoặc không dòng nào.</p>
   </section>
 
-  <section class="col-span-12 rounded border border-gray-200 max-lg:border-0 lg:col-span-8" aria-labelledby="recent-title">
-    <h2 id="recent-title" class="border-b border-gray-200 px-5 py-4 text-base font-semibold max-lg:border-b-0 max-lg:px-0">Lần nhập gần đây</h2>
-    <table class="rtable w-full border-collapse text-left text-sm lg:min-w-[560px]">
-      <caption class="sr-only">Các lần nhập kho gần đây</caption>
-      <thead class="<%= ui.thead %>">
-        <tr>
-          <th scope="col" class="px-4 py-3">Thời gian</th>
-          <th scope="col" class="px-4 py-3">Nguyên liệu</th>
-          <th scope="col" class="px-4 py-3 text-right">Số lượng</th>
-          <th scope="col" class="px-4 py-3 text-right">Đơn giá</th>
-          <th scope="col" class="px-4 py-3">Người nhập</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% recent.forEach((m) => { %>
-          <tr class="border-b border-gray-200 last:border-b-0 hover:bg-gray-50">
-            <td data-label="" class="rt-title px-4 py-3 tnum"><%= fmtTime(m.created_at) %></td>
-            <td data-label="Nguyên liệu" class="px-4 py-3">
-              <a href="/admin/inventory/<%= m.inventory_item_id %>" class="text-blue-700 hover:text-navy hover:underline"><%= m.item_name %></a>
-              <% if (m.note) { %><span class="block text-xs text-gray-500"><%= m.note %></span><% } %>
-            </td>
-            <td data-label="Số lượng" class="px-4 py-3 text-right font-mono tnum">+<%= num(m.quantity_change) %> <span class="text-gray-500"><%= m.unit %></span></td>
-            <td data-label="Đơn giá" class="px-4 py-3 text-right font-mono tnum"><%= money(m.unit_cost) %></td>
-            <td data-label="Người nhập" class="px-4 py-3 text-gray-600"><%= m.user_name || '—' %></td>
-          </tr>
-        <% }) %>
-        <% if (!recent.length) { %><tr><td colspan="5" data-label="" class="px-4 py-10 text-center text-gray-500">Chưa có lần nhập nào.</td></tr><% } %>
-      </tbody>
-    </table>
+  <!-- Lines -->
+  <section class="<%= card %> col-span-12 p-4 sm:p-5 lg:col-span-8" aria-labelledby="lines-title">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h2 id="lines-title" class="text-base font-semibold text-navy-darker">Mặt hàng nhập</h2>
+      <div class="relative w-full sm:w-80">
+        <label for="r-add" class="sr-only">Thêm mặt hàng</label>
+        <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><%- icon('search', 'h-4 w-4') %></span>
+        <input id="r-add" list="r-catalog" autocomplete="off" placeholder="Gõ tên / SKU rồi chọn để thêm…" class="<%= input %> pl-9">
+        <datalist id="r-catalog">
+          <% items.forEach((i) => { %><option value="<%= i.name %> · <%= i.sku %>"><%= groupName[i.group] %> · tồn <%= num(i.quantity_on_hand) %> <%= i.unit %></option><% }) %>
+        </datalist>
+      </div>
+    </div>
+
+    <div class="no-scrollbar mt-3 flex gap-2 overflow-x-auto pb-1" role="group" aria-label="Thêm nhanh theo phân loại">
+      <% groups.forEach((g) => { const n = items.filter((i) => i.group === g.code).length; if (!n) return; %>
+        <button type="button" data-pick-group="<%= g.code %>" class="inline-flex h-9 shrink-0 items-center gap-2 rounded-full border border-milk-200 bg-white px-3.5 text-sm font-medium hover:border-navy-accent"><%= g.label %> <span class="tnum text-xs opacity-70"><%= n %></span></button>
+      <% }) %>
+    </div>
+
+    <div id="r-picker" class="mt-2 hidden rounded-lg border border-milk-200 bg-milk-50 p-2">
+      <ul id="r-picker-list" class="grid gap-1 sm:grid-cols-2"></ul>
+    </div>
+
+    <div class="mt-4 overflow-hidden rounded-lg border border-milk-200">
+      <div class="hidden grid-cols-[2.5rem_1fr_6.5rem_8rem_8.5rem_7.5rem_2.5rem] gap-2 bg-milk-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500 md:grid">
+        <span class="text-center">#</span><span>Mặt hàng</span><span class="text-right">Số lượng</span><span>Đơn vị nhập</span><span class="text-right">Đơn giá / đơn vị (đ)</span><span class="text-right">Thành tiền</span><span></span>
+      </div>
+      <ul id="r-lines" class="divide-y divide-milk-200"></ul>
+      <p id="r-empty" class="px-4 py-10 text-center text-sm text-gray-500">Chưa có mặt hàng nào. Gõ tên ở ô trên hoặc bấm một phân loại để chọn nhanh nhiều mặt hàng.</p>
+    </div>
+    <p class="mt-3 text-xs text-gray-500">Ví dụ: 1 thùng 24 chai giá 240.000đ → nhập “1”, đơn vị “thùng (24 chai)”, đơn giá 240.000: kho tăng 24 chai, giá vốn 10.000đ / chai. 1 kg cà phê 280.000đ → đơn vị “kg”, kho tăng 1.000 g, giá vốn 280đ / g. Đặt sẵn quy cách ở Nguyên liệu → Sửa → “Quy cách nhập”.</p>
   </section>
-</div>
+</form>
+
+<!-- History -->
+<section class="<%= card %> mt-6 overflow-hidden" aria-labelledby="recent-title">
+  <div class="flex items-center justify-between border-b border-milk-200 px-4 py-4 sm:px-5">
+    <h2 id="recent-title" class="text-base font-semibold text-navy-darker">Phiếu nhập gần đây</h2>
+    <a href="/admin/receipts" class="text-sm font-medium text-blue-700 hover:underline">Xem tất cả →</a>
+  </div>
+  <table class="rtable w-full border-collapse text-left text-sm lg:min-w-[640px]">
+    <caption class="sr-only">Các phiếu nhập kho gần đây</caption>
+    <thead class="<%= ui.thead %>">
+      <tr>
+        <th scope="col" class="px-4 py-3">Phiếu</th>
+        <th scope="col" class="px-4 py-3">Thời gian</th>
+        <th scope="col" class="px-4 py-3">Nhà cung cấp</th>
+        <th scope="col" class="px-4 py-3 text-right">Dòng</th>
+        <th scope="col" class="px-4 py-3 text-right">Tổng tiền</th>
+        <th scope="col" class="px-4 py-3 text-right">Còn nợ</th>
+        <th scope="col" class="px-4 py-3">Người nhập</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% recent.forEach((r, idx) => { %>
+        <tr class="border-b border-milk-200 last:border-b-0 <%= idx % 2 === 0 ? 'bg-blue-50/70' : '' %>">
+          <td data-label="" class="rt-title px-4 py-3"><a href="/admin/receipts/<%= r.id %>" class="font-semibold text-blue-700 hover:underline tnum"><%= r.receipt_code %></a><% if (r.doc_no) { %><span class="block text-xs text-gray-500">HĐ <%= r.doc_no %></span><% } %></td>
+          <td data-label="Thời gian" class="px-4 py-3 tnum"><%= fmtTime(r.created_at) %></td>
+          <td data-label="Nhà cung cấp" class="px-4 py-3"><%= r.supplier_name || 'Mua lẻ' %></td>
+          <td data-label="Dòng" class="px-4 py-3 text-right font-mono tnum"><%= r.line_count %></td>
+          <td data-label="Tổng tiền" class="px-4 py-3 text-right font-mono font-semibold tnum"><%= money(r.total) %></td>
+          <td data-label="Còn nợ" class="px-4 py-3 text-right font-mono tnum <%= Number(r.debt) > 0 ? 'font-semibold text-red-700' : 'text-gray-400' %>"><%= Number(r.debt) > 0 ? money(r.debt) : '—' %></td>
+          <td data-label="Người nhập" class="px-4 py-3 text-gray-600"><%= r.user_name || '—' %></td>
+        </tr>
+      <% }) %>
+      <% if (!recent.length) { %><tr><td colspan="7" data-label="" class="px-4 py-10 text-center text-gray-500">Chưa có phiếu nhập nào.</td></tr><% } %>
+    </tbody>
+  </table>
+</section>
+
+<script type="application/json" id="r-data"><%- safeJson({ catalog, preselect }) %></script>
+<script nonce="<%= nonce %>">
+  (function () {
+    var data = JSON.parse(document.getElementById('r-data').textContent);
+    var byId = {}; data.catalog.forEach(function (i) { byId[i.id] = i; });
+    var listEl = document.getElementById('r-lines'), emptyEl = document.getElementById('r-empty');
+    var addInput = document.getElementById('r-add'), submit = document.getElementById('recv-submit');
+    var picker = document.getElementById('r-picker'), pickerList = document.getElementById('r-picker-list');
+    var vnd = function (n) { return Math.round(n).toLocaleString('vi-VN') + 'đ'; };
+    var num = function (n) { return Number(n).toLocaleString('vi-VN', { maximumFractionDigits: 3 }); };
+    var money2 = function (n) { return Number(n).toLocaleString('vi-VN', { maximumFractionDigits: n < 100 ? 2 : 0 }) + 'đ'; };
+    var esc = function (s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+    var fieldCls = 'h-10 w-full rounded border border-gray-300 px-2 text-right font-mono text-sm tnum focus:border-navy-accent focus:outline-none focus:ring-1 focus:ring-navy-accent';
+    var selCls = 'h-10 w-full rounded border border-gray-300 bg-white px-2 text-sm focus:border-navy-accent focus:outline-none focus:ring-1 focus:ring-navy-accent';
+
+    /** Units a line can be bought in: the stock unit, the item's own pack, kg / lít for g / ml, or a custom one. */
+    function unitsOf(it) {
+      var out = [{ label: it.unit, factor: 1 }];
+      if (it.packName && it.packSize > 0) out.push({ label: it.packName + ' (' + num(it.packSize) + ' ' + it.unit + ')', factor: it.packSize, name: it.packName, pack: true });
+      var u = it.unit.toLowerCase();
+      if ((u === 'g' || u === 'gram') && !(it.packName && it.packSize === 1000)) out.push({ label: 'kg (1.000 ' + it.unit + ')', factor: 1000, name: 'kg' });
+      if ((u === 'ml') && !(it.packName && it.packSize === 1000)) out.push({ label: 'lít (1.000 ' + it.unit + ')', factor: 1000, name: 'lít' });
+      out.push({ label: 'Khác…', custom: true });
+      return out;
+    }
+
+    function present(id) { return !!listEl.querySelector('[data-line][data-id="' + id + '"]'); }
+
+    function addLine(id, focus) {
+      var it = byId[id]; if (!it) return;
+      var existing = listEl.querySelector('[data-line][data-id="' + id + '"] [data-qty]');
+      if (existing) { if (focus) { existing.focus(); existing.select(); } return; }
+      var units = unitsOf(it);
+      var startUnit = units.some(function (u) { return u.pack; }) ? units.findIndex(function (u) { return u.pack; }) : 0;
+      var li = document.createElement('li');
+      li.setAttribute('data-line', ''); li.setAttribute('data-id', id);
+      li.className = 'grid grid-cols-2 items-center gap-2 px-3 py-3 md:grid-cols-[2.5rem_1fr_6.5rem_8rem_8.5rem_7.5rem_2.5rem]';
+      li.innerHTML =
+        '<span class="hidden text-center font-mono text-xs text-gray-500 md:block" data-no></span>' +
+        '<div class="col-span-2 min-w-0 md:col-span-1"><input type="hidden" name="item_id" value="' + it.id + '">' +
+          '<input type="hidden" name="factor" data-factor value="1"><input type="hidden" name="pack" data-pack value="">' +
+          '<p class="truncate font-semibold text-dark">' + esc(it.name) + '</p>' +
+          '<p class="font-mono text-xs text-gray-500">' + esc(it.sku) + ' · tồn ' + num(it.stock) + ' ' + esc(it.unit) + '</p>' +
+          '<p class="mt-0.5 text-xs font-medium text-emerald-700" data-derived></p></div>' +
+        '<label class="block"><span class="mb-0.5 block text-xs text-gray-500 md:sr-only">Số lượng</span>' +
+          '<input name="quantity" data-qty type="number" min="0.001" step="any" inputmode="decimal" required class="' + fieldCls + '" aria-label="Số lượng ' + esc(it.name) + '"></label>' +
+        '<label class="block"><span class="mb-0.5 block text-xs text-gray-500 md:sr-only">Đơn vị nhập</span>' +
+          '<select data-unit class="' + selCls + '" aria-label="Đơn vị nhập ' + esc(it.name) + '">' + units.map(function (u, k) { return '<option value="' + k + '"' + (k === startUnit ? ' selected' : '') + '>' + esc(u.label) + '</option>'; }).join('') + '</select></label>' +
+        '<label class="block"><span class="mb-0.5 block text-xs text-gray-500 md:sr-only">Đơn giá / đơn vị nhập (đ)</span>' +
+          '<input name="unit_cost" data-cost type="number" min="0" step="any" inputmode="decimal" required class="' + fieldCls + '" aria-label="Đơn giá ' + esc(it.name) + '"></label>' +
+        '<p class="text-right font-mono text-sm font-semibold tnum" data-total>0đ</p>' +
+        '<button type="button" data-remove class="ml-auto flex h-10 w-10 items-center justify-center rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-600" aria-label="Bỏ ' + esc(it.name) + '">✕</button>' +
+        '<div class="col-span-2 hidden grid-cols-2 gap-2 md:col-span-7 md:grid-cols-[2.5rem_1fr_1fr]" data-custom>' +
+          '<span class="hidden md:block"></span>' +
+          '<input data-custom-name maxlength="30" placeholder="Tên đơn vị (thùng, bao, hộp…)" class="' + selCls + '" aria-label="Tên đơn vị nhập">' +
+          '<input data-custom-factor type="number" min="0.001" step="any" placeholder="1 đơn vị = ? ' + esc(it.unit) + '" class="' + fieldCls + '" aria-label="Quy đổi ra ' + esc(it.unit) + '"></div>';
+      li._it = it; li._units = units; li._costTouched = false;
+      listEl.appendChild(li);
+      applyUnit(li);
+      refresh();
+      if (focus) li.querySelector('[data-qty]').focus();
+    }
+
+    /** Reads the unit selection into the hidden factor / pack fields (and suggests a price for it). */
+    function applyUnit(li) {
+      var it = li._it, u = li._units[Number(li.querySelector('[data-unit]').value)];
+      var custom = li.querySelector('[data-custom]');
+      var factor = 1, name = '';
+      if (u.custom) {
+        custom.classList.remove('hidden'); custom.classList.add('grid');
+        factor = parseFloat(li.querySelector('[data-custom-factor]').value) || 0;
+        name = li.querySelector('[data-custom-name]').value.trim();
+      } else {
+        custom.classList.add('hidden'); custom.classList.remove('grid');
+        factor = u.factor; name = u.name || '';
+      }
+      li.querySelector('[data-factor]').value = factor || '';
+      li.querySelector('[data-pack]').value = name;
+      li._factor = factor; li._unitName = name || it.unit;
+      if (!li._costTouched && it.cost && factor) li.querySelector('[data-cost]').value = Math.round(it.cost * factor * 100) / 100;   // last average cost as a starting point
+    }
+
+    function refresh() {
+      var lines = listEl.querySelectorAll('[data-line]'), total = 0, ok = lines.length > 0;
+      Array.prototype.forEach.call(lines, function (li, k) {
+        var q = parseFloat(li.querySelector('[data-qty]').value) || 0, c = parseFloat(li.querySelector('[data-cost]').value) || 0, f = li._factor || 0;
+        li.querySelector('[data-no]').textContent = k + 1;
+        li.querySelector('[data-total]').textContent = vnd(q * c);
+        var d = li.querySelector('[data-derived]');
+        d.textContent = (f && f !== 1 && q > 0) ? '= ' + num(q * f) + ' ' + li._it.unit + (c > 0 ? ' · ' + money2(c / f) + ' / ' + li._it.unit : '') : (f === 1 ? '' : 'Nhập quy đổi để tính');
+        total += q * c;
+        if (!(q > 0) || !(f > 0)) ok = false;
+      });
+      emptyEl.classList.toggle('hidden', lines.length > 0);
+      document.getElementById('sum-lines').textContent = lines.length;
+      document.getElementById('sum-total').textContent = vnd(total);
+      var retail = !document.getElementById('r-supplier').value && !document.getElementById('r-supplier-new').value.trim();
+      var mode = (document.querySelector('input[name="pay_mode"]:checked') || {}).value || 'all';
+      var paid = retail || mode === 'all' ? total : mode === 'none' ? 0 : Math.min(total, parseFloat(document.getElementById('r-paid').value) || 0);
+      document.getElementById('sum-paid').textContent = vnd(paid);
+      var debt = total - paid;
+      var debtEl = document.getElementById('sum-debt'); debtEl.textContent = vnd(debt); debtEl.className = 'font-semibold tnum ' + (debt > 0 ? 'text-red-700' : '');
+      document.getElementById('paid-partial').classList.toggle('hidden', retail || mode !== 'partial');
+      document.getElementById('pay-retail').classList.toggle('hidden', !retail);
+      Array.prototype.forEach.call(document.querySelectorAll('#pay-box input, #pay-box select'), function (el) { el.disabled = retail && el.name !== ''; });
+      submit.disabled = !ok;
+    }
+
+    function addFromText() {
+      var t = addInput.value.trim().toLowerCase(); if (!t) return;
+      var hit = data.catalog.filter(function (i) { return (i.name + ' · ' + i.sku).toLowerCase() === t; })[0] ||
+                (data.catalog.filter(function (i) { return i.sku.toLowerCase() === t || i.name.toLowerCase() === t; })[0]);
+      if (!hit) return;
+      addLine(hit.id, true); addInput.value = '';
+    }
+    addInput.addEventListener('change', addFromText);
+    addInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); addFromText(); } });
+
+    document.querySelector('[data-pick-group]').parentNode.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-pick-group]'); if (!b) return;
+      var g = b.getAttribute('data-pick-group');
+      if (!picker.classList.contains('hidden') && picker.getAttribute('data-group') === g) { picker.classList.add('hidden'); return; }
+      picker.setAttribute('data-group', g);
+      pickerList.innerHTML = data.catalog.filter(function (i) { return i.group === g; }).map(function (i) {
+        return '<li><button type="button" data-pick="' + i.id + '" class="flex w-full items-center justify-between gap-2 rounded-md bg-white px-3 py-2 text-left text-sm ring-1 ring-milk-200 hover:ring-navy-accent">' +
+          '<span class="min-w-0 truncate">' + esc(i.name) + '</span><span class="shrink-0 font-mono text-xs text-gray-500">' + (present(i.id) ? '✓ đã thêm' : 'tồn ' + num(i.stock)) + '</span></button></li>';
+      }).join('');
+      picker.classList.remove('hidden');
+    });
+    pickerList.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-pick]'); if (!b) return;
+      addLine(Number(b.getAttribute('data-pick')), false);
+      b.querySelector('span:last-child').textContent = '✓ đã thêm';
+    });
+
+    listEl.addEventListener('input', function (e) {
+      var li = e.target.closest('[data-line]');
+      if (li && e.target.matches('[data-cost]')) li._costTouched = true;
+      if (li && e.target.matches('[data-custom-name], [data-custom-factor]')) applyUnit(li);
+      refresh();
+    });
+    listEl.addEventListener('change', function (e) {
+      var li = e.target.closest('[data-line]');
+      if (li && e.target.matches('[data-unit]')) { applyUnit(li); refresh(); }
+    });
+    listEl.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-remove]'); if (!b) return;
+      b.closest('[data-line]').remove(); refresh();
+    });
+    ['r-supplier', 'r-supplier-new', 'r-paid'].forEach(function (id) { document.getElementById(id).addEventListener('input', refresh); });
+    Array.prototype.forEach.call(document.querySelectorAll('input[name="pay_mode"]'), function (r) { r.addEventListener('change', refresh); });
+    document.getElementById('receive-form').addEventListener('submit', function (e) {
+      if (submit.disabled) { e.preventDefault(); return; }
+      submit.disabled = true; submit.textContent = 'Đang lưu…';
+    });
+
+    if (data.preselect) addLine(data.preselect, true);
+    refresh();
+  })();
+</script>

@@ -20,6 +20,7 @@ const routes = require('./src/routes');
 const adminRoutes = require('./src/routes/adminRoutes');
 const mediaRoutes = require('./src/routes/mediaRoutes');
 const downloadRoutes = require('./src/routes/downloadRoutes');
+const kyThuatRoutes = require('./src/routes/kyThuatRoutes');
 const viewHelpers = require('./src/utils/viewHelpers');
 const { adminSecurity } = require('./src/middlewares/adminSecurity');
 const appRelease = require('./src/services/appRelease');
@@ -67,6 +68,9 @@ app.get('/health', async (_req, res) => {
 // iOS landing page (/download/ios -> TestFlight / App Store link) and its QR code.
 app.use('/download', downloadRoutes);
 
+// Technical-service QR page (public): finished jobs + request form; printed QR codes point here (routes/kyThuatRoutes.js).
+app.use('/ky-thuat', kyThuatRoutes);
+
 // Product introduction page (public; linked from the login page "Xem thêm").
 app.get('/gioi-thieu', adminSecurity, (_req, res) => res.render('landing', { shopName: env.business.shopName, appDownload: appRelease.loginCard(), contact: env.contact }));
 
@@ -86,15 +90,24 @@ process.on('unhandledRejection', (reason) => logger.error('unhandledRejection', 
 //  - Passenger: the global `PhusionPassenger` exists and listen()'s argument is ignored (socket injected).
 //  - Otherwise: PORT from the host's environment; 3000 only matters for `npm start` on your own machine.
 async function start() {
-  const bootstrap = await bootstrapIfEmpty();           // never throws; logs its own outcome
-  if (bootstrap === 'applied') productModel.invalidateCatalog();
-  await ensureSchemaUpgrades();                         // additive tables for older databases; never throws
-  await ensureMenuSeed();                               // printed menu, once per database; never throws
-  await ensureMenuAliases();                            // how customers really order it ("đen đá", "cf muối"), once; never throws
-  await ensureMenuPhotos();                             // shipped public/menu photos for items without one; never throws
-  backupService.startScheduler();                       // automatic database backups (Admin > Sao lưu); never throws
-  webhookGuard.ensure().catch(() => {});                // Zalo Bot Platform: re-register the webhook when its URL / secret changed; never throws, not awaited
-  payonService.startRecovery();                         // PayOn: finishes claims a dead process left half-applied; never throws
+  // SKIP_BOOT_TASKS=true: run the UI on your own machine against a live database without any of the write-y boot
+  // steps below (schema/menu/photos/backups, Zalo webhook re-registration, PayOn recovery).
+  const skipBoot = /^(1|true|yes)$/i.test(process.env.SKIP_BOOT_TASKS || '');
+  await require('./src/services/shopProfile').apply();   // shop name / address / phone saved in Cài đặt (read-only; also with SKIP_BOOT_TASKS)
+  let bootstrap = 'skipped';
+  if (!skipBoot) {
+    bootstrap = await bootstrapIfEmpty();               // never throws; logs its own outcome
+    if (bootstrap === 'applied') productModel.invalidateCatalog();
+    await ensureSchemaUpgrades();                       // additive tables for older databases; never throws
+    await ensureMenuSeed();                             // printed menu, once per database; never throws
+    await ensureMenuAliases();                          // how customers really order it ("đen đá", "cf muối"), once; never throws
+    await ensureMenuPhotos();                           // shipped public/menu photos for items without one; never throws
+    require('./src/services/taxExportService').startWorker();   // builds the tax books queued from the web / app, one at a time
+    require('./src/services/rollupService').startScheduler();   // 02:30 rebuild of the last days' revenue / expense rollups (fallback to the hPanel cron job)
+    backupService.startScheduler();                     // automatic database backups (Admin > Sao lưu); never throws
+    webhookGuard.ensure().catch(() => {});              // Zalo Bot Platform: re-register the webhook when its URL / secret changed; never throws, not awaited
+    payonService.startRecovery();                       // PayOn: finishes claims a dead process left half-applied; never throws
+  }
 
   const isPassenger = typeof PhusionPassenger !== 'undefined'; // eslint-disable-line no-undef
   const port = process.env.PORT || 3000;

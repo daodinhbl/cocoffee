@@ -75,7 +75,7 @@ suite('admin UI (jsdom)', async (t) => {
     assert.ok($$('.grid-cols-12').length >= 2);
     assert.equal($('aside#sidebar').className.includes('w-sidebar'), true);
     const hrefs = $$('#sidebar nav a').map((a) => a.getAttribute('href'));
-    assert.deepEqual(hrefs, ['/admin/dashboard', '/admin/pos', '/admin/tables', '/admin/orders', '/admin/customers', '/admin/menu', '/admin/inventory', '/admin/bom-recipes', '/admin/receiving', '/admin/reports', '/admin/zalo', '/admin/settings', '/admin/backup']);
+    assert.deepEqual(hrefs, ['/admin/dashboard', '/admin/pos', '/admin/tables', '/admin/orders', '/admin/customers', '/admin/menu', '/admin/inventory', '/admin/bom-recipes', '/admin/receiving', '/admin/receipts', '/admin/suppliers', '/admin/expenses', '/admin/reports', '/admin/tax', '/admin/zalo', '/admin/settings', '/admin/backup']);
     assert.equal($$('#sidebar [aria-disabled]').length, 0, 'no "coming soon" placeholders left');
     const logout = $('#sidebar form[action="/admin/logout"]');
     assert.equal(logout.method, 'post');
@@ -131,52 +131,44 @@ suite('admin UI (jsdom)', async (t) => {
     assert.equal(w.document.documentElement.dataset.device, 'tablet');
   });
 
-  await t.test('tabs: click + arrow keys keep ARIA state and panel visibility in sync', async () => {
-    const { $, click, key } = await open('/admin/bom-recipes');
-    const [drinks, retail] = [$('#tab-drinks'), $('#tab-retail')];
-    assert.equal(drinks.getAttribute('aria-selected'), 'true');
-    assert.equal($('#panel-retail').hidden, true);
-    click(retail);
-    assert.equal(retail.getAttribute('aria-selected'), 'true');
-    assert.equal(retail.tabIndex, 0);
-    assert.equal(drinks.tabIndex, -1);
-    assert.equal($('#panel-drinks').hidden, true);
-    assert.equal($('#panel-retail').hidden, false);
-    key(retail, 'ArrowLeft');
-    assert.equal(drinks.getAttribute('aria-selected'), 'true');
-    key(drinks, 'End');
-    assert.equal(retail.getAttribute('aria-selected'), 'true');
-    key(retail, 'Home');
-    assert.equal(drinks.getAttribute('aria-selected'), 'true');
+  await t.test('BOM tabs are server-side links: drinks by default, retail on ?tab=retail', async () => {
+    const { $, $$ } = await open('/admin/bom-recipes');
+    const group = $('[aria-label="Loại món"]');
+    const [drinks, retail] = $$('a', group);
+    assert.equal(drinks.getAttribute('aria-current'), 'page');
+    assert.equal(retail.getAttribute('aria-current'), null);
+    assert.equal(retail.getAttribute('href'), '/admin/bom-recipes?tab=retail');
+    const page = await open('/admin/bom-recipes?tab=retail');
+    const tabs = page.$$('a', page.$('[aria-label="Loại món"]'));
+    assert.equal(tabs[1].getAttribute('aria-current'), 'page');
+    assert.equal(page.$$('tbody tr[data-row]').length, 1);
   });
 
   await t.test('BOM page shows real counts: drinks vs retail, and the missing-recipe warning', async () => {
     const { $, $$ } = await open('/admin/bom-recipes');
-    assert.equal($$('#panel-drinks tbody tr[data-row]').length, 2);
-    assert.equal($$('#panel-retail tbody tr[data-row]').length, 1);
-    assert.match($('#panel-drinks').textContent, /Chưa có định mức/);
-    assert.equal($('#tab-drinks [data-tab-count]').textContent, '2');
-    assert.ok(!$('#panel-retail [data-recipe-open="edit"]'), 'retail rows are not editable here');
+    assert.equal($$('tbody tr[data-row]').length, 2);
+    assert.match($('tbody').textContent, /Chưa có định mức/);
+    const group = $('[aria-label="Loại món"]');
+    assert.match($$('a', group)[0].textContent, /Đồ uống pha chế\s*2/);
+    assert.match($$('a', group)[1].textContent, /Hàng bán lẻ\s*1/);
+    const retail = await open('/admin/bom-recipes?tab=retail');
+    assert.ok(!retail.$('[data-recipe-open="edit"]'), 'retail rows are not editable here');
+    assert.equal(retail.$$('tbody tr[data-row] td')[0].textContent.trim(), '1', 'STT column');
   });
 
-  await t.test('filter: diacritic-insensitive, updates both counters, empty state, header search mirrors', async () => {
-    const { w, $, $$, type } = await open('/admin/bom-recipes');
-    const panel = $('#panel-drinks');
-    const rows = () => $$('tbody tr[data-row]', panel).filter((r) => !r.hidden);
-    assert.equal(rows().length, 2);
-    type($('#filter-drinks'), 'ca phe sua');               // typed without diacritics, data has "Cà phê sữa đá"
-    assert.equal(rows().length, 1);
-    assert.match(rows()[0].textContent, /Cà phê sữa đá/);
-    assert.deepEqual($$('[data-count]', panel).map((n) => n.textContent), ['1', '1'], 'desktop + phone counters both update');
-    type($('#filter-drinks'), 'ly nhua');                  // ingredient search
-    assert.equal(rows().length, 1);
-    type($('#filter-drinks'), 'zzz');
-    assert.equal(rows().length, 0);
-    assert.equal($('[data-empty]', panel).hidden, false);
-    type($('#quick-search'), '');                          // header search mirrors into the page filter and clears it
-    assert.equal(rows().length, 2);
-    assert.equal($('#filter-drinks').value, '');
-    assert.equal($('[data-empty]', panel).hidden, true);
+  await t.test('search is server-side and diacritic-insensitive (names and ingredients); missing-only filter', async () => {
+    const { $, $$ } = await open('/admin/bom-recipes?q=ca%20phe%20sua');       // typed without diacritics, data has "Cà phê sữa đá"
+    assert.equal($$('tbody tr[data-row]').length, 1);
+    assert.match($('tbody').textContent, /Cà phê sữa đá/);
+    assert.equal($('#bom-q').value, 'ca phe sua');
+    assert.equal((await open('/admin/bom-recipes?q=ly%20nhua')).$$('tbody tr[data-row]').length, 1, 'ingredient search');
+    const none = await open('/admin/bom-recipes?q=zzz');
+    assert.equal(none.$$('tbody tr[data-row]').length, 0);
+    assert.ok(none.$('tr[data-empty]'));
+    const missing = await open('/admin/bom-recipes?missing=1');
+    assert.equal(missing.$$('tbody tr[data-row]').length, 1);
+    assert.match(missing.$('tbody').textContent, /Chưa có định mức/);
+    const { w } = await open('/admin/bom-recipes');
     assert.ok(w.CoCoffee && typeof w.CoCoffee.toast === 'function');
   });
 
@@ -184,7 +176,7 @@ suite('admin UI (jsdom)', async (t) => {
     const { w, $, $$, click, type, submit } = await open('/admin/bom-recipes');
     const dlg = $('#recipe-dialog');
     const form = $('#recipe-form');
-    click($('#panel-drinks tbody tr[data-row] [data-recipe-open="edit"]'));   // Cà phê sữa đá: 18g coffee + 1 cup
+    click($('tbody tr[data-row] [data-recipe-open="edit"]'));   // Cà phê sữa đá: 18g coffee + 1 cup
     assert.ok(dlg.hasAttribute('open'));
     assert.equal($('#recipe-title').textContent, 'Sửa công thức');
     assert.equal(form.getAttribute('action'), '/admin/bom-recipes/1');
@@ -232,7 +224,7 @@ suite('admin UI (jsdom)', async (t) => {
 
   await t.test('destructive forms ask first: confirm dialog names the action, OK submits, Cancel does not', async () => {
     const { w, $, click } = await open('/admin/bom-recipes');
-    const form = $('#panel-drinks tbody tr[data-row] form[data-confirm]');
+    const form = $('tbody tr[data-row] form[data-confirm]');
     assert.equal(form.getAttribute('action'), '/admin/bom-recipes/1/delete');
     assert.ok($('input[name="_csrf"]', form).value);
     click($('button[type="submit"]', form));
@@ -272,14 +264,18 @@ suite('admin UI (jsdom)', async (t) => {
     assert.notEqual($('[data-new-only]', dlg).style.display, 'none');
   });
 
-  await t.test('inventory page: low-stock link, status badges, and live filter', async () => {
+  await t.test('inventory page: low-stock link, status badges, and search', async () => {
     const { $, $$, type } = await open('/admin/inventory');
     assert.match($('section[aria-label="Tóm tắt"] a[href="/admin/inventory?low=1"]').textContent, /1/);
     const rows = () => $$('tbody tr[data-row]').filter((r) => !r.hidden);
     assert.equal(rows().length, 3);
-    type($('#inv-filter'), 'sua');
-    assert.equal(rows().length, 1);
-    assert.match(rows()[0].textContent, /Sắp hết/);
+    assert.equal($('#inv-filter').form.getAttribute('method'), 'get', 'search is a server-side form (the list is paginated)');
+    assert.equal($('#inv-filter').getAttribute('name'), 'q');
+    const found = await open('/admin/inventory?q=sua');
+    const hits = found.$$('tbody tr[data-row]');
+    assert.equal(hits.length, 1);
+    assert.match(hits[0].textContent, /Sắp hết/);
+    assert.equal(found.$('#inv-filter').value, 'sua');
   });
 
   await t.test('notifications dropdown lists real alerts with links; toggles, closes on outside click and Escape', async () => {

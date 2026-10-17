@@ -1,6 +1,9 @@
 <%
   const { input, label, btnPrimary, btnSecondary, btnGhost, sheet, grabber } = ui;
-  const shown = onlyLow ? items.filter((i) => i.is_active && i.is_low) : items;
+  const offset = (page - 1) * pageSize;          // STT of the first row on this page
+  const inGroup = group ? items.filter((i) => groupOf(i) === group) : items;
+  const total_all_in_group = inGroup.length;
+  const lowInGroup = inGroup.filter((i) => i.is_active && i.is_low).length;
   const active = items.filter((i) => i.is_active);
   const lowCount = active.filter((i) => i.is_low).length;
   const outCount = active.filter((i) => Number(i.quantity_on_hand) <= 0).length;
@@ -20,58 +23,66 @@
   </div>
 </div>
 
-<section aria-label="Tóm tắt" class="no-scrollbar -mx-4 mt-5 flex snap-x gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-4 sm:gap-5 sm:overflow-visible sm:px-0">
-  <div class="<%= card %> <%= swipe %> p-4">
-    <div class="flex items-start justify-between gap-2">
-      <p class="text-xs font-semibold uppercase tracking-wide text-milk-500">Mặt hàng đang dùng</p>
-      <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-milk-100 text-navy" aria-hidden="true"><%- icon('box', 'h-5 w-5') %></span>
-    </div>
-    <p class="mt-1 font-mono text-2xl font-bold text-navy-darker tnum"><%= active.length %></p>
-    <p class="mt-1 text-xs text-milk-500"><%= items.length - active.length %> ngừng dùng</p>
+<!-- Summary (same look as Thực đơn) -->
+<section aria-label="Tóm tắt" class="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+  <div class="<%= card %> px-4 py-3">
+    <p class="text-xs font-medium uppercase tracking-wide text-gray-500">Mặt hàng đang dùng</p>
+    <p class="mt-1 text-2xl font-semibold tnum text-navy-darker"><%= active.length %></p>
+    <p class="text-xs text-milk-500"><%= items.length - active.length %> ngừng dùng</p>
   </div>
-  <a href="/admin/inventory?low=1" class="<%= card %> <%= swipe %> block p-4 transition hover:border-amber-300">
-    <div class="flex items-start justify-between gap-2">
-      <p class="text-xs font-semibold uppercase tracking-wide text-milk-500">Dưới mức tối thiểu</p>
-      <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 text-amber-700" aria-hidden="true"><%- icon('bell', 'h-5 w-5') %></span>
-    </div>
-    <p class="mt-1 font-mono text-2xl font-bold tnum <%= lowCount ? 'text-amber-700' : 'text-navy-darker' %>"><%= lowCount %></p>
-    <p class="mt-1 text-xs text-milk-500"><%= lowCount ? 'Cần nhập thêm →' : 'Không có mục nào' %></p>
+  <a href="/admin/inventory?low=1" class="<%= card %> block px-4 py-3 transition hover:border-amber-300">
+    <p class="text-xs font-medium uppercase tracking-wide text-gray-500">Dưới mức tối thiểu</p>
+    <p class="mt-1 text-2xl font-semibold tnum <%= lowCount ? 'text-amber-700' : 'text-navy-darker' %>"><%= lowCount %></p>
+    <p class="text-xs text-milk-500"><%= lowCount ? 'Cần nhập thêm →' : 'Không có mục nào' %></p>
   </a>
-  <div class="<%= card %> <%= swipe %> p-4">
-    <div class="flex items-start justify-between gap-2">
-      <p class="text-xs font-semibold uppercase tracking-wide text-milk-500">Hết hàng</p>
-      <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-red-50 text-red-700" aria-hidden="true"><%- icon('x', 'h-5 w-5') %></span>
-    </div>
-    <p class="mt-1 font-mono text-2xl font-bold tnum <%= outCount ? 'text-red-700' : 'text-navy-darker' %>"><%= outCount %></p>
-    <p class="mt-1 text-xs text-milk-500">Món dùng nguyên liệu này sẽ báo hết</p>
+  <div class="<%= card %> px-4 py-3">
+    <p class="text-xs font-medium uppercase tracking-wide text-gray-500">Hết hàng</p>
+    <p class="mt-1 text-2xl font-semibold tnum <%= outCount ? 'text-red-700' : 'text-navy-darker' %>"><%= outCount %></p>
+    <p class="text-xs text-milk-500">Món dùng nguyên liệu này sẽ báo hết</p>
   </div>
-  <div class="<%= card %> <%= swipe %> p-4">
-    <div class="flex items-start justify-between gap-2">
-      <p class="text-xs font-semibold uppercase tracking-wide text-milk-500">Giá trị tồn kho</p>
-      <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-navy text-white" aria-hidden="true"><%- icon('chart', 'h-5 w-5') %></span>
-    </div>
-    <p class="mt-1 font-mono text-2xl font-bold text-navy-darker tnum"><%= money(stockValue) %></p>
-    <p class="mt-1 text-xs text-milk-500">Theo giá vốn bình quân</p>
+  <div class="<%= card %> px-4 py-3">
+    <p class="text-xs font-medium uppercase tracking-wide text-gray-500">Giá trị tồn kho</p>
+    <p class="mt-1 text-2xl font-semibold tnum text-navy-darker"><%= money(stockValue) %></p>
+    <p class="text-xs text-milk-500">Theo giá vốn bình quân</p>
   </div>
 </section>
 
-<div class="mt-6 flex flex-wrap items-center justify-between gap-3">
-  <div class="flex gap-2" role="group" aria-label="Lọc theo tồn kho">
-    <a href="/admin/inventory" <%- !onlyLow ? 'aria-current="true"' : '' %> class="inline-flex h-10 items-center gap-2 rounded-full border px-4 text-sm font-medium transition <%= !onlyLow ? 'border-navy bg-navy text-white shadow-sm' : 'border-milk-200 bg-white hover:border-navy-accent' %>">Tất cả <span class="rounded-full px-2 py-0.5 font-mono text-xs tnum <%= !onlyLow ? 'bg-white/15' : 'bg-milk-100 text-milk-500' %>"><%= items.length %></span></a>
-    <a href="/admin/inventory?low=1" <%- onlyLow ? 'aria-current="true"' : '' %> class="inline-flex h-10 items-center gap-2 rounded-full border px-4 text-sm font-medium transition <%= onlyLow ? 'border-navy bg-navy text-white shadow-sm' : 'border-milk-200 bg-white hover:border-navy-accent' %>">Sắp hết <span class="rounded-full px-2 py-0.5 font-mono text-xs tnum <%= onlyLow ? 'bg-white/15' : lowCount ? 'bg-amber-100 text-amber-800' : 'bg-milk-100 text-milk-500' %>"><%= lowCount %></span></a>
+<!-- One filter card: search, stock status, classification chips -->
+<section class="mt-6" aria-label="Bộ lọc">
+  <div class="<%= card %> p-3 sm:p-4">
+    <div class="flex flex-col gap-3 lg:flex-row lg:items-center">
+      <form method="get" action="/admin/inventory" role="search" class="relative lg:w-80">
+        <% if (group) { %><input type="hidden" name="group" value="<%= group %>"><% } %>
+        <% if (onlyLow) { %><input type="hidden" name="low" value="1"><% } %>
+        <label for="inv-filter" class="sr-only">Tìm nguyên liệu</label>
+        <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><%- icon('search', 'h-4 w-4') %></span>
+        <input id="inv-filter" name="q" type="search" value="<%= q %>" autocomplete="off" placeholder="Tìm theo tên hoặc SKU… (Enter)" class="<%= input %> pl-9">
+      </form>
+      <div role="group" aria-label="Lọc theo tồn kho" class="inline-flex w-full rounded-lg bg-milk-50 p-1 lg:w-auto">
+        <a href="<%= tabUrl(group, false) %>" <%- !onlyLow ? 'aria-current="true"' : '' %>
+           class="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition lg:flex-none <%= !onlyLow ? 'bg-white text-navy-darker shadow' : 'text-gray-600 hover:text-dark' %>">Tất cả <span class="tnum text-xs opacity-70"><%= total_all_in_group %></span></a>
+        <a href="<%= tabUrl(group, true) %>" <%- onlyLow ? 'aria-current="true"' : '' %>
+           class="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-md px-3 text-sm font-medium transition lg:flex-none <%= onlyLow ? 'bg-white text-navy-darker shadow' : 'text-gray-600 hover:text-dark' %>">Sắp hết <span class="tnum text-xs <%= lowInGroup ? 'rounded-full bg-amber-100 px-1.5 text-amber-800' : 'opacity-70' %>"><%= lowInGroup %></span></a>
+      </div>
+      <p class="text-sm text-gray-500 lg:ml-auto" aria-live="polite"><span class="font-semibold tnum text-dark"><%= total %></span> mặt hàng<%= q ? ` khớp “${q}”` : '' %></p>
+    </div>
+    <nav aria-label="Phân loại nguyên liệu" class="no-scrollbar mt-3 flex gap-2 overflow-x-auto pb-1 lg:flex-wrap">
+      <% [{ code: '', label: 'Tất cả', n: items.length }, ...groups.map((g) => ({ code: g.code, label: g.label, n: groupCounts[g.code] }))].forEach((t) => { const on = group === t.code; %>
+        <a href="<%= tabUrl(t.code) %>" <%- on ? 'aria-current="page"' : '' %>
+           class="inline-flex h-9 shrink-0 items-center gap-2 rounded-full border px-3.5 text-sm font-medium transition <%= on ? 'border-navy bg-navy text-white' : 'border-milk-200 bg-white text-dark hover:border-navy-accent' %>">
+          <%= t.label %> <span class="tnum text-xs opacity-70"><%= t.n %></span>
+        </a>
+      <% }) %>
+    </nav>
   </div>
-  <div class="relative w-full sm:w-80">
-    <label for="inv-filter" class="sr-only">Tìm nguyên liệu</label>
-    <span class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-milk-500"><%- icon('search', 'h-4 w-4') %></span>
-    <input id="inv-filter" type="search" data-filter-input autocomplete="off" placeholder="Tìm theo tên hoặc SKU…" class="<%= input %> pl-9">
-  </div>
-</div>
+</section>
 
 <div class="<%= card %> mt-3 overflow-hidden">
-  <table class="w-full table-auto border-collapse text-left text-sm" data-filterable>
+  <table class="w-full table-auto border-collapse text-left text-sm">
     <caption class="sr-only">Tồn kho</caption>
     <thead class="<%= ui.thead %>">
       <tr>
+        <th scope="col" class="w-12 px-2 py-3 text-center sm:px-4">STT</th>
         <th scope="col" class="px-2 py-3 sm:px-4">Mặt hàng</th>
         <th scope="col" class="px-2 py-3 sm:px-4">Tồn kho</th>
         <th scope="col" class="hidden px-4 py-3 text-right sm:table-cell">Tối thiểu</th>
@@ -82,11 +93,13 @@
       </tr>
     </thead>
     <tbody>
-      <% shown.forEach((i) => {
-           const fillEdit = { name: i.name, unit: i.unit, min_stock: i.min_stock, sku: i.sku, is_active: Boolean(i.is_active), image_url: i.image_url || '' };
+      <% shown.forEach((i, idx) => {
+           const stt = offset + idx + 1;
+           const fillEdit = { name: i.name, unit: i.unit, min_stock: i.min_stock, sku: i.sku, is_active: Boolean(i.is_active), image_url: i.image_url || '', group_code: i.group_code || '', pack_name: i.pack_name || '', pack_size: i.pack_size ? Number(i.pack_size) : '' };
            const fillAdj = { new_quantity: i.quantity_on_hand };
            const lv = stockLevel(i); %>
-        <tr data-row class="border-b border-milk-200 last:border-b-0 hover:bg-milk-50 <%= i.is_active ? '' : 'text-milk-500' %>">
+        <tr data-row class="border-b border-milk-200 last:border-b-0 <%= stt % 2 === 1 ? 'bg-blue-50/70 hover:bg-blue-100/70' : 'hover:bg-milk-50' %> <%= i.is_active ? '' : 'text-milk-500' %>">
+          <td class="px-2 py-3 text-center font-mono text-xs text-milk-500 tnum sm:px-4"><%= stt %></td>
           <td class="px-2 py-3 sm:px-4">
             <div class="flex items-center gap-3">
               <% if (i.image_url) { %>
@@ -123,12 +136,16 @@
           </td>
         </tr>
       <% }) %>
-      <tr data-empty <%- shown.length ? 'hidden' : '' %>>
-        <td colspan="7" class="px-4 py-12 text-center text-sm text-milk-500"><%= shown.length ? 'Không có mặt hàng phù hợp.' : (onlyLow ? 'Không có mặt hàng nào dưới mức tối thiểu.' : 'Chưa có nguyên liệu nào.') %></td>
+      <% if (!shown.length) { %>
+      <tr data-empty>
+        <td colspan="8" class="px-4 py-12 text-center text-sm text-milk-500"><%= q ? 'Không có mặt hàng phù hợp.' : (onlyLow ? 'Không có mặt hàng nào dưới mức tối thiểu.' : 'Chưa có nguyên liệu nào.') %></td>
       </tr>
+      <% } %>
     </tbody>
   </table>
 </div>
+
+<%- include('../partials/pager', { page, pages, total, pageSize, pageUrl, unit: 'mặt hàng' }) %>
 
 <%- include('../partials/inventory_dialogs') %>
 

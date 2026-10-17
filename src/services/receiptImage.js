@@ -79,10 +79,14 @@ function wrap(ctx, text, maxWidth, fontSpec) {
  * Lays the receipt out as drawing operations; `ctx` is only used to measure text.
  * @returns {{ ops: object[], height: number }}
  */
-function layout(ctx, { order, items, shop, printer, paid }) {
+function layout(ctx, { order, items, shop, printer, paid, logo }) {
   const ops = [];
   const inner = WIDTH - 2 * MARGIN;
   let y = 28;
+  if (logo) {                                              // shop logo, centred above the name
+    ops.push({ t: 'image', img: logo.img, x: Math.round((WIDTH - logo.w) / 2), y, w: logo.w, h: logo.h });
+    y += logo.h + 12;
+  }
   const center = (text, size, { bold = false, gap = 6 } = {}) => {
     for (const line of wrap(ctx, text, inner, font(size, bold))) {
       ops.push({ t: 'text', x: WIDTH / 2, y: y + size, text: line, size, bold, align: 'center' });
@@ -102,8 +106,10 @@ function layout(ctx, { order, items, shop, printer, paid }) {
   const rule = (dashed = true) => { y += 6; ops.push({ t: 'rule', y, dashed }); y += 14; };
 
   center(shop.name.toUpperCase(), 36, { bold: true, gap: 8 });
+  if (printer.legalName && printer.legalName.toLowerCase() !== shop.name.toLowerCase()) center(printer.legalName, 20);
   if (printer.shopAddress) center(printer.shopAddress, 20);
   if (printer.shopPhone) center(`ĐT: ${printer.shopPhone}`, 20);
+  if (printer.taxCode) center(`MST: ${printer.taxCode}`, 20);
   y += 6;
   rule(false);
   center('HÓA ĐƠN', 30, { bold: true, gap: 8 });
@@ -123,7 +129,7 @@ function layout(ctx, { order, items, shop, printer, paid }) {
     row('Tạm tính', `${formatVnd(order.subtotal)}đ`, 22);
     row('Giảm giá', `-${formatVnd(order.discount)}đ`, 22);
   }
-  row('TỔNG CỘNG', `${formatVnd(order.total)}đ`, 34, { bold: true, gap: 10 });
+  row('TỔNG CỘNG', `${formatVnd(order.total)}đ`, 28, { bold: true, gap: 10 });
   if (printer.showVat && printer.vatRate > 0) {
     const vat = Number(order.total) - Number(order.total) / (1 + printer.vatRate / 100);
     row(`Trong đó VAT (${printer.vatRate}%)`, `${formatVnd(Math.round(vat))}đ`, 20);
@@ -133,16 +139,49 @@ function layout(ctx, { order, items, shop, printer, paid }) {
   rule();
   const footer = printer.footer || '';
   if (footer) center(footer, 20);
+  if (printer.wifiName) {
+    y += 4;
+    center(`Wi-Fi: ${printer.wifiName}`, 22, { bold: true, gap: 4 });
+    if (printer.wifiPassword) center(`Mật khẩu: ${printer.wifiPassword}`, 22, { bold: true });
+  }
   if (!/cảm ơn/i.test(footer)) center('Cảm ơn quý khách!', 22, { bold: true });
   return { ops, height: y + 24 };
 }
 
+const LOGO_MM = { s: 22, m: 32, l: 44 };
+const logoCache = new Map();   // url -> decoded bitmap (a logo URL never changes content: each upload gets a new id)
+
+/** The shop logo (Cài đặt > Máy in hóa đơn) decoded and scaled for the 576 px receipt, or null. Never throws. */
+async function loadLogo(printer) {
+  const url = printer && printer.logoUrl;
+  if (!url) return null;
+  try {
+    let img = logoCache.get(url);
+    if (!img) {
+      const id = require('./imageStore').mediaIdOf(url);
+      const row = id ? await require('../models/mediaModel').get(id) : null;
+      if (!row) return null;
+      const stream = () => require('stream').Readable.from(row.bytes);
+      img = row.mime === 'image/png' ? await PImage.decodePNGFromStream(stream()) : await PImage.decodeJPEGFromStream(stream());
+      if (logoCache.size > 8) logoCache.clear();
+      logoCache.set(url, img);
+    }
+    const width = Math.round(((LOGO_MM[printer.logoSize] || 32) / 72) * WIDTH);          // 72 mm printable = 576 px
+    const k = Math.min(width / img.width, 170 / img.height);
+    return { img, w: Math.max(1, Math.round(img.width * k)), h: Math.max(1, Math.round(img.height * k)) };
+  } catch (err) {
+    logger.warn(`Receipt logo skipped: ${err.message}`);
+    return null;
+  }
+}
+
 /** Draws a receipt and returns the PNG bytes, or null when the font / pureimage is not available. */
-async function render({ order, items, printer = {}, shopName = env.business.shopName }) {
+async function render({ order, items, printer = {}, shopName = env.business.shopName, raw = false }) {
   if (!setup()) return null;
   const measure = PImage.make(8, 8).getContext('2d');
   const paid = order.payment_status === 'paid';
-  const { ops, height } = layout(measure, { order, items, shop: { name: shopName }, printer, paid });
+  const logo = await loadLogo(printer);
+  const { ops, height } = layout(measure, { order, items, shop: { name: shopName }, printer, paid, logo });
 
   const img = PImage.make(WIDTH, height);
   const ctx = img.getContext('2d');
@@ -150,6 +189,7 @@ async function render({ order, items, printer = {}, shopName = env.business.shop
   ctx.fillRect(0, 0, WIDTH, height);
   ctx.fillStyle = '#000000';
   for (const op of ops) {
+    if (op.t === 'image') { ctx.drawImage(op.img, op.x, op.y, op.w, op.h); continue; }
     if (op.t === 'rule') {
       if (!op.dashed) { ctx.fillRect(MARGIN, op.y, WIDTH - 2 * MARGIN, 2); continue; }
       for (let x = MARGIN; x < WIDTH - MARGIN; x += 10) ctx.fillRect(x, op.y, 5, 2);
@@ -161,6 +201,11 @@ async function render({ order, items, printer = {}, shopName = env.business.shop
     ctx.fillText(op.text, x, op.y);
   }
 
+  if (raw) {                                              // PDF: opaque RGB pixels (the picture is drawn on white)
+    const rgb = Buffer.alloc(WIDTH * height * 3);
+    for (let i = 0, o = 0; i < WIDTH * height * 4; i += 4, o += 3) { rgb[o] = img.data[i]; rgb[o + 1] = img.data[i + 1]; rgb[o + 2] = img.data[i + 2]; }
+    return { width: WIDTH, height, rgb };
+  }
   return toPng(img);
 }
 

@@ -17,10 +17,16 @@ async function list({ lowStockOnly = false } = {}, conn) {
 async function listAll(conn) {
   const [rows] = await db(conn).query(
     `SELECT id, sku, name, unit, quantity_on_hand, avg_cost, min_stock, is_active,
-            (quantity_on_hand <= min_stock) AS is_low, ROUND(quantity_on_hand * avg_cost, 2) AS stock_value, image_url
+            (quantity_on_hand <= min_stock) AS is_low, ROUND(quantity_on_hand * avg_cost, 2) AS stock_value, image_url, group_code, pack_name, pack_size
        FROM inventory_items ORDER BY is_active DESC, name`
   );
   return rows;
+}
+
+/** Is this SKU taken (case-insensitive, like the UNIQUE key)? */
+async function skuExists(sku, conn) {
+  const [rows] = await db(conn).query('SELECT 1 FROM inventory_items WHERE sku = ? LIMIT 1', [sku]);
+  return rows.length > 0;
 }
 
 async function getById(id, conn, { forUpdate = false } = {}) {
@@ -42,21 +48,24 @@ async function lockByIds(ids, conn) {
   return new Map(rows.map((r) => [r.id, r]));
 }
 
-async function create({ sku, name, unit, quantity_on_hand, avg_cost, min_stock, is_active }, conn) {
+async function create({ sku, name, unit, quantity_on_hand, avg_cost, min_stock, is_active, group_code, pack_name, pack_size }, conn) {
   const [res] = await db(conn).query(
-    `INSERT INTO inventory_items (sku, name, unit, quantity_on_hand, avg_cost, min_stock, is_active)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [sku, name, unit, quantity_on_hand || 0, avg_cost || 0, min_stock || 0, is_active ?? 1]
+    `INSERT INTO inventory_items (sku, name, unit, quantity_on_hand, avg_cost, min_stock, is_active, group_code, pack_name, pack_size)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [sku, name, unit, quantity_on_hand || 0, avg_cost || 0, min_stock || 0, is_active ?? 1, group_code || null, pack_name || null, pack_size || null]
   );
   return res.insertId;
 }
 
-async function update(id, { name, unit, min_stock, is_active }, conn) {
+/** group_code: undefined = leave as is; null = back to automatic; a code = set. */
+async function update(id, { name, unit, min_stock, is_active, group_code, pack_name, pack_size }, conn) {
   await db(conn).query(
     `UPDATE inventory_items SET name = COALESCE(?, name), unit = COALESCE(?, unit),
             min_stock = COALESCE(?, min_stock), is_active = COALESCE(?, is_active) WHERE id = ?`,
     [name ?? null, unit ?? null, min_stock ?? null, is_active ?? null, id]
   );
+  if (group_code !== undefined) await db(conn).query('UPDATE inventory_items SET group_code = ? WHERE id = ?', [group_code, id]);
+  if (pack_name !== undefined) await db(conn).query('UPDATE inventory_items SET pack_name = ?, pack_size = ? WHERE id = ?', [pack_name || null, pack_name ? (pack_size || null) : null, id]);
 }
 
 async function setStock(id, quantity, avgCost, conn) {
@@ -134,4 +143,5 @@ async function setImage(id, url, conn) {
 }
 
 module.exports = {
+  skuExists,
   setImage, list, listAll, getById, lockByIds, create, update, setStock, addMovement, movements, usage, usedIn };

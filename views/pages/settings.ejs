@@ -48,6 +48,37 @@
     </dl>
   </section>
 
+  <% if (shop) { %>
+  <section class="col-span-12 rounded border border-gray-200 bg-white p-5" aria-labelledby="shop-title">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h2 id="shop-title" class="text-base font-semibold">Thông tin cửa hàng / hộ kinh doanh</h2>
+        <p class="mt-1 max-w-3xl text-xs text-gray-500">Tên, địa chỉ, điện thoại hiển thị trên hóa đơn, tin nhắn Zalo và trang giới thiệu. Chủ hộ, mã số thuế, số giấy đăng ký và kỳ kê khai dùng cho sổ sách và báo cáo thuế. Để trống một ô thì dùng giá trị mặc định của hệ thống.</p>
+      </div>
+      <div><%- shop.stored.taxCode ? badge(`MST ${shop.stored.taxCode}`, 'good') : badge('Chưa có mã số thuế', 'neutral') %></div>
+    </div>
+    <form method="post" action="/admin/settings/shop" class="mt-4 grid grid-cols-12 gap-4">
+      <%- include('../partials/csrf') %>
+      <input type="hidden" name="_back" value="/admin/settings">
+      <% const span = { name: 'sm:col-span-6 lg:col-span-4', legalName: 'sm:col-span-6 lg:col-span-4', ownerName: 'sm:col-span-6 lg:col-span-4', taxCode: 'sm:col-span-6 lg:col-span-3', regNo: 'sm:col-span-6 lg:col-span-3', address: 'sm:col-span-12 lg:col-span-6', phone: 'sm:col-span-6 lg:col-span-3', email: 'sm:col-span-6 lg:col-span-4', businessLine: 'sm:col-span-6 lg:col-span-5' }; %>
+      <% shopFields.forEach(([key, text, max, kind]) => { %>
+        <div class="col-span-12 <%= span[key] || 'sm:col-span-6' %>">
+          <label for="shop-<%= key %>" class="<%= label %>"><%= text %></label>
+          <input id="shop-<%= key %>" name="<%= key %>" maxlength="<%= max %>" value="<%= shop.stored[key] %>" placeholder="<%= shop.defaults[key] %>" autocomplete="off"
+                 <%- kind === 'tax' ? 'inputmode="numeric" pattern="\\d{10}(-\\d{3})?"' : '' %> <%- kind === 'email' ? 'type="email"' : '' %> class="<%= input %> <%= kind === 'tax' ? 'font-mono' : '' %>">
+        </div>
+      <% }) %>
+      <div class="col-span-12 sm:col-span-6 lg:col-span-3">
+        <label for="shop-period" class="<%= label %>">Kỳ kê khai thuế</label>
+        <select id="shop-period" name="declarationPeriod" class="<%= input %>">
+          <% declarationPeriods.forEach((p) => { %><option value="<%= p.code %>" <%= (shop.stored.declarationPeriod || shop.defaults.declarationPeriod) === p.code ? 'selected' : '' %>><%= p.label %></option><% }) %>
+        </select>
+      </div>
+      <div class="col-span-12"><button type="submit" class="<%= btnPrimary %> w-full sm:w-auto">Lưu thông tin cửa hàng</button></div>
+    </form>
+  </section>
+  <% } %>
+
   <section class="col-span-12 rounded border border-gray-200 bg-white p-5" aria-labelledby="ios-title">
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div>
@@ -115,6 +146,28 @@
       <div class="col-span-12">
         <label for="p-footer" class="<%= label %>">Lời chào cuối hóa đơn</label>
         <input id="p-footer" name="footer" maxlength="255" value="<%= printer.footer %>" class="<%= input %>">
+      </div>
+      <div class="col-span-12 grid grid-cols-12 gap-4">
+        <div class="col-span-12 sm:col-span-6 lg:col-span-4">
+          <label for="p-wifi" class="<%= label %>">Tên Wi-Fi (in cuối hóa đơn)</label>
+          <input id="p-wifi" name="wifiName" maxlength="60" value="<%= printer.wifiName %>" autocomplete="off" placeholder="VD: CoCoffee" class="<%= input %>">
+        </div>
+        <div class="col-span-12 sm:col-span-6 lg:col-span-4">
+          <label for="p-wifipw" class="<%= label %>">Mật khẩu Wi-Fi</label>
+          <input id="p-wifipw" name="wifiPassword" maxlength="60" value="<%= printer.wifiPassword %>" autocomplete="off" spellcheck="false" class="<%= input %> font-mono">
+        </div>
+        <p class="col-span-12 -mt-2 text-xs text-gray-500">Địa chỉ và điện thoại ở trên cũng được in ngay dưới tên quán. Để trống Wi-Fi thì không in.</p>
+      </div>
+      <div class="col-span-12 grid grid-cols-12 gap-4 rounded-lg border border-gray-200 p-4">
+        <div class="col-span-12 lg:col-span-8">
+          <%- include('../partials/image_field', { fieldId: 'logo', mode: 'logo', current: printer.logoUrl, title: 'Logo cửa hàng (in trên đầu hóa đơn)', hint: 'PNG/JPEG. Nên dùng logo nền trắng, nét đậm (máy in nhiệt chỉ in đen trắng). Ảnh tự thu nhỏ tối đa 480 × 240 px.' }) %>
+        </div>
+        <div class="col-span-12 lg:col-span-4">
+          <label for="p-logo-size" class="<%= label %>">Cỡ logo trên hóa đơn</label>
+          <select id="p-logo-size" name="logoSize" class="<%= input %>">
+            <% [['s', 'Nhỏ (22mm)'], ['m', 'Vừa (32mm)'], ['l', 'Lớn (44mm)']].forEach(([k, t]) => { %><option value="<%= k %>" <%= printer.logoSize === k ? 'selected' : '' %>><%= t %></option><% }) %>
+          </select>
+        </div>
       </div>
       <div class="col-span-12 flex flex-wrap gap-x-6 gap-y-2 text-sm">
         <label class="flex min-h-10 items-center gap-2">

@@ -9,6 +9,8 @@ import '../features/bom/bom_screen.dart';
 import '../features/customers/customer_detail_screen.dart';
 import '../features/customers/customers_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
+import '../features/finance/expenses_screen.dart';
+import '../features/finance/finance_screen.dart';
 import '../features/heli/heli_screen.dart';
 import '../features/inventory/inventory_data.dart';
 import '../features/inventory/inventory_detail_screen.dart';
@@ -115,6 +117,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(parentNavigatorKey: _rootKey, path: '/tables', builder: (_, _) => const TablesScreen()),
       GoRoute(parentNavigatorKey: _rootKey, path: '/menu', builder: (_, _) => const MenuScreen()),
       GoRoute(parentNavigatorKey: _rootKey, path: '/bom', builder: (_, _) => const BomScreen()),
+      GoRoute(parentNavigatorKey: _rootKey, path: '/expenses', builder: (_, _) => const ExpensesScreen()),
+      GoRoute(parentNavigatorKey: _rootKey, path: '/finance', builder: (_, _) => const FinanceScreen()),
       GoRoute(parentNavigatorKey: _rootKey, path: '/zalo', builder: (_, _) => const ZaloScreen()),
       GoRoute(parentNavigatorKey: _rootKey, path: '/customers', builder: (_, _) => const CustomersScreen()),
       GoRoute(parentNavigatorKey: _rootKey, path: '/customers/:id', builder: (_, s) => CustomerDetailScreen(id: _id(s))),

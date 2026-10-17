@@ -15,13 +15,18 @@ async function list({ categoryId, activeOnly = true } = {}, conn) {
   if (categoryId) { where.push('p.category_id = ?'); params.push(categoryId); }
   const [rows] = await db(conn).query(
     `SELECT p.id, p.category_id, c.name AS category_name, p.sku, p.name, p.price,
-            p.stock_mode, p.inventory_item_id, p.is_active, p.image_url
+            p.stock_mode, p.inventory_item_id, p.is_active, p.image_url, p.tax_category_id
        FROM products p JOIN categories c ON c.id = p.category_id
       ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
       ORDER BY c.sort_order, p.name`,
     params
   );
   return rows;
+}
+
+/** Tax group of a product (NULL = automatic: retail goods vs prepared drinks). Applies to sales from now on. */
+async function setTaxCategory(id, taxCategoryId, conn) {
+  await db(conn).query('UPDATE products SET tax_category_id = ? WHERE id = ?', [taxCategoryId || null, id]);
 }
 
 async function getById(id, conn) {
@@ -41,6 +46,12 @@ async function getManyByIds(ids, conn) {
   if (!ids.length) return [];
   const [rows] = await db(conn).query('SELECT * FROM products WHERE id IN (?)', [ids]);
   return rows;
+}
+
+/** Is this SKU taken (case-insensitive, like the UNIQUE key)? */
+async function skuExists(sku, conn) {
+  const [rows] = await db(conn).query('SELECT 1 FROM products WHERE sku = ? LIMIT 1', [sku]);
+  return rows.length > 0;
 }
 
 async function create({ category_id, sku, name, price, stock_mode, inventory_item_id, is_active }, conn) {
@@ -200,6 +211,7 @@ async function setImage(id, url, conn) {
 }
 
 module.exports = {
+  skuExists, setTaxCategory,
   setImage,
   list, listForAdmin, listWithCost, getById, getManyByIds, create, update, setActive, setRecipe, setAliases,
   getStockSpecs, listForMatching, invalidateCatalog,

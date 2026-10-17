@@ -5,6 +5,7 @@ const tableModel = require('../models/tableModel');
 const productModel = require('../models/productModel');
 const inventoryService = require('./inventoryService');
 const customerModel = require('../models/customerModel');
+const taxService = require('./taxService');
 const auditModel = require('../models/auditModel');
 const env = require('../config/env');
 const logger = require('../utils/logger');
@@ -52,6 +53,11 @@ async function finalizeOrder(conn, order) {
   const { cogsTotal, lines } = await inventoryService.consumeForOrder(conn, order, items);
   for (const l of lines) await orderModel.setItemCogs(l.itemId, l.unitCogs, l.lineCogs, conn);
   await orderModel.markCompleted(order.id, cogsTotal, conn);
+  try {
+    await taxService.snapshotOrder(conn, order);                // tax group / rates / net revenue per line + today's rollup (rev_daily)
+  } catch (err) {                                              // a sale must never fail because of bookkeeping; scripts/rollup.js repairs it
+    logger.error(`Tax snapshot of order ${order.id} failed`, err);
+  }
   if (order.table_id) await tableModel.release(order.table_id, conn);
 }
 
@@ -78,8 +84,144 @@ async function replaceOpenOrderItems(orderId, items) {
     const order = await orderModel.getById(orderId, conn, { forUpdate: true });
     if (!order) throw new AppError(404, 'NOT_FOUND', 'Order not found');
     if (order.status !== 'open') throw new AppError(409, 'ORDER_NOT_OPEN', `Order is ${order.status}`);
-    await orderModel.replaceItems(orderId, await priceLines(conn, items), conn);
+    const lines = await priceLines(conn, items);
+    const prepaid = await orderModel.paidTotal(orderId, conn);
+    if (prepaid > 0 && lines.reduce((s, l) => s + Number(l.unit_price) * l.quantity, 0) < prepaid) {
+      throw new AppError(422, 'BELOW_PREPAID', 'Order total would drop below the amount already prepaid');
+    }
+    await orderModel.replaceItems(orderId, lines, conn);
     return getWithItems(orderId, conn);
+  });
+}
+
+// ------------------------------------------------------------------ prepayment / merge / split (POS)
+/** Thanh toán trước: takes money on an open order. The final payment then only collects what is left. */
+async function prepayOrder(orderId, { method, amount, reference, userId }) {
+  return withTransaction(async (conn) => {
+    const order = await orderModel.getById(orderId, conn, { forUpdate: true });
+    if (!order) throw new AppError(404, 'NOT_FOUND', 'Order not found');
+    if (order.status !== 'open') throw new AppError(409, 'ORDER_NOT_OPEN', `Order is ${order.status}`);
+    const amt = Number(amount);
+    if (!(amt > 0)) throw new AppError(400, 'VALIDATION', 'amount must be > 0');
+    const paid = await orderModel.paidTotal(orderId, conn);
+    const left = Number(order.total) - paid;
+    if (amt > left) throw new AppError(422, 'PREPAY_TOO_MUCH', `Prepayment exceeds what is left to pay (${left})`);
+    const ref = ['Trả trước', reference].filter(Boolean).join(' · ').slice(0, 100);
+    await orderModel.insertPayment({ orderId, method, amount: amt, reference: ref, userId }, conn);
+    return { order: await getWithItems(orderId, conn), prepaid: paid + amt };
+  });
+}
+
+/** Locks an open order sitting on `table`, or throws. */
+async function openOrderOf(conn, table) {
+  if (!table.current_order_id) throw new AppError(409, 'TABLE_HAS_NO_ORDER', 'Table has no open order');
+  const order = await orderModel.getById(table.current_order_id, conn, { forUpdate: true });
+  if (!order || order.status !== 'open') throw new AppError(409, 'ORDER_NOT_OPEN', 'Order is not open');
+  return order;
+}
+
+/**
+ * Ghép bàn: `otherTableId` joins the order of `primaryTableId`. A free table is just attached; a table with its own
+ * open order has its lines, payments and note moved onto the primary order (that order is then cancelled, empty).
+ */
+async function mergeTables({ primaryTableId, otherTableId }) {
+  return withTransaction(async (conn) => {
+    if (primaryTableId === otherTableId) throw new AppError(400, 'VALIDATION', 'Choose two different tables');
+    const [first, second] = primaryTableId < otherTableId ? [primaryTableId, otherTableId] : [otherTableId, primaryTableId];
+    const locked = new Map();
+    for (const id of [first, second]) locked.set(id, await tableModel.getById(id, conn, { forUpdate: true }));
+    const primary = locked.get(primaryTableId);
+    const other = locked.get(otherTableId);
+    if (!primary || !primary.is_active || !other || !other.is_active) throw new AppError(404, 'NOT_FOUND', 'Table not found');
+    if (primary.merged_into) throw new AppError(409, 'TABLE_MERGED', 'Primary table is itself merged into another table');
+    if (other.merged_into) throw new AppError(409, 'TABLE_MERGED', 'Table is already merged');
+    if ((await tableModel.mergedInto(other.id, conn)).length) throw new AppError(409, 'TABLE_HAS_MERGED', 'Table already leads a merged group');
+    const target = await openOrderOf(conn, primary);
+
+    if (other.status === 'serving') {
+      const moved = await openOrderOf(conn, other);
+      await orderModel.moveAllItems(moved.id, target.id, conn);
+      await orderModel.movePayments(moved.id, target.id, conn);
+      await orderModel.recalcTotals(target.id, conn);
+      await orderModel.recalcTotals(moved.id, conn);
+      if (moved.note) await orderModel.setNote(target.id, [target.note, moved.note].filter(Boolean).join('; '), conn);
+      await orderModel.setNote(moved.id, `Ghép vào ${target.order_code}`, conn);
+      await orderModel.markCancelled(moved.id, conn);
+    }
+    await tableModel.setMerged(other.id, primary.id, conn);
+    return getWithItems(target.id, conn);
+  });
+}
+
+/** Tách bàn (1): a merged table leaves its group and becomes free again. */
+async function unmergeTable(tableId) {
+  return withTransaction(async (conn) => {
+    const table = await tableModel.getById(tableId, conn, { forUpdate: true });
+    if (!table) throw new AppError(404, 'NOT_FOUND', 'Table not found');
+    if (!table.merged_into) throw new AppError(409, 'TABLE_NOT_MERGED', 'Table is not merged');
+    await tableModel.release(tableId, conn);
+    return { tableId };
+  });
+}
+
+/**
+ * Tách bàn (2): moves part of an open order to another table's order (a new one when that table is free).
+ * items: [{ item_id, quantity }] - quantity of a line may be partial. The source order keeps at least one item and
+ * must still cover what was prepaid on it.
+ */
+async function splitOrder({ orderId, targetTableId, items, userId }) {
+  return withTransaction(async (conn) => {
+    const order = await orderModel.getById(orderId, conn, { forUpdate: true });
+    if (!order) throw new AppError(404, 'NOT_FOUND', 'Order not found');
+    if (order.status !== 'open') throw new AppError(409, 'ORDER_NOT_OPEN', `Order is ${order.status}`);
+    if (!Array.isArray(items) || !items.length) throw new AppError(400, 'VALIDATION', 'Choose the items to move');
+
+    const rows = await orderModel.getItems(orderId, conn);
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    const want = new Map();
+    for (const i of items) {
+      const id = Number(i?.item_id);
+      const qty = Number(i?.quantity);
+      if (!byId.has(id)) throw new AppError(400, 'VALIDATION', 'Item does not belong to this order');
+      if (!Number.isInteger(qty) || qty < 1) throw new AppError(400, 'VALIDATION', 'quantity must be a whole number >= 1');
+      want.set(id, (want.get(id) || 0) + qty);
+    }
+    let movedQty = 0;
+    for (const [id, qty] of want) {
+      if (qty > byId.get(id).quantity) throw new AppError(400, 'VALIDATION', 'Cannot move more than the ordered quantity');
+      movedQty += qty;
+    }
+    if (movedQty >= rows.reduce((s, r) => s + r.quantity, 0)) throw new AppError(422, 'SPLIT_ALL', 'Leave at least one item on the original order');
+
+    const target = await tableModel.getById(targetTableId, conn, { forUpdate: true });
+    if (!target || !target.is_active) throw new AppError(404, 'NOT_FOUND', 'Table not found');
+    if (target.id === order.table_id) throw new AppError(400, 'VALIDATION', 'Choose another table');
+    if (target.merged_into) throw new AppError(409, 'TABLE_MERGED', 'Target table is merged into another table');
+    let targetOrderId;
+    if (target.status === 'serving') {
+      targetOrderId = (await openOrderOf(conn, target)).id;
+    } else {
+      targetOrderId = await orderModel.insert({ tableId: target.id, source: 'pos', status: 'open', createdBy: userId }, conn);
+      await tableModel.setServing(target.id, targetOrderId, conn);
+    }
+
+    for (const [id, qty] of want) {
+      const row = byId.get(id);
+      if (qty === row.quantity) {
+        await orderModel.moveItem(id, targetOrderId, conn);
+      } else {
+        await orderModel.setItemQuantity(id, row.quantity - qty, conn);
+        await orderModel.insertItemCopy(row, targetOrderId, qty, conn);
+      }
+    }
+    await orderModel.recalcTotals(orderId, conn);
+    await orderModel.recalcTotals(targetOrderId, conn);
+
+    const left = await orderModel.getById(orderId, conn, { forUpdate: true });
+    if (Number(left.subtotal) < await orderModel.paidTotal(orderId, conn)) {
+      throw new AppError(422, 'BELOW_PREPAID', 'The remaining order would be worth less than what was prepaid on it');
+    }
+    return { source: await getWithItems(orderId, conn), target: await getWithItems(targetOrderId, conn) };
   });
 }
 
@@ -126,11 +268,14 @@ async function payOrder(orderId, { method, tendered, reference, discount, userId
       throw new AppError(409, 'ORDER_NOT_PAYABLE', `Order is ${order.status}/${order.payment_status}`);
     }
 
-    const total = order.total;
+    // Prepayments (thanh toán trước) already sit in `payments`: only the rest is collected now.
+    const prepaid = await orderModel.paidTotal(orderId, conn);
+    const total = prepaid ? Number(order.total) - prepaid : order.total;
+    if (prepaid && total < 0) throw new AppError(409, 'PREPAID_EXCEEDS_TOTAL', 'Prepaid amount is larger than the order total');
     const given = tendered === undefined || tendered === null ? total : Number(tendered);
     if (!(given >= total)) throw new AppError(422, 'INSUFFICIENT_PAYMENT', `Tendered amount is less than total (${total})`);
 
-    await orderModel.insertPayment({ orderId, method, amount: total, reference, userId }, conn);
+    if (!(prepaid && total === 0)) await orderModel.insertPayment({ orderId, method, amount: total, reference, userId }, conn);
     await orderModel.markPaid(orderId, method, conn);
     if (order.customer_id && order.status === 'completed') {          // was on the customer's debt: settle it
       await customerModel.addEntry({ customerId: order.customer_id, orderId, type: 'payment', amount: -Number(total), method, note: `Thu nợ đơn ${order.order_code}`, userId }, conn);
@@ -144,6 +289,9 @@ async function cancelOrder(orderId) {
     const order = await orderModel.getById(orderId, conn, { forUpdate: true });
     if (!order) throw new AppError(404, 'NOT_FOUND', 'Order not found');
     if (!['draft', 'open'].includes(order.status)) throw new AppError(409, 'ORDER_NOT_CANCELLABLE', `Order is ${order.status}`);
+    for (const p of await orderModel.paidByMethod(orderId, conn)) {     // give prepayments back: a negative row nets the books to zero
+      await orderModel.insertPayment({ orderId, method: p.method, amount: -p.amount, reference: 'Hoàn tiền trả trước' }, conn);
+    }
     await orderModel.markCancelled(orderId, conn);
     if (order.table_id) await tableModel.release(order.table_id, conn);
     return getWithItems(orderId, conn);
@@ -215,5 +363,6 @@ async function cancelDraft(conn, orderId) {
 
 module.exports = {
   getWithItems, createPosOrder, replaceOpenOrderItems, payOrder, cancelOrder,
+  prepayOrder, mergeTables, unmergeTable, splitOrder,
   upsertZaloDraft, confirmDraft, cancelDraft, finalizeOrder,
 };

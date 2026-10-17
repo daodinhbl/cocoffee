@@ -7,6 +7,8 @@ const v = require('../../utils/validate');
 const { render, formFlag, optional } = require('./common');
 const imageStore = require('../../services/imageStore');
 const menuRules = require('../../services/menuRules');
+const skuGenerator = require('../../services/skuGenerator');
+const taxModel = require('../../models/taxModel');
 
 const { parseAliases } = menuRules;
 
@@ -21,7 +23,7 @@ async function pageData() {
 async function page(_req, res) {
   await render(res, 'menu', {
     title: 'Thực đơn', activeMenu: 'menu', breadcrumbs: [{ label: 'Vận hành', href: '#' }, { label: 'Thực đơn' }],
-  }, await pageData());
+  }, { ...(await pageData()), taxCategories: await taxModel.categories().catch(() => []) });
 }
 
 // ---------------------------------------------------------------- categories
@@ -56,9 +58,12 @@ async function createProduct(req) {
   if (b.image_data) imageStore.decode(b.image_data);
   let id;
   await withTransaction(async (conn) => {
+    // SKU left empty -> GD-<name in capitals> (retail goods)
+    const typed = optional(b.sku);
+    const sku = typed ? v.str(typed, 'Mã SKU', { max: 40 }) : await skuGenerator.generate({ prefix: 'GD', name, exists: (s) => productModel.skuExists(s, conn) });
     id = await productModel.create({
       category_id: v.id(b.category_id, 'Nhóm'),
-      sku: v.str(b.sku, 'Mã SKU', { max: 40 }),
+      sku,
       name,
       price: v.num(b.price, 'Giá bán', { min: 0 }),
       stock_mode: 'direct',
@@ -69,6 +74,13 @@ async function createProduct(req) {
   });
   await imageStore.applyFromForm(b, { dirKey: 'products', id, name, currentUrl: null, setImage: productModel.setImage });
   return { message: `Đã thêm ${name}.` };
+}
+
+/** A tax group id from the form, checked against the table. */
+async function taxGroup(value) {
+  const id = v.id(value, 'Nhóm thuế');
+  if (!(await taxModel.categories()).some((c) => c.id === id)) throw new AppError(400, 'VALIDATION', 'Nhóm thuế không hợp lệ.');
+  return id;
 }
 
 async function updateProduct(req) {
@@ -91,6 +103,7 @@ async function updateProduct(req) {
       is_active: formFlag(b.is_active),
     }, conn);
     await productModel.setAliases(id, name, aliases, conn);
+    if (b.tax_category_id !== undefined) await productModel.setTaxCategory(id, optional(b.tax_category_id) ? await taxGroup(b.tax_category_id) : null, conn);
   });
   await imageStore.applyFromForm(b, { dirKey: 'products', id, name, currentUrl: current.image_url, setImage: productModel.setImage });
   return { message: `Đã cập nhật ${name}.` };

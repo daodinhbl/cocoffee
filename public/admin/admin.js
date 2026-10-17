@@ -264,7 +264,9 @@
     if (hint) { if (!hint.hasAttribute('data-default')) hint.setAttribute('data-default', hint.textContent); hint.textContent = hint.getAttribute('data-default'); }
     showImage(field, url || '');
   }
-  function compressImage(file, done) {
+  // Pages that render a field with a photo already set (settings: logo) show it at load.
+  $$('[data-image-field]').forEach(function (f) { var cur = $('[data-image-current]', f); if (cur && cur.value) showImage(f, cur.value); });
+  function compressImage(file, done, mode) {
     if (!/^image\/(jpeg|png|webp)$/.test(file.type)) { done(new Error('Chỉ nhận ảnh JPEG, PNG hoặc WebP.')); return; }
     if (file.size > 15 * 1024 * 1024) { done(new Error('Ảnh quá lớn (tối đa 15 MB trước khi nén).')); return; }
     // Read as a data: URL, not URL.createObjectURL: the admin CSP allows img-src 'self' data: only (no blob:).
@@ -273,6 +275,31 @@
     reader.onload = function () { img.src = reader.result; };
     reader.onerror = function () { done(new Error('Không đọc được ảnh này.')); };
     img.onload = function () {
+      if (mode === 'receipt') {                                    // invoice photo: fit inside 1600 px, JPEG, <= ~300 KB
+        var rk = Math.min(1, 1600 / Math.max(img.naturalWidth, img.naturalHeight));
+        var rw = Math.max(1, Math.round(img.naturalWidth * rk)), rh = Math.max(1, Math.round(img.naturalHeight * rk));
+        var out = null;
+        for (var pass = 0; pass < 4; pass++) {
+          var rc = document.createElement('canvas'); rc.width = rw; rc.height = rh;
+          var rx = rc.getContext('2d'); rx.fillStyle = '#fff'; rx.fillRect(0, 0, rw, rh); rx.drawImage(img, 0, 0, rw, rh);
+          var rq = 0.72; out = rc.toDataURL('image/jpeg', rq);
+          while (out.length > 420000 && rq > 0.4) { rq -= 0.08; out = rc.toDataURL('image/jpeg', rq); }
+          if (out.length <= 420000) break;
+          rw = Math.round(rw * 0.8); rh = Math.round(rh * 0.8);        // still too big: shrink and retry
+        }
+        done(null, out);
+        return;
+      }
+      if (mode === 'logo') {                                         // not cropped: fit inside 480 x 240, PNG
+        var k = Math.min(1, 480 / img.naturalWidth, 240 / img.naturalHeight);
+        var lc = document.createElement('canvas');
+        lc.width = Math.max(1, Math.round(img.naturalWidth * k)); lc.height = Math.max(1, Math.round(img.naturalHeight * k));
+        var lx = lc.getContext('2d');
+        lx.fillStyle = '#fff'; lx.fillRect(0, 0, lc.width, lc.height);   // receipts are printed on white
+        lx.drawImage(img, 0, 0, lc.width, lc.height);
+        done(null, lc.toDataURL('image/png'));
+        return;
+      }
       var side = Math.min(img.naturalWidth, img.naturalHeight);
       var canvas = document.createElement('canvas');
       canvas.width = canvas.height = Math.min(IMG_SIZE, side);
@@ -416,7 +443,7 @@
         $('[name="image_remove"]', field).value = '';
         showImage(field, data);
         if (hint) hint.textContent = 'Ảnh mới sẽ được lưu khi bấm Lưu (' + Math.round(data.length * 0.75 / 1024) + ' KB).';
-      });
+      }, field.getAttribute('data-image-mode'));
       return;
     }
     if (recipeDlg && recipeDlg.contains(t) && t.matches('[data-line-ref]')) recalc();

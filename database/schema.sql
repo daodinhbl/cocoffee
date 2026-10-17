@@ -6,7 +6,7 @@
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
-DROP TABLE IF EXISTS audit_log, payon_payments, idempotency_keys, media_files, customer_ledger, customers, app_settings, zalo_tokens, zalo_events, zalo_sessions, payments, inventory_movements,
+DROP TABLE IF EXISTS tax_exports, tax_periods, exp_daily, rev_daily, tax_rates, tax_categories, expenses, expense_categories, supplier_payments, purchase_receipt_lines, purchase_receipts, suppliers, shifts, service_leads, audit_log, payon_payments, idempotency_keys, media_files, customer_ledger, customers, app_settings, zalo_tokens, zalo_events, zalo_sessions, payments, inventory_movements,
                      order_items, orders, dining_tables, recipes, product_aliases, products,
                      inventory_items, categories, users;
 
@@ -55,6 +55,9 @@ CREATE TABLE inventory_items (
   min_stock        DECIMAL(14,3) NOT NULL DEFAULT 0,
   is_active        TINYINT(1)    NOT NULL DEFAULT 1,
   image_url        VARCHAR(255)  NULL,
+  group_code       VARCHAR(20)   NULL,           -- raw | packaging | retail | other; NULL = guessed from the SKU
+  pack_name        VARCHAR(20)   NULL,           -- how it is bought: thùng, kg, bao ...
+  pack_size        DECIMAL(14,3) NULL,           -- units in one pack (24 chai, 1000 g)
   created_at       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (id),
@@ -120,6 +123,7 @@ CREATE TABLE dining_tables (
   capacity         SMALLINT UNSIGNED NOT NULL DEFAULT 4,
   status           ENUM('available','serving') NOT NULL DEFAULT 'available',
   current_order_id INT UNSIGNED NULL,
+  merged_into      INT UNSIGNED NULL,               -- ghép bàn: this table shares the open order of table `merged_into`
   is_active        TINYINT(1)   NOT NULL DEFAULT 1,
   created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -206,6 +210,255 @@ CREATE TABLE payments (
   CONSTRAINT fk_payments_order FOREIGN KEY (order_id)    REFERENCES orders (id) ON DELETE CASCADE,
   CONSTRAINT fk_payments_user  FOREIGN KEY (received_by) REFERENCES users (id)  ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Ca làm việc: "chốt ca" at the POS closes the period since the previous shift and stores the totals.
+CREATE TABLE shifts (
+  id             INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+  period_from    DATETIME      NOT NULL,
+  period_to      DATETIME      NOT NULL,
+  closed_by      INT UNSIGNED  NULL,
+  opening_cash   DECIMAL(14,2) NOT NULL DEFAULT 0,
+  counted_cash   DECIMAL(14,2) NOT NULL DEFAULT 0,
+  expected_cash  DECIMAL(14,2) NOT NULL DEFAULT 0,
+  difference     DECIMAL(14,2) NOT NULL DEFAULT 0,
+  cash_total     DECIMAL(14,2) NOT NULL DEFAULT 0,
+  transfer_total DECIMAL(14,2) NOT NULL DEFAULT 0,
+  card_total     DECIMAL(14,2) NOT NULL DEFAULT 0,
+  other_total    DECIMAL(14,2) NOT NULL DEFAULT 0,
+  orders_count   INT UNSIGNED  NOT NULL DEFAULT 0,
+  cancelled_count INT UNSIGNED NOT NULL DEFAULT 0,
+  revenue        DECIMAL(14,2) NOT NULL DEFAULT 0,
+  discount_total DECIMAL(14,2) NOT NULL DEFAULT 0,
+  unpaid_total   DECIMAL(14,2) NOT NULL DEFAULT 0,
+  note           VARCHAR(255)  NULL,
+  created_at     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_shifts_from (period_from),
+  KEY idx_shifts_to (period_to),
+  CONSTRAINT fk_shifts_user FOREIGN KEY (closed_by) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Nhà cung cấp, phiếu nhập kho (nhiều dòng) và công nợ nhà cung cấp.
+CREATE TABLE suppliers (
+  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name       VARCHAR(120) NOT NULL,
+  phone      VARCHAR(30)  NULL,
+  address    VARCHAR(200) NULL,
+  tax_code   VARCHAR(30)  NULL,
+  note       VARCHAR(255) NULL,
+  is_active  TINYINT(1)   NOT NULL DEFAULT 1,
+  created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_suppliers_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE purchase_receipts (
+  id           INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+  receipt_code VARCHAR(30)   NULL,
+  supplier_id  INT UNSIGNED  NULL,
+  doc_no       VARCHAR(40)   NULL,
+  note         VARCHAR(255)  NULL,
+  total        DECIMAL(14,2) NOT NULL DEFAULT 0,
+  paid         DECIMAL(14,2) NOT NULL DEFAULT 0,
+  created_by   INT UNSIGNED  NULL,
+  created_at   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_receipts_code (receipt_code),
+  KEY idx_receipts_supplier (supplier_id, created_at),
+  KEY idx_receipts_created (created_at),
+  CONSTRAINT fk_receipts_supplier FOREIGN KEY (supplier_id) REFERENCES suppliers (id) ON DELETE SET NULL,
+  CONSTRAINT fk_receipts_user     FOREIGN KEY (created_by)  REFERENCES users (id)     ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE purchase_receipt_lines (
+  id                INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+  receipt_id        INT UNSIGNED  NOT NULL,
+  inventory_item_id INT UNSIGNED  NOT NULL,
+  item_name         VARCHAR(150)  NOT NULL,
+  unit              VARCHAR(20)   NOT NULL,
+  pack_label        VARCHAR(30)   NULL,
+  pack_qty          DECIMAL(14,3) NOT NULL DEFAULT 0,
+  pack_factor       DECIMAL(14,3) NOT NULL DEFAULT 1,
+  pack_price        DECIMAL(14,4) NOT NULL DEFAULT 0,
+  quantity          DECIMAL(14,3) NOT NULL,
+  unit_cost         DECIMAL(14,4) NOT NULL,
+  line_total        DECIMAL(14,2) NOT NULL,
+  PRIMARY KEY (id),
+  KEY idx_receipt_lines_receipt (receipt_id),
+  KEY idx_receipt_lines_item (inventory_item_id),
+  CONSTRAINT fk_receipt_lines_receipt FOREIGN KEY (receipt_id)        REFERENCES purchase_receipts (id) ON DELETE CASCADE,
+  CONSTRAINT fk_receipt_lines_item    FOREIGN KEY (inventory_item_id) REFERENCES inventory_items (id)   ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE supplier_payments (
+  id          INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+  supplier_id INT UNSIGNED  NOT NULL,
+  receipt_id  INT UNSIGNED  NULL,
+  amount      DECIMAL(14,2) NOT NULL,
+  method      ENUM('cash','transfer','other') NOT NULL DEFAULT 'cash',
+  note        VARCHAR(255)  NULL,
+  created_by  INT UNSIGNED  NULL,
+  paid_at     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_supplier_payments_supplier (supplier_id, paid_at),
+  KEY idx_supplier_payments_receipt (receipt_id),
+  CONSTRAINT fk_supplier_payments_supplier FOREIGN KEY (supplier_id) REFERENCES suppliers (id)         ON DELETE CASCADE,
+  CONSTRAINT fk_supplier_payments_receipt  FOREIGN KEY (receipt_id)  REFERENCES purchase_receipts (id) ON DELETE SET NULL,
+  CONSTRAINT fk_supplier_payments_user     FOREIGN KEY (created_by)  REFERENCES users (id)             ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Chi phí vận hành: danh mục (có cách xử lý thuế) và sổ chi phí; mỗi phiếu nhập kho sinh một khoản chi.
+CREATE TABLE expense_categories (
+  id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  code          VARCHAR(40)  NOT NULL,
+  name          VARCHAR(100) NOT NULL,
+  parent_id     INT UNSIGNED NULL,
+  tax_treatment ENUM('deductible','non_deductible','capex') NOT NULL DEFAULT 'deductible',
+  ledger_code   VARCHAR(20)  NULL,
+  sort_order    INT          NOT NULL DEFAULT 0,
+  is_system     TINYINT(1)   NOT NULL DEFAULT 0,
+  is_active     TINYINT(1)   NOT NULL DEFAULT 1,
+  created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_expense_categories_code (code),
+  KEY idx_expense_categories_parent (parent_id),
+  CONSTRAINT fk_expense_categories_parent FOREIGN KEY (parent_id) REFERENCES expense_categories (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE expenses (
+  id                  INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+  expense_date        DATE          NOT NULL,
+  category_id         INT UNSIGNED  NOT NULL,
+  amount              DECIMAL(14,2) NOT NULL,
+  vat_included       TINYINT(1)    NOT NULL DEFAULT 0,
+  payee               VARCHAR(120)  NULL,
+  supplier_id         INT UNSIGNED  NULL,
+  purchase_receipt_id INT UNSIGNED  NULL,
+  doc_no              VARCHAR(40)   NULL,
+  note                VARCHAR(255)  NULL,
+  receipt_media_id    INT UNSIGNED  NULL,
+  receipt_sha256      CHAR(64)      NULL,
+  source              ENUM('manual','purchase') NOT NULL DEFAULT 'manual',
+  status              ENUM('posted','void') NOT NULL DEFAULT 'posted',
+  void_reason         VARCHAR(255)  NULL,
+  created_by          INT UNSIGNED  NULL,
+  voided_by           INT UNSIGNED  NULL,
+  created_at          TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at          TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_expenses_receipt (purchase_receipt_id),
+  KEY idx_expenses_date (expense_date, category_id),
+  KEY idx_expenses_category (category_id, expense_date),
+  KEY idx_expenses_supplier (supplier_id),
+  KEY idx_expenses_sha (receipt_sha256),
+  CONSTRAINT fk_expenses_category FOREIGN KEY (category_id)         REFERENCES expense_categories (id),
+  CONSTRAINT fk_expenses_supplier FOREIGN KEY (supplier_id)         REFERENCES suppliers (id)         ON DELETE SET NULL,
+  CONSTRAINT fk_expenses_receipt  FOREIGN KEY (purchase_receipt_id) REFERENCES purchase_receipts (id) ON DELETE SET NULL,
+  CONSTRAINT fk_expenses_user     FOREIGN KEY (created_by)          REFERENCES users (id)             ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO expense_categories (code, name, tax_treatment, sort_order, is_system) VALUES
+     ('nguyen-vat-lieu', 'Nguyên vật liệu & hàng hóa', 'deductible', 1, 1),
+     ('bao-bi', 'Bao bì & vật dụng', 'deductible', 2, 1),
+     ('nhan-cong', 'Nhân công / lương', 'deductible', 3, 1),
+     ('thue-mat-bang', 'Thuê mặt bằng', 'deductible', 4, 1),
+     ('dien-nuoc', 'Điện, nước, internet', 'deductible', 5, 1),
+     ('marketing', 'Marketing & quảng cáo', 'deductible', 6, 1),
+     ('sua-chua', 'Sửa chữa & bảo trì', 'deductible', 7, 1),
+     ('thiet-bi', 'Mua thiết bị, dụng cụ', 'capex', 8, 1),
+     ('thue-phi', 'Thuế, phí, lệ phí', 'non_deductible', 9, 1),
+     ('khac', 'Chi phí khác', 'deductible', 10, 1);
+
+-- Thuế: nhóm thuế, thuế suất có hiệu lực theo ngày, rollup doanh thu / chi phí theo ngày, kỳ thuế, hàng đợi xuất sổ.
+-- order_items.tax_category_id / vat_rate / pit_rate / net_revenue và products.tax_category_id: xem ALTER ở bootstrapDb.js (snapshot lúc hoàn tất đơn).
+CREATE TABLE tax_categories (
+  id         INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  code       VARCHAR(40)  NOT NULL,
+  name       VARCHAR(100) NOT NULL,
+  sort_order INT          NOT NULL DEFAULT 0,
+  is_active  TINYINT(1)   NOT NULL DEFAULT 1,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_tax_categories_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE tax_rates (
+  id             INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+  category_id    INT UNSIGNED  NOT NULL,
+  effective_from DATE          NOT NULL,
+  effective_to   DATE          NULL,
+  vat_rate       DECIMAL(6,4)  NOT NULL DEFAULT 0,
+  pit_rate       DECIMAL(6,4)  NOT NULL DEFAULT 0,
+  legal_basis    VARCHAR(200)  NULL,
+  created_by     INT UNSIGNED  NULL,
+  created_at     TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_tax_rates_from (category_id, effective_from),
+  CONSTRAINT fk_tax_rates_category FOREIGN KEY (category_id) REFERENCES tax_categories (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE rev_daily (
+  day             DATE          NOT NULL,
+  tax_category_id INT UNSIGNED  NOT NULL,
+  lines_count     INT UNSIGNED  NOT NULL DEFAULT 0,
+  gross_revenue   DECIMAL(16,2) NOT NULL DEFAULT 0,
+  discount        DECIMAL(16,2) NOT NULL DEFAULT 0,
+  net_revenue     DECIMAL(16,2) NOT NULL DEFAULT 0,
+  vat_amount      DECIMAL(16,2) NOT NULL DEFAULT 0,
+  pit_amount      DECIMAL(16,2) NOT NULL DEFAULT 0,
+  updated_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (day, tax_category_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE exp_daily (
+  day         DATE          NOT NULL,
+  category_id INT UNSIGNED  NOT NULL,
+  amount      DECIMAL(16,2) NOT NULL DEFAULT 0,
+  tx_count    INT           NOT NULL DEFAULT 0,
+  updated_at  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (day, category_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE tax_periods (
+  id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  kind        ENUM('month','quarter','year') NOT NULL,
+  period_from DATE         NOT NULL,
+  period_to   DATE         NOT NULL,
+  status      ENUM('open','locked','filed') NOT NULL DEFAULT 'locked',
+  totals_json MEDIUMTEXT   NULL,
+  filed_ref   VARCHAR(100) NULL,
+  locked_by   INT UNSIGNED NULL,
+  locked_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uq_tax_periods (kind, period_from),
+  KEY idx_tax_periods_range (period_from, period_to),
+  CONSTRAINT fk_tax_periods_user FOREIGN KEY (locked_by) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE tax_exports (
+  id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  kind         ENUM('revenue_book','expense_book','declaration','bundle') NOT NULL,
+  period_from  DATE         NOT NULL,
+  period_to    DATE         NOT NULL,
+  status       ENUM('queued','running','done','failed') NOT NULL DEFAULT 'queued',
+  attempts     TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  file_name    VARCHAR(150) NULL,
+  file_bytes   BIGINT UNSIGNED NULL,
+  error        VARCHAR(255) NULL,
+  requested_by INT UNSIGNED NULL,
+  created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  started_at   DATETIME     NULL,
+  finished_at  DATETIME     NULL,
+  expires_at   DATETIME     NULL,
+  PRIMARY KEY (id),
+  KEY idx_tax_exports_status (status, id),
+  CONSTRAINT fk_tax_exports_user FOREIGN KEY (requested_by) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+INSERT INTO tax_categories (code, name, sort_order) VALUES
+     ('fnb_service', 'Dịch vụ ăn uống (đồ uống pha chế, đồ ăn)', 1),
+     ('goods_distribution', 'Bán hàng hóa nguyên trạng (thuốc lá, nước đóng chai)', 2),
+     ('none', 'Không chịu thuế / không tính', 3);
 
 -- -----------------------------------------------------------------------------
 -- Stock ledger (every change to inventory_items.quantity_on_hand)
@@ -393,4 +646,19 @@ CREATE TABLE audit_log (
   KEY idx_audit_entity (entity, created_at),
   KEY idx_audit_action (action, created_at),
   KEY idx_audit_user (user_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Leads from the public technical-service QR page (/ky-thuat; see models/leadModel.js). Also created at startup (ensureSchemaUpgrades).
+CREATE TABLE service_leads (
+  id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+  name        VARCHAR(120) NOT NULL,
+  phone       VARCHAR(20)  NOT NULL,
+  need        VARCHAR(40)  NOT NULL,
+  source      VARCHAR(30)  NOT NULL DEFAULT 'qr',
+  note        VARCHAR(500) NULL,
+  status      ENUM('new','contacted','won','lost') NOT NULL DEFAULT 'new',
+  created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_leads_phone (phone, created_at),
+  KEY idx_leads_status (status, created_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

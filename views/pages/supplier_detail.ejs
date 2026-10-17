@@ -1,0 +1,94 @@
+<%
+  const { input, label, btnPrimary, btnSecondary, btnGhost, sheet, grabber } = ui;
+  const card = 'rounded-xl border border-milk-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,.04)]';
+  const debt = Number(supplier.debt);
+  const METHOD = { cash: 'Tiền mặt', transfer: 'Chuyển khoản', other: 'Khác' };
+  const fill = { name: supplier.name, phone: supplier.phone || '', address: supplier.address || '', tax_code: supplier.tax_code || '', note: supplier.note || '', is_active: Boolean(supplier.is_active) };
+  const payStatus = (r) => (Number(r.debt) <= 0 ? ['Đã trả đủ', 'good'] : Number(r.paid) > 0 ? ['Trả một phần', 'warn'] : ['Chưa trả', 'bad']);
+%>
+<div class="flex flex-wrap items-start justify-between gap-4">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight text-navy-darker sm:text-2xl"><%= supplier.name %> <% if (!supplier.is_active) { %><%- badge('Ngừng giao dịch', 'neutral') %><% } %></h1>
+    <p class="mt-1 text-sm text-gray-500"><%= [supplier.phone && `ĐT ${supplier.phone}`, supplier.tax_code && `MST ${supplier.tax_code}`, supplier.address].filter(Boolean).join(' · ') || 'Chưa có thông tin liên hệ' %></p>
+    <% if (supplier.note) { %><p class="mt-0.5 text-sm italic text-gray-500"><%= supplier.note %></p><% } %>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    <a href="/admin/receiving?supplier=<%= supplier.id %>" class="<%= btnSecondary %>"><%- icon('upload', 'h-4 w-4') %> Nhập hàng</a>
+    <button type="button" class="<%= btnSecondary %>" data-modal-open="#supplier-dialog" data-action="/admin/suppliers/<%= supplier.id %>" data-title="Sửa nhà cung cấp" data-fill="<%= safeJson(fill) %>"><%- icon('pencil', 'h-4 w-4') %> Sửa</button>
+    <button type="button" id="pay-open" class="<%= btnPrimary %> disabled:opacity-50" <%= debt > 0 ? '' : 'disabled' %> data-modal-open="#pay-dialog" data-action="/admin/suppliers/<%= supplier.id %>/pay" data-title="Trả nợ — <%= supplier.name %>" data-fill="<%= safeJson({ amount: debt }) %>">Trả nợ</button>
+  </div>
+</div>
+
+<section aria-label="Tóm tắt" class="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+  <div class="<%= card %> px-4 py-3"><p class="text-xs font-medium uppercase tracking-wide text-gray-500">Số phiếu nhập</p><p class="mt-1 text-2xl font-semibold tnum text-navy-darker"><%= supplier.receipts %></p><p class="text-xs text-milk-500"><%= supplier.last_at ? `Gần nhất ${fmtTime(supplier.last_at)}` : 'Chưa nhập lần nào' %></p></div>
+  <div class="<%= card %> px-4 py-3"><p class="text-xs font-medium uppercase tracking-wide text-gray-500">Tổng tiền hàng đã nhập</p><p class="mt-1 text-2xl font-semibold tnum text-navy-darker"><%= money(supplier.purchased) %></p></div>
+  <div class="<%= card %> px-4 py-3"><p class="text-xs font-medium uppercase tracking-wide text-gray-500">Đã thanh toán</p><p class="mt-1 text-2xl font-semibold tnum text-emerald-700"><%= money(supplier.paid) %></p></div>
+  <div class="<%= card %> px-4 py-3"><p class="text-xs font-medium uppercase tracking-wide text-gray-500">Còn nợ</p><p class="mt-1 text-2xl font-semibold tnum <%= debt > 0 ? 'text-red-700' : 'text-navy-darker' %>"><%= money(debt) %></p></div>
+</section>
+
+<section class="<%= card %> mt-6 overflow-hidden" aria-labelledby="rcp-title">
+  <h2 id="rcp-title" class="border-b border-milk-200 px-4 py-4 text-base font-semibold text-navy-darker sm:px-5">Lịch sử nhập hàng</h2>
+  <table class="rtable w-full border-collapse text-left text-sm lg:min-w-[720px]">
+    <caption class="sr-only">Các phiếu nhập của nhà cung cấp</caption>
+    <thead class="<%= ui.thead %>">
+      <tr>
+        <th scope="col" class="w-12 px-2 py-3 text-center sm:px-4">STT</th>
+        <th scope="col" class="px-4 py-3">Phiếu</th>
+        <th scope="col" class="px-4 py-3">Thời gian</th>
+        <th scope="col" class="px-4 py-3 text-right">Dòng</th>
+        <th scope="col" class="px-4 py-3 text-right">Tổng tiền</th>
+        <th scope="col" class="px-4 py-3 text-right">Đã trả</th>
+        <th scope="col" class="px-4 py-3 text-right">Còn nợ</th>
+        <th scope="col" class="px-4 py-3">Trạng thái</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% receipts.forEach((r, idx) => { const st = payStatus(r); %>
+        <tr class="border-b border-milk-200 last:border-b-0 <%= (idx + 1) % 2 === 1 ? 'bg-blue-50/70' : '' %>">
+          <td data-label="" class="rt-no px-2 py-3 text-center font-mono text-xs text-milk-500 tnum sm:px-4"><%= idx + 1 %></td>
+          <td data-label="" class="rt-title px-4 py-3"><a href="/admin/receipts/<%= r.id %>" class="font-semibold text-blue-700 hover:underline tnum"><%= r.receipt_code %></a><% if (r.doc_no) { %><span class="block text-xs text-gray-500">HĐ <%= r.doc_no %></span><% } %></td>
+          <td data-label="Thời gian" class="px-4 py-3 tnum"><%= fmtTime(r.created_at) %></td>
+          <td data-label="Dòng" class="px-4 py-3 text-right font-mono tnum"><%= r.line_count %></td>
+          <td data-label="Tổng tiền" class="px-4 py-3 text-right font-mono font-semibold tnum"><%= money(r.total) %></td>
+          <td data-label="Đã trả" class="px-4 py-3 text-right font-mono tnum text-emerald-700"><%= money(r.paid) %></td>
+          <td data-label="Còn nợ" class="px-4 py-3 text-right font-mono tnum <%= Number(r.debt) > 0 ? 'font-semibold text-red-700' : 'text-gray-400' %>"><%= Number(r.debt) > 0 ? money(r.debt) : '—' %></td>
+          <td data-label="Trạng thái" class="px-4 py-3"><%- badge(st[0], st[1]) %></td>
+        </tr>
+      <% }) %>
+      <% if (!receipts.length) { %><tr><td colspan="8" data-label="" class="px-4 py-10 text-center text-gray-500">Chưa có phiếu nhập nào từ nhà cung cấp này.</td></tr><% } %>
+    </tbody>
+  </table>
+</section>
+
+<section class="<%= card %> mt-6 overflow-hidden" aria-labelledby="pay-title-h">
+  <h2 id="pay-title-h" class="border-b border-milk-200 px-4 py-4 text-base font-semibold text-navy-darker sm:px-5">Lịch sử thanh toán</h2>
+  <table class="rtable w-full border-collapse text-left text-sm lg:min-w-[640px]">
+    <caption class="sr-only">Các lần thanh toán cho nhà cung cấp</caption>
+    <thead class="<%= ui.thead %>">
+      <tr>
+        <th scope="col" class="px-4 py-3">Thời gian</th>
+        <th scope="col" class="px-4 py-3">Phiếu</th>
+        <th scope="col" class="px-4 py-3">Hình thức</th>
+        <th scope="col" class="px-4 py-3 text-right">Số tiền</th>
+        <th scope="col" class="px-4 py-3">Ghi chú</th>
+        <th scope="col" class="px-4 py-3">Người ghi</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% payments.forEach((p, idx) => { %>
+        <tr class="border-b border-milk-200 last:border-b-0 <%= (idx + 1) % 2 === 1 ? 'bg-blue-50/70' : '' %>">
+          <td data-label="" class="rt-title px-4 py-3 tnum"><%= fmtTime(p.paid_at) %></td>
+          <td data-label="Phiếu" class="px-4 py-3 tnum"><% if (p.receipt_id) { %><a href="/admin/receipts/<%= p.receipt_id %>" class="text-blue-700 hover:underline"><%= p.receipt_code %></a><% } else { %>—<% } %></td>
+          <td data-label="Hình thức" class="px-4 py-3"><%= METHOD[p.method] || p.method %></td>
+          <td data-label="Số tiền" class="px-4 py-3 text-right font-mono font-semibold tnum text-emerald-700"><%= money(p.amount) %></td>
+          <td data-label="Ghi chú" class="px-4 py-3 text-gray-600"><%= p.note || '' %></td>
+          <td data-label="Người ghi" class="px-4 py-3 text-gray-600"><%= p.user_name || '—' %></td>
+        </tr>
+      <% }) %>
+      <% if (!payments.length) { %><tr><td colspan="6" data-label="" class="px-4 py-10 text-center text-gray-500">Chưa có khoản thanh toán nào.</td></tr><% } %>
+    </tbody>
+  </table>
+</section>
+
+<%- include('../partials/pay_dialog', { backTo: `/admin/suppliers/${supplier.id}` }) %>
+<%- include('../partials/supplier_dialog', { backTo: `/admin/suppliers/${supplier.id}` }) %>

@@ -4,6 +4,7 @@ const v = require('../../utils/validate');
 const { render, formBool } = require('./common');
 const printerSettings = require('../../services/printerSettings');
 const iosApp = require('../../services/iosApp');
+const shopProfile = require('../../services/shopProfile');
 const userService = require('../../services/userService');
 const { systemConfig } = require('../../services/settingsService');
 const payon = require('./payon');
@@ -19,6 +20,8 @@ async function page(req, res) {
     printer: forced ? null : await printerSettings.get(),
     payonPanel: forced ? null : await payon.settingsPanel(),
     iosApp: forced ? null : await iosApp.view(),
+    shop: forced ? null : await shopProfile.get(),
+    shopFields: shopProfile.FIELDS, declarationPeriods: shopProfile.PERIODS,
     config: { ...systemConfig(), publicBaseUrl: env.publicBaseUrl || '(chưa đặt)' },
   });
 }
@@ -51,4 +54,10 @@ async function saveIosApp(req) {
   return { message: link ? `Đã lưu liên kết tải ứng dụng iOS (${link.label}).` : 'Đã bỏ liên kết tải ứng dụng iOS.', to: '/admin/settings' };
 }
 
-module.exports = { page, createUser, resetPassword, setActive, savePrinter, saveIosApp };
+/** Store / household-business profile: name, owner, tax code, address, phone... */
+async function saveShop(req) {
+  await shopProfile.save(req.body, req.user.id);
+  return { message: 'Đã lưu thông tin cửa hàng.', to: '/admin/settings' };
+}
+
+module.exports = { page, createUser, resetPassword, setActive, savePrinter, saveIosApp, saveShop };

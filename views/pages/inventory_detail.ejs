@@ -16,7 +16,7 @@
   const coverText = cover === null ? null : cover < 1 ? 'dưới 1 ngày' : cover > 365 ? 'trên 1 năm' : `khoảng ${num(Math.round(cover))} ngày`;
   const counts = MOVEMENT_TYPES.reduce((acc, t) => { acc[t] = movements.filter((m) => m.movement_type === t).length; return acc; }, {});
   const shown = type ? movements.filter((m) => m.movement_type === type) : movements;
-  const fillEdit = { name: item.name, unit: item.unit, min_stock: item.min_stock, sku: item.sku, is_active: Boolean(item.is_active), image_url: item.image_url || '' };
+  const fillEdit = { name: item.name, unit: item.unit, min_stock: item.min_stock, sku: item.sku, is_active: Boolean(item.is_active), image_url: item.image_url || '', group_code: item.group_code || '', pack_name: item.pack_name || '', pack_size: item.pack_size ? Number(item.pack_size) : '' };
   const pill = (on) => `inline-flex h-9 shrink-0 items-center gap-2 rounded-full border px-3.5 text-sm font-medium transition ${on ? 'border-navy bg-navy text-white shadow-sm' : 'border-milk-200 bg-white hover:border-navy-accent'}`;
   const pillCount = (on) => `rounded-full px-1.5 py-0.5 font-mono text-xs tnum ${on ? 'bg-white/15' : 'bg-milk-100 text-milk-500'}`;
   const signed = (x) => `${x > 0 ? '+' : x < 0 ? '−' : ''}${num(Math.abs(x))}`;

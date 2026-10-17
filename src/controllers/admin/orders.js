@@ -12,7 +12,8 @@ const { parseDay, dayBounds, shopDay } = require('../../utils/shopTime');
 const { render, optional } = require('./common');
 const payon = require('./payon');
 
-const { PAGE_SIZE, STATUSES } = orderQuery;
+const { STATUSES } = orderQuery;
+const PAGE_SIZE = 20;                     // rows per page on /admin/orders
 const METHODS = ['cash', 'transfer', 'card', 'other'];
 
 const pick = (value, allowed) => (allowed.includes(value) ? value : undefined);

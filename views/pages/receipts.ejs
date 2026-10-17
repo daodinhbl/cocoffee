@@ -1,0 +1,90 @@
+<%
+  const { input, label, btnPrimary, btnSecondary } = ui;
+  const card = 'rounded-xl border border-milk-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,.04)]';
+  const offset = (page - 1) * pageSize;
+  const payStatus = (r) => (Number(r.debt) <= 0 ? ['Đã trả đủ', 'good'] : Number(r.paid) > 0 ? ['Trả một phần', 'warn'] : ['Chưa trả', 'bad']);
+  const hasFilter = supplierId || from || to || q || onlyDebt;
+  const quick = (a, b) => { const p = new URLSearchParams(); if (supplierId) p.set('supplier', supplierId); if (q) p.set('q', q); if (onlyDebt) p.set('debt', '1'); p.set('from', a); p.set('to', b); return `/admin/receipts?${p}`; };
+%>
+<div class="flex flex-wrap items-end justify-between gap-4">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight text-navy-darker sm:text-2xl">Lịch sử nhập kho</h1>
+    <p class="mt-1 max-w-2xl text-sm text-gray-500">Các phiếu nhập đã lập: ai nhập, từ nhà cung cấp nào, bao nhiêu tiền, đã trả bao nhiêu. Bấm mã phiếu để xem từng dòng hàng và trả nợ.</p>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    <a href="/admin/suppliers" class="<%= btnSecondary %>">Nhà cung cấp</a>
+    <a href="/admin/receiving" class="<%= btnPrimary %>"><%- icon('plus', 'h-4 w-4') %> Lập phiếu nhập</a>
+  </div>
+</div>
+
+<section aria-label="Tóm tắt" class="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+  <div class="<%= card %> px-4 py-3"><p class="text-xs font-medium uppercase tracking-wide text-gray-500">Số phiếu</p><p class="mt-1 text-2xl font-semibold tnum text-navy-darker"><%= sums.n %></p><p class="text-xs text-milk-500"><%= hasFilter ? 'Theo bộ lọc hiện tại' : 'Tất cả thời gian' %></p></div>
+  <div class="<%= card %> px-4 py-3"><p class="text-xs font-medium uppercase tracking-wide text-gray-500">Tổng tiền hàng nhập</p><p class="mt-1 text-2xl font-semibold tnum text-navy-darker"><%= money(sums.total) %></p></div>
+  <div class="<%= card %> px-4 py-3"><p class="text-xs font-medium uppercase tracking-wide text-gray-500">Đã thanh toán</p><p class="mt-1 text-2xl font-semibold tnum text-emerald-700"><%= money(sums.paid) %></p></div>
+  <div class="<%= card %> px-4 py-3"><p class="text-xs font-medium uppercase tracking-wide text-gray-500">Còn nợ</p><p class="mt-1 text-2xl font-semibold tnum <%= sums.total - sums.paid > 0 ? 'text-red-700' : 'text-navy-darker' %>"><%= money(sums.total - sums.paid) %></p></div>
+</section>
+
+<section class="mt-6" aria-label="Bộ lọc">
+  <form method="get" action="/admin/receipts" class="<%= card %> grid grid-cols-12 gap-3 p-3 sm:p-4">
+    <div class="col-span-12 sm:col-span-6 lg:col-span-3">
+      <label for="f-q" class="<%= label %>">Tìm phiếu</label>
+      <input id="f-q" name="q" type="search" value="<%= q %>" placeholder="Mã phiếu, số hóa đơn, NCC…" class="<%= input %>" autocomplete="off">
+    </div>
+    <div class="col-span-12 sm:col-span-6 lg:col-span-3">
+      <label for="f-sup" class="<%= label %>">Nhà cung cấp</label>
+      <select id="f-sup" name="supplier" class="<%= input %>">
+        <option value="">Tất cả</option>
+        <% suppliers.forEach((s) => { %><option value="<%= s.id %>" <%= s.id === supplierId ? 'selected' : '' %>><%= s.name %></option><% }) %>
+      </select>
+    </div>
+    <div class="col-span-6 lg:col-span-2"><label for="f-from" class="<%= label %>">Từ ngày</label><input id="f-from" name="from" type="date" value="<%= from %>" class="<%= input %>"></div>
+    <div class="col-span-6 lg:col-span-2"><label for="f-to" class="<%= label %>">Đến ngày</label><input id="f-to" name="to" type="date" value="<%= to %>" class="<%= input %>"></div>
+    <div class="col-span-12 flex items-end gap-2 lg:col-span-2">
+      <label class="flex h-10 flex-1 items-center gap-2 text-sm"><input type="checkbox" name="debt" value="1" <%= onlyDebt ? 'checked' : '' %> class="h-4 w-4 rounded border-gray-300 accent-blue-700"> Còn nợ</label>
+      <button type="submit" class="<%= btnPrimary %>">Lọc</button>
+    </div>
+    <div class="col-span-12 flex flex-wrap items-center gap-2 text-sm">
+      <span class="text-gray-500">Nhanh:</span>
+      <a href="<%= quick(today, today) %>" class="rounded-full border border-milk-200 px-3 py-1 hover:border-navy-accent">Hôm nay</a>
+      <a href="<%= quick(monthStart, today) %>" class="rounded-full border border-milk-200 px-3 py-1 hover:border-navy-accent">Tháng này</a>
+      <% if (hasFilter) { %><a href="/admin/receipts" class="ml-auto font-medium text-blue-700 hover:underline">Xóa bộ lọc</a><% } %>
+    </div>
+  </form>
+</section>
+
+<div class="<%= card %> mt-3 overflow-hidden">
+  <table class="rtable w-full border-collapse text-left text-sm lg:min-w-[900px]">
+    <caption class="sr-only">Phiếu nhập kho</caption>
+    <thead class="<%= ui.thead %>">
+      <tr>
+        <th scope="col" class="w-12 px-2 py-3 text-center sm:px-4">STT</th>
+        <th scope="col" class="px-4 py-3">Phiếu</th>
+        <th scope="col" class="px-4 py-3">Thời gian</th>
+        <th scope="col" class="px-4 py-3">Nhà cung cấp</th>
+        <th scope="col" class="px-4 py-3 text-right">Dòng</th>
+        <th scope="col" class="px-4 py-3 text-right">Tổng tiền</th>
+        <th scope="col" class="px-4 py-3 text-right">Còn nợ</th>
+        <th scope="col" class="px-4 py-3">Trạng thái</th>
+        <th scope="col" class="px-4 py-3">Người nhập</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% rows.forEach((r, idx) => { const stt = offset + idx + 1; const st = payStatus(r); %>
+        <tr data-row class="border-b border-milk-200 last:border-b-0 <%= stt % 2 === 1 ? 'bg-blue-50/70 hover:bg-blue-100/70' : 'hover:bg-milk-50' %>">
+          <td data-label="" class="rt-no px-2 py-3 text-center font-mono text-xs text-milk-500 tnum sm:px-4"><%= stt %></td>
+          <td data-label="" class="rt-title px-4 py-3"><a href="/admin/receipts/<%= r.id %>" class="font-semibold text-blue-700 hover:underline tnum"><%= r.receipt_code %></a><% if (r.doc_no) { %><span class="block text-xs text-gray-500">HĐ <%= r.doc_no %></span><% } %></td>
+          <td data-label="Thời gian" class="px-4 py-3 tnum"><%= fmtTime(r.created_at) %></td>
+          <td data-label="Nhà cung cấp" class="px-4 py-3"><% if (r.supplier_id) { %><a href="/admin/suppliers/<%= r.supplier_id %>" class="hover:underline"><%= r.supplier_name %></a><% } else { %><span class="text-gray-500">Mua lẻ</span><% } %></td>
+          <td data-label="Dòng" class="px-4 py-3 text-right font-mono tnum"><%= r.line_count %></td>
+          <td data-label="Tổng tiền" class="px-4 py-3 text-right font-mono font-semibold tnum"><%= money(r.total) %></td>
+          <td data-label="Còn nợ" class="px-4 py-3 text-right font-mono tnum <%= Number(r.debt) > 0 ? 'font-semibold text-red-700' : 'text-gray-400' %>"><%= Number(r.debt) > 0 ? money(r.debt) : '—' %></td>
+          <td data-label="Trạng thái" class="px-4 py-3"><%- badge(st[0], st[1]) %></td>
+          <td data-label="Người nhập" class="px-4 py-3 text-gray-600"><%= r.user_name || '—' %></td>
+        </tr>
+      <% }) %>
+      <% if (!rows.length) { %><tr data-empty><td colspan="9" data-label="" class="px-4 py-12 text-center text-sm text-gray-500"><%= hasFilter ? 'Không có phiếu nhập phù hợp.' : 'Chưa có phiếu nhập nào.' %></td></tr><% } %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('../partials/pager', { page, pages, total, pageSize, pageUrl, unit: 'phiếu' }) %>

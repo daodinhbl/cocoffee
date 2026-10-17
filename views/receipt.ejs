@@ -5,6 +5,7 @@
   const base = paper === 58 ? 9 : 10.5;          // pt
   const methodText = payments.length ? payments.map((p) => p.label).join(', ') : 'Chưa thanh toán';
   const copies = Math.max(1, Math.min(3, printer.copies || 1));
+  const logoMm = Math.min(printable, ({ s: 22, m: 32, l: 44 })[printer.logoSize] || 32);
 %><!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -36,7 +37,9 @@
     td.n, th.n { text-align: right; white-space: nowrap; }
     .item { font-weight: bold; }
     .sub { font-size: <%= base - 1 %>pt; padding-top: 0; }
-    .total { font-size: <%= base + 5 %>pt; font-weight: bold; }
+    .total { font-size: <%= base + 2.5 %>pt; font-weight: bold; }
+    .wifi { margin-top: 2mm; padding-top: 1.5mm; border-top: 1px dashed #000; font-size: <%= base %>pt; }
+    .logo { display: block; margin: 0 auto 1.5mm; width: <%= logoMm %>mm; max-height: 24mm; object-fit: contain; filter: grayscale(1) contrast(1.35); }
     .note { font-style: italic; }
     .bar { position: sticky; top: 0; display: flex; gap: 8px; justify-content: center; padding: 10px; background: #0f172a; }
     .bar button { font: inherit; font-size: 14pt; min-height: 48px; padding: 0 20px; border: 0; border-radius: 10px; cursor: pointer; }
@@ -59,10 +62,13 @@
 
   <main class="paper">
     <% if (sample) { %><div class="sample">HÓA ĐƠN IN THỬ — KHÔNG CÓ GIÁ TRỊ</div><% } %>
+    <% if (printer.logoUrl) { %><img class="logo" src="<%= printer.logoUrl %>" alt=""><% } %>
     <div class="center">
       <div class="shop"><%= shopName %></div>
+      <% if (printer.legalName && printer.legalName !== shopName) { %><div class="muted"><%= printer.legalName %></div><% } %>
       <% if (printer.shopAddress) { %><div class="muted"><%= printer.shopAddress %></div><% } %>
       <% if (printer.shopPhone) { %><div class="muted">ĐT: <%= printer.shopPhone %></div><% } %>
+      <% if (printer.taxCode) { %><div class="muted">MST: <%= printer.taxCode %></div><% } %>
       <div class="title">HÓA ĐƠN THANH TOÁN</div>
       <div class="muted">Số: <b><%= order.order_code %></b></div>
     </div>
@@ -102,6 +108,7 @@
     <hr class="rule">
     <div class="center">
       <div><b><%= printer.footer || 'Cảm ơn quý khách — hẹn gặp lại!' %></b></div>
+      <% if (printer.wifiName) { %><div class="wifi">Wi-Fi: <b><%= printer.wifiName %></b><% if (printer.wifiPassword) { %><br>Mật khẩu: <b><%= printer.wifiPassword %></b><% } %></div><% } %>
       <% if (copies > 1) { %><div class="copy">Liên <%= copy %>/<%= copies %></div><% } %>
     </div>
   </main>

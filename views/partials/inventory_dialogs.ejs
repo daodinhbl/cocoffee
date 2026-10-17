@@ -24,12 +24,31 @@
       <div class="grid grid-cols-2 gap-4">
         <div>
           <label for="i-sku" class="<%= label %>">Mã (SKU)</label>
-          <input id="i-sku" name="sku" maxlength="40" class="<%= input %> font-mono read-only:bg-gray-50 read-only:text-gray-500" autocomplete="off" autocapitalize="characters" data-create-only>
+          <input id="i-sku" name="sku" maxlength="40" class="<%= input %> font-mono read-only:bg-gray-50 read-only:text-gray-500" autocomplete="off" autocapitalize="characters" placeholder="Để trống: tự tạo" data-create-only>
+          <p class="mt-1 text-xs text-gray-500">Tự tạo từ phân loại + tên (VD: RM-DUONG-CAT).</p>
         </div>
         <div>
           <label for="i-unit" class="<%= label %>">Đơn vị</label>
           <input id="i-unit" name="unit" required maxlength="20" class="<%= input %>" placeholder="g, ml, bao…" autocomplete="off">
         </div>
+      </div>
+      <div>
+        <label for="i-group" class="<%= label %>">Phân loại</label>
+        <select id="i-group" name="group_code" class="<%= input %>">
+          <option value="">Tự động (theo mã SKU)</option>
+          <% (locals.groups || []).forEach((g) => { %><option value="<%= g.code %>"><%= g.label %></option><% }) %>
+        </select>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label for="i-pack" class="<%= label %>">Quy cách nhập: tên</label>
+          <input id="i-pack" name="pack_name" maxlength="20" class="<%= input %>" placeholder="thùng, kg, bao…" autocomplete="off">
+        </div>
+        <div>
+          <label for="i-packsize" class="<%= label %>">1 đơn vị nhập = ? (đơn vị kho)</label>
+          <input id="i-packsize" name="pack_size" type="number" min="0.001" step="any" inputmode="decimal" class="<%= input %> text-right font-mono" placeholder="24, 1000…">
+        </div>
+        <p class="col-span-2 -mt-2 text-xs text-gray-500">Để trống nếu luôn nhập theo đơn vị kho. Khi nhập kho sẽ tự chia giá: 1 thùng 24 chai → giá từng chai; 1 kg → giá từng gam.</p>
       </div>
       <div>
         <label for="i-min" class="<%= label %>">Tồn tối thiểu (cảnh báo khi bằng hoặc thấp hơn)</label>

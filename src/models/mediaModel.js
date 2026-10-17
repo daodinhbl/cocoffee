@@ -13,7 +13,7 @@ async function create({ folder, mime, bytes }, conn) {
 
 /** @returns {Promise<{id:number, mime:string, bytes:Buffer}|null>} */
 async function get(id, conn) {
-  const [rows] = await db(conn).query('SELECT id, mime, bytes FROM media_files WHERE id = ?', [id]);
+  const [rows] = await db(conn).query('SELECT id, folder, mime, bytes FROM media_files WHERE id = ?', [id]);
   return rows[0] || null;
 }
 

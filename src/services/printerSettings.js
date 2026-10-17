@@ -2,6 +2,7 @@ const env = require('../config/env');
 const settingsModel = require('../models/settingsModel');
 const logger = require('../utils/logger');
 const { AppError } = require('../utils/httpError');
+const imageStore = require('./imageStore');
 
 /**
  * Receipt printer configuration, edited in Web Admin > Cài đặt > Máy in hóa đơn.
@@ -13,6 +14,8 @@ const { AppError } = require('../utils/httpError');
  */
 const PREFIX = 'printer.';
 const PAPERS = [58, 80];
+// Logo width on the receipt in mm (small / medium / large); the picture itself is stored once, at most 480 px wide.
+const LOGO_SIZES = { s: 22, m: 32, l: 44 };
 
 function defaults() {
   return {
@@ -25,6 +28,10 @@ function defaults() {
     footer: env.business.paymentNote || 'Cảm ơn quý khách — hẹn gặp lại!',
     showVat: true,
     vatRate: 8,
+    logoUrl: '',
+    logoSize: 'm',
+    wifiName: '',
+    wifiPassword: '',
   };
 }
 
@@ -50,11 +57,18 @@ async function get() {
     autoPrint: bool(s('autoPrint'), d.autoPrint),
     copies: int(s('copies'), d.copies, 1, 3),
     printerName: s('printerName') ?? d.printerName,
-    shopAddress: s('shopAddress') ?? d.shopAddress,
-    shopPhone: s('shopPhone') ?? d.shopPhone,
+    shopAddress: s('shopAddress') || d.shopAddress,          // blank -> the shop profile
+    shopPhone: s('shopPhone') || d.shopPhone,
+    shopName: env.business.shopName,
+    legalName: env.business.legalName || '',
+    taxCode: env.business.taxCode || '',
     footer: s('footer') ?? d.footer,
     showVat: bool(s('showVat'), d.showVat),
     vatRate: int(s('vatRate'), d.vatRate, 0, 20),
+    logoUrl: /^\/media\/\d+-[a-z0-9-]+\.(jpg|png)$/.test(s('logoUrl') || '') ? s('logoUrl') : '',
+    logoSize: LOGO_SIZES[s('logoSize')] ? s('logoSize') : d.logoSize,
+    wifiName: s('wifiName') ?? d.wifiName,
+    wifiPassword: s('wifiPassword') ?? d.wifiPassword,
   };
 }
 
@@ -73,7 +87,19 @@ async function save(body, userId) {
   const vatRate = Number(body.vatRate);
   if (!Number.isInteger(vatRate) || vatRate < 0 || vatRate > 20) throw new AppError(400, 'VALIDATION', 'Thuế VAT từ 0 đến 20%.');
   const flag = (v) => ([].concat(v).includes('1') ? '1' : '0');   // hidden "0" + checkbox "1"
+  const logoSize = LOGO_SIZES[body.logoSize] ? body.logoSize : 'm';
+  if (body.image_data) {                                           // validate before anything is written
+    if (imageStore.decode(body.image_data).ext === 'webp') throw new AppError(400, 'VALIDATION', 'Logo dùng ảnh PNG hoặc JPEG.');
+  }
+  const currentLogo = (await get()).logoUrl;
+  let logoUrl = currentLogo;
+  if (body.image_data) logoUrl = await imageStore.save(body.image_data, 'logo', 'logo');
+  else if (body.image_remove === '1') logoUrl = '';
   await settingsModel.setMany({
+    [`${PREFIX}logoUrl`]: logoUrl,
+    [`${PREFIX}logoSize`]: logoSize,
+    [`${PREFIX}wifiName`]: text(body.wifiName, 'Tên Wi-Fi', 60),
+    [`${PREFIX}wifiPassword`]: text(body.wifiPassword, 'Mật khẩu Wi-Fi', 60),
     [`${PREFIX}paperMm`]: paper,
     [`${PREFIX}autoPrint`]: flag(body.autoPrint),
     [`${PREFIX}copies`]: copies,
@@ -84,6 +110,7 @@ async function save(body, userId) {
     [`${PREFIX}showVat`]: flag(body.showVat),
     [`${PREFIX}vatRate`]: vatRate,
   }, userId);
+  if (currentLogo && currentLogo !== logoUrl) await imageStore.remove(currentLogo);   // after the new one is saved
 }
 
-module.exports = { get, save, defaults, PAPERS };
+module.exports = { get, save, defaults, PAPERS, LOGO_SIZES };

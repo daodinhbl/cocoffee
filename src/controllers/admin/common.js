@@ -28,6 +28,7 @@ async function notifications() {
 
 /** Locals every admin page needs (layout + header + sidebar). */
 async function shell({ title, activeMenu, breadcrumbs }) {
+  await require('../../services/shopProfile').refresh();           // another worker may have saved a new shop name
   const [zalo, notes] = await Promise.all([zaloStatus(), notifications()]);
   return { title, activeMenu, breadcrumbs, zalo, notifications: notes, shopName: env.business.shopName };
 }

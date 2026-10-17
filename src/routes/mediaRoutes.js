@@ -10,7 +10,7 @@ router.get('/:file', async (req, res, next) => {
   try {
     const id = imageStore.mediaIdOf(`/media/${req.params.file}`);
     const row = id ? await mediaModel.get(id) : null;
-    if (!row) return next();                                   // -> 404 handler
+    if (!row || row.folder === 'expense') return next();       // -> 404 handler (expense receipts are served to admins only)
     res.set({
       'Content-Type': row.mime,
       'Content-Length': String(row.bytes.length),

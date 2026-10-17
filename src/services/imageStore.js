@@ -14,7 +14,7 @@ const { AppError } = require('../utils/httpError');
  * Older photos under /uploads/ (scripts/sync_images.js before this change) keep working and are still cleaned up.
  */
 const MAX_BYTES = 600 * 1024;
-const FOLDERS = new Set(['products', 'ingredients']);
+const FOLDERS = new Set(['products', 'ingredients', 'logo', 'expense']);
 const UPLOAD_ROOT = path.join(env.rootDir, 'public', 'uploads');
 const MIME = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
 const MEDIA_URL = /^\/media\/(\d+)-[a-z0-9-]+\.(jpg|png|webp)$/;

@@ -152,6 +152,8 @@ module.exports = {
     email: optional('SHOP_EMAIL'),
     zalo: optional('SHOP_ZALO'),
     hours: optional('SHOP_HOURS'),
+    // Household-business data, filled in Web Admin > Cài đặt (services/shopProfile.js)
+    legalName: '', ownerName: '', taxCode: '', regNo: '', businessLine: '', declarationPeriod: 'quarter',
   },
 
   // Printed receipt (thermal printer). 80mm paper prints ~72mm wide; 58mm prints ~48mm.
@@ -159,6 +161,13 @@ module.exports = {
     widthMm: [58, 80].includes(int('RECEIPT_PAPER_MM', 80)) ? int('RECEIPT_PAPER_MM', 80) : 80,
   },
 
+  // Tax books / declaration sheets built by the export worker (services/taxExportService.js). Not under public/.
+  taxExport: { dir: path.resolve(path.resolve(__dirname, '../..'), optional('TAX_EXPORT_DIR', 'exports/tax')) },
+  // A PDF copy of every receipt paid at the POS, kept on the server (see services/receiptPdf.js).
+  receiptPdf: {
+    enabled: bool('RECEIPT_PDF_ENABLED', true),
+    dir: path.resolve(path.resolve(__dirname, '../..'), optional('RECEIPT_PDF_DIR', 'public/uploads/receipts')),
+  },
   receiptImage: {
     enabled: bool('RECEIPT_IMAGE_ENABLED', false),
     fontPath: path.resolve(path.resolve(__dirname, '../..'), optional('RECEIPT_FONT_PATH', 'assets/fonts/Roboto-Regular.ttf')),

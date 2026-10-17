@@ -5,16 +5,17 @@
    * clears the current photo. The current photo URL is set by the dialog fill (data-fill "image_url").
    */
   const fieldId = locals.fieldId || 'img';
+  const logoMode = locals.mode === 'logo' || locals.mode === 'receipt';     // logo: wide box, picture kept whole (object-contain), no square crop
 %>
-<div data-image-field class="flex items-center gap-4">
-  <div class="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-dashed border-milk-300 bg-milk-50">
-    <img data-image-preview alt="" class="hidden h-full w-full object-cover">
+<div data-image-field <% if (logoMode) { %>data-image-mode="<%= locals.mode %>"<% } %> class="flex items-center gap-4">
+  <div class="relative shrink-0 overflow-hidden rounded-xl border border-dashed border-milk-300 bg-milk-50 <%= logoMode ? 'h-20 w-40' : 'h-20 w-20' %>">
+    <img data-image-preview alt="" class="hidden h-full w-full <%= logoMode ? 'object-contain' : 'object-cover' %>">
     <span data-image-empty class="absolute inset-0 flex items-center justify-center text-milk-500" aria-hidden="true">
       <svg class="h-8 w-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 17-5-5-9 8"/></svg>
     </span>
   </div>
   <div class="min-w-0 flex-1">
-    <span class="mb-1 block text-sm font-medium">Hình ảnh</span>
+    <span class="mb-1 block text-sm font-medium"><%= locals.title || 'Hình ảnh' %></span>
     <div class="flex flex-wrap gap-2">
       <label for="<%= fieldId %>-file" class="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-milk-200 bg-white px-3 text-xs font-semibold text-navy hover:border-navy-accent hover:bg-blue-50">
         <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 16V4m0 0-4 4m4-4 4 4M4 20h16"/></svg>
@@ -23,9 +24,9 @@
       <input id="<%= fieldId %>-file" type="file" accept="image/jpeg,image/png,image/webp" data-image-file class="sr-only">
       <button type="button" data-image-clear class="hidden h-9 items-center rounded-lg border border-milk-200 px-3 text-xs font-semibold text-red-700 hover:border-red-300 hover:bg-red-50">Xóa ảnh</button>
     </div>
-    <p data-image-hint class="mt-1 text-xs text-milk-500">JPEG/PNG/WebP. Ảnh tự cắt vuông và nén ~400px trước khi lưu.</p>
+    <p data-image-hint class="mt-1 text-xs text-milk-500"><%= locals.hint || 'JPEG/PNG/WebP. Ảnh tự cắt vuông và nén ~400px trước khi lưu.' %></p>
     <input type="hidden" name="image_data" value="">
     <input type="hidden" name="image_remove" value="">
-    <input type="hidden" name="image_url" value="" data-image-current>
+    <input type="hidden" name="image_url" value="<%= locals.current || '' %>" data-image-current>
   </div>
 </div>

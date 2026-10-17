@@ -1,0 +1,48 @@
+<%
+  const { input, label, btnPrimary, btnSecondary, btnGhost, sheet, grabber } = ui;
+%>
+<!-- Dialog: add / edit supplier -->
+<dialog id="supplier-dialog" aria-labelledby="supplier-title" class="max-w-lg <%= sheet %>">
+  <form method="post" action="/admin/suppliers" class="flex max-h-[calc(100dvh-2rem)] flex-col">
+    <%- include('../partials/csrf') %>
+    <input type="hidden" name="_back" value="<%= locals.backTo || '/admin/suppliers' %>">
+    <%- grabber %>
+    <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4">
+      <h2 id="supplier-title" data-dialog-title class="text-lg font-semibold">Nhà cung cấp</h2>
+      <button type="button" data-modal-close aria-label="Đóng" class="<%= btnGhost %>"><%- icon('x', 'h-5 w-5') %></button>
+    </div>
+    <div class="space-y-4 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+      <div>
+        <label for="s-name" class="<%= label %>">Tên nhà cung cấp</label>
+        <input id="s-name" name="name" required maxlength="120" class="<%= input %>" autocomplete="off">
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label for="s-phone" class="<%= label %>">Điện thoại</label>
+          <input id="s-phone" name="phone" maxlength="30" inputmode="tel" class="<%= input %>" autocomplete="off">
+        </div>
+        <div>
+          <label for="s-tax" class="<%= label %>">Mã số thuế</label>
+          <input id="s-tax" name="tax_code" maxlength="30" class="<%= input %> font-mono" autocomplete="off">
+        </div>
+      </div>
+      <div>
+        <label for="s-address" class="<%= label %>">Địa chỉ</label>
+        <input id="s-address" name="address" maxlength="200" class="<%= input %>" autocomplete="off">
+      </div>
+      <div>
+        <label for="s-note" class="<%= label %>">Ghi chú</label>
+        <input id="s-note" name="note" maxlength="255" class="<%= input %>" autocomplete="off" placeholder="VD: giao hàng thứ 2, 4, 6">
+      </div>
+      <label class="flex items-center gap-2 text-sm" data-edit-only>
+        <input type="hidden" name="is_active" value="0">
+        <input type="checkbox" name="is_active" value="1" checked class="h-4 w-4 rounded border-gray-300 accent-blue-700">
+        Đang giao dịch
+      </label>
+    </div>
+    <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-4 py-3 max-sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
+      <button type="button" data-modal-close class="<%= btnSecondary %> max-sm:flex-1">Hủy</button>
+      <button type="submit" class="<%= btnPrimary %> max-sm:flex-[2]">Lưu</button>
+    </div>
+  </form>
+</dialog>

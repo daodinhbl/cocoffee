@@ -8,14 +8,56 @@ const { render, formFlag, optional } = require('./common');
 const imageStore = require('../../services/imageStore');
 const inventoryExcel = require('../../services/inventoryExcel');
 const logger = require('../../utils/logger');
+const groups = require('../../services/inventoryGroups');
+const skuGenerator = require('../../services/skuGenerator');
+const supplierModel = require('../../models/supplierModel');
+const purchaseModel = require('../../models/purchaseModel');
+const purchaseService = require('../../services/purchaseService');
+
+const PAGE_SIZE = 20;                       // rows per page on /admin/inventory
+const fold = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
 
 async function page(req, res) {
   const { items, stockValue } = await inventoryService.listWithValue();
+  const onlyLow = req.query.low === '1';
+  const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 40) : '';
+  const term = fold(q);
+  const groupOf = (i) => groups.groupOf(i);
+  const group = groups.CODES.includes(req.query.group) ? req.query.group : '';
+  const groupCounts = Object.fromEntries(groups.CODES.map((c) => [c, 0]));
+  items.forEach((i) => { groupCounts[groupOf(i)] += 1; });
+  const matching = items
+    .filter((i) => !group || groupOf(i) === group)
+    .filter((i) => !onlyLow || (i.is_active && i.is_low))
+    .filter((i) => !term || fold(`${i.name} ${i.sku}`).includes(term));
+  const total = matching.length;
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const pageNo = Math.min(pages, Math.max(1, parseInt(req.query.page, 10) || 1));
+  const pageUrl = (n) => {
+    const p = new URLSearchParams();
+    if (group) p.set('group', group);
+    if (onlyLow) p.set('low', '1');
+    if (q) p.set('q', q);
+    if (n > 1) p.set('page', n);
+    const s = p.toString();
+    return `/admin/inventory${s ? `?${s}` : ''}`;
+  };
   await render(res, 'inventory', {
     title: 'Nguyên liệu', activeMenu: 'inventory', breadcrumbs: [{ label: 'Kho & Định mức', href: '#' }, { label: 'Nguyên liệu' }],
   }, {
-    items,
-    onlyLow: req.query.low === '1',
+    items,                                                      // everything: the summary cards and tab counts
+    shown: matching.slice((pageNo - 1) * PAGE_SIZE, pageNo * PAGE_SIZE),
+    onlyLow, q, total, page: pageNo, pages, pageSize: PAGE_SIZE, pageUrl,
+    group, groups: groups.GROUPS, groupCounts, groupOf,
+    // link to another group tab / low-stock toggle, keeping the search
+    tabUrl: (g, low = onlyLow) => {
+      const p = new URLSearchParams();
+      if (g) p.set('group', g);
+      if (low) p.set('low', '1');
+      if (q) p.set('q', q);
+      const s = p.toString();
+      return `/admin/inventory${s ? `?${s}` : ''}`;
+    },
     stockValue,
   });
 }
@@ -37,7 +79,23 @@ async function detail(req, res) {
   await render(res, 'inventory_detail', {
     title: item.name, activeMenu: 'inventory',
     breadcrumbs: [{ label: 'Nguyên liệu', href: '/admin/inventory' }, { label: item.name }],
-  }, { item, movements, usage, usedIn, type, MOVEMENT_TYPES });
+  }, { item, movements, usage, usedIn, type, MOVEMENT_TYPES, groups: groups.GROUPS });
+}
+
+/** No group chosen: guess from the name; an unrecognised item on the ingredients screen is a raw material. */
+const guessedGroup = (name) => { const g = groups.groupOf({ name, sku: '' }); return g === 'other' ? 'raw' : g; };
+const SKU_PREFIX = { raw: 'RM', packaging: 'PK', retail: 'GD', other: 'OT' };
+
+/** "Quy cách nhập": pack_name (thùng, kg…) + pack_size (stock units in one pack); both or neither. */
+function readPack(b) {
+  const name = v.str(optional(b.pack_name), 'Đơn vị nhập', { max: 20, required: false }) || '';
+  if (!name) return { pack_name: '', pack_size: null };
+  return { pack_name: name, pack_size: v.num(b.pack_size, 'Số lượng trong một đơn vị nhập', { min: 0.001, max: 1000000 }) };
+}
+
+/** Form value of the group select: a known code, or '' for automatic. */
+function readGroup(value) {
+  return v.oneOf(optional(value), 'Phân loại', groups.CODES, { required: false }) || '';
 }
 
 async function create(req) {
@@ -50,14 +108,22 @@ async function create(req) {
   if (b.image_data) imageStore.decode(b.image_data);
   let id;
   await withTransaction(async (conn) => {
+    // SKU left empty -> made from the group and the name (RM-DUONG-CAT)
+    const group = readGroup(b.group_code);
+    const typed = optional(b.sku);
+    const sku = typed ? v.str(typed, 'Mã SKU', { max: 40 }) : await skuGenerator.generate({
+      prefix: SKU_PREFIX[group || guessedGroup(name)], name, exists: (s) => inventoryModel.skuExists(s, conn),
+    });
     id = await inventoryModel.create({
-      sku: v.str(b.sku, 'Mã SKU', { max: 40 }),
+      sku,
       name,
       unit: v.str(b.unit, 'Đơn vị', { max: 20 }),
       quantity_on_hand: 0,
       avg_cost: 0,
       min_stock: v.num(optional(b.min_stock), 'Tồn tối thiểu', { required: false }),
       is_active: formFlag(b.is_active),
+      group_code: readGroup(b.group_code) || null,
+      ...readPack(b),
     }, conn);
     if (quantity > 0) await inventoryService.receive(conn, id, quantity, cost, { userId: req.user.id, note: 'Tồn đầu kỳ' });
   });
@@ -75,6 +141,8 @@ async function update(req) {
     unit: v.str(optional(req.body.unit), 'Đơn vị', { max: 20, required: false }),
     min_stock: v.num(optional(req.body.min_stock), 'Tồn tối thiểu', { required: false }),
     is_active: formFlag(req.body.is_active),
+    group_code: req.body.group_code === undefined ? undefined : (readGroup(req.body.group_code) || null),
+    ...(req.body.pack_name === undefined ? {} : readPack(req.body)),
   });
   await imageStore.applyFromForm(req.body, { dirKey: 'ingredients', id, name: optional(req.body.name) || current.name, currentUrl: current.image_url, setImage: inventoryModel.setImage });
   return { message: 'Đã cập nhật nguyên liệu.' };
@@ -93,21 +161,75 @@ async function adjust(req) {
 
 // ------------------------------------------------------------------ receiving
 async function receivingPage(req, res) {
-  const [items, recent] = await Promise.all([inventoryModel.list(), adminModel.recentPurchases(30)]);
+  const [all, suppliers, recent] = await Promise.all([inventoryModel.listAll(), supplierModel.options(), purchaseModel.listReceipts({ limit: 10 })]);
+  const items = all.filter((i) => i.is_active).map((i) => ({ ...i, group: groups.groupOf(i) }));
   const preselect = Number(req.query.item) || 0;
+  const supplier = Number(req.query.supplier) || 0;
   await render(res, 'receiving', {
     title: 'Nhập kho', activeMenu: 'receiving', breadcrumbs: [{ label: 'Kho & Định mức', href: '#' }, { label: 'Nhập kho' }],
-  }, { items, recent, preselect: items.some((i) => i.id === preselect) ? preselect : 0 });
+  }, {
+    items, groups: groups.GROUPS, suppliers, recent,
+    preselect: items.some((i) => i.id === preselect) ? preselect : 0,
+    preSupplier: suppliers.some((s) => s.id === supplier) ? supplier : 0,
+  });
+}
+
+const MAX_RECEIPT_LINES = 50;
+const asList = (x) => (x === undefined ? [] : [].concat(x));
+
+/**
+ * One receiving slip with several lines, booked in ONE transaction (all lines or none). The form posts parallel arrays
+ * item_id[] / quantity[] / unit_cost[] (+ factor[] and pack[] when bought by the box / kg); the older single-line fields
+ * (inventory_item_id, quantity, unit_cost) still work. quantity and unit_cost are in the unit BOUGHT (thùng, kg):
+ * purchaseService converts them to stock units (chai, g).
+ */
+function readReceiptLines(body) {
+  const ids = asList(body.item_id !== undefined ? body.item_id : body.inventory_item_id);
+  const qty = asList(body.quantity);
+  const cost = asList(body.unit_cost);
+  const factor = asList(body.factor);
+  const pack = asList(body.pack);
+  const lines = [];
+  ids.forEach((raw, k) => {
+    if (raw === '' || raw === undefined) return;                               // an empty row is ignored
+    const f = factor[k] === undefined || factor[k] === '' ? 1 : v.num(factor[k], `Quy đổi (dòng ${k + 1})`, { min: 0.001, max: 1000000 });
+    lines.push({
+      itemId: v.id(raw, 'Nguyên liệu'),
+      packQty: v.num(qty[k], `Số lượng (dòng ${k + 1})`, { min: 0.001 }),
+      packFactor: f,
+      packPrice: v.num(cost[k], `Đơn giá nhập (dòng ${k + 1})`, { min: 0 }),
+      packLabel: f !== 1 ? v.str(optional(pack[k]), 'Đơn vị nhập', { max: 30, required: false }) : '',
+    });
+  });
+  if (!lines.length) throw new AppError(400, 'VALIDATION', 'Chọn ít nhất một mặt hàng để nhập.');
+  if (lines.length > MAX_RECEIPT_LINES) throw new AppError(400, 'VALIDATION', `Một phiếu nhập tối đa ${MAX_RECEIPT_LINES} dòng.`);
+  return lines;
 }
 
 async function receive(req) {
-  const id = v.id(req.body.inventory_item_id, 'Nguyên liệu');
-  const quantity = v.num(req.body.quantity, 'Số lượng', { min: 0.001 });
-  const result = await withTransaction((conn) => inventoryService.receive(conn, id, quantity, v.num(req.body.unit_cost, 'Đơn giá nhập', { min: 0 }), {
-    userId: req.user.id,
-    note: v.str(optional(req.body.note), 'Ghi chú', { max: 255, required: false }),
-  }));
-  return { message: `Đã nhập kho. Tồn mới: ${result.quantity_on_hand}, giá vốn bình quân: ${Math.round(result.avg_cost)}đ.` };
+  const b = req.body;
+  const lines = readReceiptLines(b);
+  const docNo = v.str(optional(b.doc_no), 'Số hóa đơn', { max: 40, required: false }) || null;
+  const extra = v.str(optional(b.note), 'Ghi chú', { max: 255, required: false }) || null;
+  const legacySupplier = v.str(optional(b.supplier), 'Nhà cung cấp', { max: 120, required: false });   // older form: free text
+  let supplierId = optional(b.supplier_id) ? v.id(b.supplier_id, 'Nhà cung cấp') : null;
+  const newName = v.str(optional(b.supplier_new), 'Nhà cung cấp mới', { max: 120, required: false }) || legacySupplier;
+  if (!supplierId && newName) {
+    const found = await supplierModel.findByName(newName);
+    supplierId = found ? found.id : await supplierModel.create({ name: newName });
+  }
+  const mode = ['all', 'none', 'partial'].includes(b.pay_mode) ? b.pay_mode : 'all';
+  const paid = mode === 'all' ? 'all' : mode === 'none' ? 0 : v.num(b.paid_amount, 'Số tiền đã trả', { min: 0 });
+  const result = await purchaseService.createReceipt({
+    supplierId, docNo, note: extra, userId: req.user.id, paid, method: v.oneOf(optional(b.pay_method), 'Hình thức', purchaseService.METHODS, { required: false }) || 'cash', lines,
+  });
+  const debt = result.total - result.paid;
+  const money = (n) => `${Math.round(n).toLocaleString('vi-VN')}đ`;
+  if (result.lines === 1 && !supplierId) {
+    const item = await inventoryModel.getById(lines[0].itemId);
+    return { message: `Đã nhập kho (${result.code}). Tồn mới: ${item ? item.quantity_on_hand : ''}, giá vốn bình quân: ${item ? Math.round(item.avg_cost) : ''}đ.` };
+  }
+  return { message: `Đã nhập kho ${result.lines} dòng hàng (${result.code}), tổng tiền ${money(result.total)}${debt > 0 ? `, còn nợ ${money(debt)}` : ''}.`, to: `/admin/receipts/${result.id}` };
 }
 
 // ------------------------------------------------------------------ Excel import / export

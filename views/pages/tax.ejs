@@ -1,0 +1,173 @@
+<%
+  const { input, label, btnPrimary, btnSecondary } = ui;
+  const card = 'rounded-xl border border-milk-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,.04)]';
+  const e = o.estimate;
+  const pct = (x) => `${(Number(x) * 100).toLocaleString('vi-VN', { maximumFractionDigits: 2 })}%`;
+  const yearPct = e.year.threshold > 0 ? Math.min(100, Math.round((e.year.through / e.year.threshold) * 100)) : 100;
+  const lockStatus = o.lock ? o.lock.status : null;
+  const catName = Object.fromEntries(cats.map((c) => [c.id, c.name]));
+  const stTone = { queued: ['Đang chờ', 'neutral'], running: ['Đang tạo…', 'info'], done: ['Sẵn sàng', 'good'], failed: ['Lỗi', 'bad'] };
+  const busy = exports.some((x) => x.status === 'queued' || x.status === 'running');
+%>
+<div class="flex flex-wrap items-end justify-between gap-4">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight text-navy-darker sm:text-2xl">Thuế (ước tính)</h1>
+    <p class="mt-1 max-w-3xl text-sm text-gray-500">Thuế GTGT và TNCN của hộ kinh doanh kê khai, tính từ doanh thu đã gắn nhóm thuế lúc bán và chi phí trong sổ chi phí. Đây là số <b>ước tính</b> để chuẩn bị kê khai; kế toán xác nhận trước khi nộp. Thuế suất và ngưỡng ở mục “Cấu hình” bên dưới.</p>
+  </div>
+  <div class="flex flex-wrap gap-2"><a href="/admin/expenses" class="<%= btnSecondary %>">Sổ chi phí</a><a href="/admin/reports" class="<%= btnSecondary %>">Báo cáo</a></div>
+</div>
+
+<!-- Period -->
+<div class="<%= card %> mt-5 flex flex-wrap items-center gap-3 p-3 sm:p-4">
+  <div role="group" aria-label="Loại kỳ" class="inline-flex rounded-lg bg-milk-50 p-1">
+    <% ['month', 'quarter', 'year'].forEach((k) => { %><a href="<%= kindUrl(k) %>" <%- kind === k ? 'aria-current="true"' : '' %> class="inline-flex h-9 items-center rounded-md px-4 text-sm font-medium transition <%= kind === k ? 'bg-white text-navy-darker shadow' : 'text-gray-600 hover:text-dark' %>"><%= kindText[k] %></a><% }) %>
+  </div>
+  <div class="flex items-center gap-1">
+    <a href="<%= prevUrl %>" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-milk-200 hover:border-navy-accent" aria-label="Kỳ trước">‹</a>
+    <span class="min-w-[9rem] text-center text-base font-semibold text-navy-darker"><%= o.period.label %></span>
+    <a href="<%= nextUrl %>" class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-milk-200 hover:border-navy-accent" aria-label="Kỳ sau">›</a>
+  </div>
+  <span class="text-sm text-gray-500"><%= o.period.from.split('-').reverse().join('/') %> → <%= o.period.to.split('-').reverse().join('/') %></span>
+  <div class="ml-auto flex flex-wrap items-center gap-2">
+    <% if (lockStatus) { %>
+      <%- badge(lockStatus === 'filed' ? `Đã nộp${o.lock.filedRef ? ' · ' + o.lock.filedRef : ''}` : 'Đã khóa kỳ', lockStatus === 'filed' ? 'good' : 'info') %>
+      <% if (lockStatus === 'locked') { %>
+        <form method="post" action="/admin/tax/unlock" class="inline"><%- include('../partials/csrf') %><input type="hidden" name="_back" value="<%= '/admin/tax?kind=' + kind + '&date=' + o.period.from %>"><input type="hidden" name="kind" value="<%= kind %>"><input type="hidden" name="date" value="<%= o.period.from %>"><button class="<%= btnSecondary %>">Mở khóa</button></form>
+        <form method="post" action="/admin/tax/filed" class="inline-flex gap-2"><%- include('../partials/csrf') %><input type="hidden" name="_back" value="<%= '/admin/tax?kind=' + kind + '&date=' + o.period.from %>"><input type="hidden" name="kind" value="<%= kind %>"><input type="hidden" name="date" value="<%= o.period.from %>"><input name="ref" maxlength="100" placeholder="Mã giao dịch nộp (tùy chọn)" class="<%= input %> w-52"><button class="<%= btnSecondary %>">Đã nộp</button></form>
+      <% } %>
+    <% } else if (canLock) { %>
+      <form method="post" action="/admin/tax/lock" data-confirm="Khóa <%= o.period.label %>? Chi phí có ngày trong kỳ này sẽ không thêm / sửa / hủy được nữa cho đến khi mở khóa."><%- include('../partials/csrf') %><input type="hidden" name="_back" value="<%= '/admin/tax?kind=' + kind + '&date=' + o.period.from %>"><input type="hidden" name="kind" value="<%= kind %>"><input type="hidden" name="date" value="<%= o.period.from %>"><button class="<%= btnPrimary %>">Khóa kỳ</button></form>
+    <% } else { %>
+      <span class="text-xs text-gray-500">Kỳ chưa kết thúc: chưa khóa được</span>
+    <% } %>
+  </div>
+</div>
+
+<!-- Summary -->
+<section aria-label="Tóm tắt" class="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+  <div class="<%= card %> px-4 py-3"><p class="text-xs font-medium uppercase tracking-wide text-gray-500">Doanh thu thuần</p><p class="mt-1 text-2xl font-semibold tnum text-navy-darker"><%= money(e.revenue.net) %></p><p class="text-xs text-milk-500">Đã trừ giảm giá <%= money(e.revenue.discount) %></p></div>
+  <div class="<%= card %> px-4 py-3"><p class="text-xs font-medium uppercase tracking-wide text-gray-500">Chi phí</p><p class="mt-1 text-2xl font-semibold tnum text-navy-darker"><%= money(e.expenses.total) %></p><p class="text-xs text-milk-500">Được trừ <%= money(e.expenses.deductible) %></p></div>
+  <div class="<%= card %> px-4 py-3"><p class="text-xs font-medium uppercase tracking-wide text-gray-500">Lợi nhuận trước thuế</p><p class="mt-1 text-2xl font-semibold tnum <%= e.profit < 0 ? 'text-red-700' : 'text-emerald-700' %>"><%= money(e.profit) %></p><p class="text-xs text-milk-500">Doanh thu − chi phí được trừ</p></div>
+  <div class="<%= card %> px-4 py-3"><p class="text-xs font-medium uppercase tracking-wide text-gray-500">Thuế ước tính</p><p class="mt-1 text-2xl font-semibold tnum text-amber-700"><%= money(e.tax) %></p><p class="text-xs text-milk-500">GTGT <%= money(e.vat) %> · TNCN <%= money(e.pit) %></p></div>
+</section>
+
+<div class="mt-4 grid gap-4 lg:grid-cols-2">
+  <!-- Threshold -->
+  <section class="<%= card %> p-4 sm:p-5" aria-labelledby="th-h">
+    <h2 id="th-h" class="text-base font-semibold text-navy-darker">Ngưỡng doanh thu năm <%= o.period.from.slice(0, 4) %></h2>
+    <p class="mt-1 text-sm text-gray-500">Chỉ phần doanh thu vượt ngưỡng <b><%= money(e.year.threshold) %></b> trong năm mới chịu thuế (cấu hình, cần kế toán xác nhận).</p>
+    <div class="mt-3 h-3 rounded-full bg-milk-100" role="img" aria-label="Doanh thu năm so với ngưỡng"><div class="h-3 rounded-full <%= e.year.exempt ? 'bg-emerald-500' : 'bg-amber-500' %>" style="width: <%= yearPct %>%"></div></div>
+    <p class="mt-2 flex flex-wrap justify-between gap-2 text-sm">
+      <span>Lũy kế đến hết kỳ: <b class="tnum"><%= money(e.year.through) %></b></span>
+      <% if (e.year.exempt) { %><span class="text-emerald-700">Còn <b class="tnum"><%= money(e.year.remaining) %></b> mới chạm ngưỡng: kỳ này chưa phát sinh thuế</span>
+      <% } else { %><span class="text-amber-700">Doanh thu chịu thuế của kỳ: <b class="tnum"><%= money(e.taxableRevenue) %></b></span><% } %>
+    </p>
+  </section>
+
+  <!-- By group -->
+  <section class="<%= card %> overflow-hidden" aria-labelledby="cat-h">
+    <h2 id="cat-h" class="border-b border-milk-200 px-4 py-4 text-base font-semibold text-navy-darker sm:px-5">Theo nhóm thuế</h2>
+    <table class="w-full border-collapse text-left text-sm">
+      <thead class="<%= ui.thead %>"><tr><th scope="col" class="px-4 py-2.5">Nhóm</th><th scope="col" class="px-4 py-2.5 text-right">Doanh thu thuần</th><th scope="col" class="px-4 py-2.5 text-right">GTGT</th><th scope="col" class="px-4 py-2.5 text-right">TNCN</th></tr></thead>
+      <tbody>
+        <% e.categories.forEach((c, i) => { %><tr class="border-b border-milk-200 last:border-b-0 <%= i % 2 === 0 ? 'bg-blue-50/70' : '' %>"><td class="px-4 py-2.5"><%= c.name %></td><td class="px-4 py-2.5 text-right font-mono tnum"><%= money(c.net) %></td><td class="px-4 py-2.5 text-right font-mono tnum"><%= money(c.vat) %></td><td class="px-4 py-2.5 text-right font-mono tnum"><%= money(c.pit) %></td></tr><% }) %>
+        <% if (!e.categories.length) { %><tr><td colspan="4" class="px-4 py-8 text-center text-gray-500">Chưa có doanh thu trong kỳ này.</td></tr><% } else { %>
+          <tr class="border-t border-milk-200 bg-milk-50 text-xs text-gray-500"><td class="px-4 py-2" colspan="2">Trước khi trừ ngưỡng</td><td class="px-4 py-2 text-right font-mono tnum"><%= money(e.vatBeforeThreshold) %></td><td class="px-4 py-2 text-right font-mono tnum"><%= money(e.pitBeforeThreshold) %></td></tr>
+        <% } %>
+      </tbody>
+    </table>
+  </section>
+</div>
+
+<!-- Months -->
+<% if (o.months.length) { %>
+<section class="<%= card %> mt-4 p-4 sm:p-5" aria-labelledby="mo-h">
+  <h2 id="mo-h" class="text-base font-semibold text-navy-darker">6 tháng gần đây</h2>
+  <ul class="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-6">
+    <% o.months.slice(-6).forEach((m) => { %>
+      <li class="text-center"><div class="flex h-24 items-end justify-center gap-1" role="img" aria-label="Tháng <%= m.month %>: doanh thu <%= money(m.revenue) %>, chi phí <%= money(m.expenses) %>"><span class="w-4 rounded-t bg-navy" style="height: <%= Math.max(2, Math.round(m.revenue / maxMonth * 100)) %>%"></span><span class="w-4 rounded-t bg-amber-400" style="height: <%= Math.max(2, Math.round(m.expenses / maxMonth * 100)) %>%"></span></div><p class="mt-1 text-xs text-gray-500"><%= m.month.slice(5) %>/<%= m.month.slice(2, 4) %></p></li>
+    <% }) %>
+  </ul>
+  <p class="mt-2 flex gap-4 text-xs text-gray-500"><span><span class="mr-1 inline-block h-2 w-2 rounded-sm bg-navy"></span>Doanh thu thuần</span><span><span class="mr-1 inline-block h-2 w-2 rounded-sm bg-amber-400"></span>Chi phí</span></p>
+</section>
+<% } %>
+
+<!-- Exports -->
+<section class="<%= card %> mt-4 p-4 sm:p-5" aria-labelledby="ex-h">
+  <h2 id="ex-h" class="text-base font-semibold text-navy-darker">Xuất sổ (Excel)</h2>
+  <p class="mt-1 text-sm text-gray-500">Sổ được tạo ở nền, không làm chậm quầy bán hàng. Tạo xong tải về trong 7 ngày. Khoảng ngày mặc định là kỳ đang xem.</p>
+  <form method="post" action="/admin/tax/exports" class="mt-3 flex flex-wrap items-end gap-3">
+    <%- include('../partials/csrf') %>
+    <input type="hidden" name="_back" value="<%= '/admin/tax?kind=' + kind + '&date=' + o.period.from %>">
+    <div><label for="x-from" class="<%= label %>">Từ ngày</label><input id="x-from" name="from" type="date" value="<%= o.period.from %>" max="<%= today %>" class="<%= input %>"></div>
+    <div><label for="x-to" class="<%= label %>">Đến ngày</label><input id="x-to" name="to" type="date" value="<%= o.period.to > today ? today : o.period.to %>" max="<%= today %>" class="<%= input %>"></div>
+    <div class="flex flex-wrap gap-2">
+      <% exportKinds.forEach((k) => { %><button name="export_kind" value="<%= k %>" class="<%= k === 'bundle' ? btnPrimary : btnSecondary %>"><%= exportText[k] %></button><% }) %>
+    </div>
+  </form>
+  <ul id="export-list" class="mt-4 divide-y divide-milk-200 rounded-lg border border-milk-200" data-busy="<%= busy ? '1' : '0' %>">
+    <% exports.forEach((x) => { const st = stTone[x.status] || ['', 'neutral']; %>
+      <li class="flex flex-wrap items-center gap-3 px-3 py-2.5 text-sm" data-export="<%= x.id %>">
+        <span class="font-semibold"><%= exportText[x.kind] %></span>
+        <span class="text-gray-500 tnum"><%= String(x.period_from).slice(0, 10).split('-').reverse().join('/') %> → <%= String(x.period_to).slice(0, 10).split('-').reverse().join('/') %></span>
+        <span data-status><%- badge(st[0], st[1]) %></span>
+        <% if (x.status === 'failed' && x.error) { %><span class="text-xs text-red-600"><%= x.error %></span><% } %>
+        <span class="ml-auto" data-action><% if (x.status === 'done' && x.file_name) { %><a href="/admin/tax/exports/<%= x.id %>/file" class="font-semibold text-blue-700 hover:underline">Tải về (<%= Math.max(1, Math.round(Number(x.file_bytes) / 1024)) %> KB)</a><% } %></span>
+      </li>
+    <% }) %>
+    <% if (!exports.length) { %><li class="px-3 py-6 text-center text-sm text-gray-500">Chưa tạo sổ nào.</li><% } %>
+  </ul>
+</section>
+
+<!-- Configuration -->
+<section class="<%= card %> mt-4 p-4 sm:p-5" aria-labelledby="cfg-h">
+  <h2 id="cfg-h" class="text-base font-semibold text-navy-darker">Cấu hình thuế</h2>
+  <p class="mt-1 text-sm text-gray-500">Ngưỡng, cách tính TNCN và thuế suất là <b>cấu hình của cửa hàng</b>, không phải văn bản pháp luật: hãy đối chiếu với kế toán / cơ quan thuế. Đổi thuế suất bằng cách thêm dòng có ngày hiệu lực mới; đơn đã bán giữ nguyên thuế suất của ngày đó.</p>
+  <form method="post" action="/admin/tax/config" class="mt-3 grid grid-cols-12 gap-3">
+    <%- include('../partials/csrf') %><input type="hidden" name="_back" value="<%= '/admin/tax?kind=' + kind + '&date=' + o.period.from %>">
+    <div class="col-span-12 sm:col-span-4"><label for="c-th" class="<%= label %>">Ngưỡng doanh thu năm không chịu thuế (đ)</label><input id="c-th" name="exempt_threshold" type="number" min="0" step="1000000" value="<%= cfg.exemptThreshold %>" class="<%= input %> text-right font-mono"></div>
+    <div class="col-span-12 sm:col-span-5"><label for="c-m" class="<%= label %>">Cách tính TNCN</label><select id="c-m" name="pit_method" class="<%= input %>"><option value="revenue" <%= cfg.pitMethod === 'revenue' ? 'selected' : '' %>>Theo tỷ lệ % trên doanh thu</option><option value="profit" <%= cfg.pitMethod === 'profit' ? 'selected' : '' %>>Theo lợi nhuận (doanh thu − chi phí được trừ)</option></select></div>
+    <div class="col-span-12 sm:col-span-3"><label for="c-r" class="<%= label %>">Thuế suất trên lợi nhuận (%)</label><input id="c-r" name="profit_rate_pct" type="number" min="0.1" max="99" step="0.1" value="<%= cfg.profitRate * 100 %>" class="<%= input %> text-right font-mono"></div>
+    <div class="col-span-12"><button class="<%= btnPrimary %>">Lưu cấu hình</button></div>
+  </form>
+
+  <h3 class="mt-6 text-sm font-semibold text-navy-darker">Thuế suất theo nhóm (theo ngày hiệu lực)</h3>
+  <div class="mt-2 overflow-x-auto rounded-lg border border-milk-200">
+    <table class="w-full border-collapse text-left text-sm">
+      <thead class="<%= ui.thead %>"><tr><th scope="col" class="px-3 py-2">Nhóm</th><th scope="col" class="px-3 py-2">Hiệu lực</th><th scope="col" class="px-3 py-2 text-right">GTGT</th><th scope="col" class="px-3 py-2 text-right">TNCN</th><th scope="col" class="px-3 py-2">Căn cứ</th></tr></thead>
+      <tbody>
+        <% rates.forEach((r) => { %><tr class="border-b border-milk-200 last:border-b-0"><td class="px-3 py-2"><%= r.category_name %></td><td class="px-3 py-2 tnum"><%= String(r.effective_from).slice(0, 10).split('-').reverse().join('/') %><%= r.effective_to ? ' → ' + String(r.effective_to).slice(0, 10).split('-').reverse().join('/') : ' → nay' %></td><td class="px-3 py-2 text-right font-mono tnum"><%= pct(r.vat_rate) %></td><td class="px-3 py-2 text-right font-mono tnum"><%= pct(r.pit_rate) %></td><td class="px-3 py-2 text-xs text-gray-500"><%= r.legal_basis || '' %></td></tr><% }) %>
+      </tbody>
+    </table>
+  </div>
+  <form method="post" action="/admin/tax/rates" class="mt-3 grid grid-cols-12 items-end gap-3">
+    <%- include('../partials/csrf') %><input type="hidden" name="_back" value="<%= '/admin/tax?kind=' + kind + '&date=' + o.period.from %>">
+    <div class="col-span-12 sm:col-span-3"><label for="r-cat" class="<%= label %>">Nhóm</label><select id="r-cat" name="category_id" class="<%= input %>"><% cats.forEach((c) => { %><option value="<%= c.id %>"><%= c.name %></option><% }) %></select></div>
+    <div class="col-span-6 sm:col-span-2"><label for="r-from" class="<%= label %>">Hiệu lực từ</label><input id="r-from" name="effective_from" type="date" required class="<%= input %>"></div>
+    <div class="col-span-3 sm:col-span-2"><label for="r-vat" class="<%= label %>">GTGT %</label><input id="r-vat" name="vat_pct" type="number" min="0" max="100" step="0.01" required class="<%= input %> text-right font-mono"></div>
+    <div class="col-span-3 sm:col-span-2"><label for="r-pit" class="<%= label %>">TNCN %</label><input id="r-pit" name="pit_pct" type="number" min="0" max="100" step="0.01" required class="<%= input %> text-right font-mono"></div>
+    <div class="col-span-12 sm:col-span-3"><label for="r-basis" class="<%= label %>">Căn cứ (văn bản)</label><input id="r-basis" name="legal_basis" maxlength="200" class="<%= input %>" autocomplete="off"></div>
+    <div class="col-span-12"><button class="<%= btnSecondary %>">Thêm thuế suất</button></div>
+  </form>
+</section>
+
+<script nonce="<%= nonce %>">
+  (function () {
+    var list = document.getElementById('export-list');
+    if (!list || list.getAttribute('data-busy') !== '1') return;
+    var tries = 0;
+    var timer = setInterval(function () {
+      tries += 1; if (tries > 100) { clearInterval(timer); return; }
+      fetch('/admin/tax/exports.json', { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+          var pending = false;
+          j.exports.forEach(function (x) {
+            if (x.status === 'queued' || x.status === 'running') pending = true;
+          });
+          if (!pending) { clearInterval(timer); window.location.reload(); }
+        })
+        .catch(function () { /* keep trying */ });
+    }, 3000);
+  })();
+</script>

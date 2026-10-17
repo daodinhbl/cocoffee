@@ -54,7 +54,7 @@ const MENU = [
   // NƯỚC NGỌT (lon / chai)
   { cat: 'soft_drink', name: 'Wake Up 24/7', price: 14000 },
   { cat: 'soft_drink', name: 'Number One', price: 14000 },
-  { cat: 'soft_drink', name: 'Bò Cụng (RedBull)', price: 18000 },
+  { cat: 'soft_drink', name: 'Bò Húc Thái (Redbull)', price: 20000 },
   { cat: 'soft_drink', name: 'Sting', price: 14000 },
   // THUỐC LÁ (the owner's list of 2026-10-16; the demo packs 555 / Marlboro / Thăng Long stay as they are)
   { cat: 'cigarette', name: 'Thuốc Lá Seven', price: 18000 },
@@ -283,7 +283,7 @@ const EXTRA_ALIASES = {
   'Cà Phê Đá Xay': ['cf đá xay', 'cafe đá xay', 'cà phê xay', 'đá xay cà phê'],
   'Wake Up 24/7': ['wake up', 'wakeup', 'wake up 247', 'wake up 24 7', 'cà phê lon wake up'],
   'Number One': ['number 1', 'numberone', 'nước tăng lực number one'],
-  'Bò Cụng (RedBull)': ['bò cụng', 'redbull', 'red bull', 'bò húc'],
+  'Bò Húc Thái (Redbull)': ['bò cụng', 'redbull', 'red bull', 'bò húc'],
   'Sting': ['sting dâu', 'sting đỏ', 'sting vàng'],
   'Thuốc Lá Seven': ['seven', 'thuốc seven', 'gói seven'],
   'Thuốc Lá Sài Gòn Bạc': ['sài gòn bạc', 'thuốc sài gòn bạc', 'sg bạc', 'saigon bạc'],

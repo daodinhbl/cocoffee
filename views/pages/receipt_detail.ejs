@@ -1,0 +1,85 @@
+<%
+  const { btnPrimary, btnSecondary } = ui;
+  const card = 'rounded-xl border border-milk-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,.04)]';
+  const debt = Number(receipt.debt);
+  const METHOD = { cash: 'Tiền mặt', transfer: 'Chuyển khoản', other: 'Khác' };
+  const st = debt <= 0 ? ['Đã trả đủ', 'good'] : Number(receipt.paid) > 0 ? ['Trả một phần', 'warn'] : ['Chưa trả', 'bad'];
+%>
+<div class="flex flex-wrap items-start justify-between gap-4">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight text-navy-darker sm:text-2xl">Phiếu nhập <span class="tnum"><%= receipt.receipt_code %></span> <%- badge(st[0], st[1]) %></h1>
+    <p class="mt-1 text-sm text-gray-500">
+      <%= fmtTime(receipt.created_at) %> · <%= receipt.user_name || '—' %> ·
+      <% if (receipt.supplier_id) { %><a href="/admin/suppliers/<%= receipt.supplier_id %>" class="font-medium text-blue-700 hover:underline"><%= receipt.supplier_name %></a><% } else { %>Mua lẻ (không công nợ)<% } %>
+      <% if (receipt.doc_no) { %> · HĐ <%= receipt.doc_no %><% } %>
+    </p>
+    <% if (receipt.note) { %><p class="mt-0.5 text-sm italic text-gray-500"><%= receipt.note %></p><% } %>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    <a href="/admin/receipts" class="<%= btnSecondary %>">← Lịch sử</a>
+    <% if (debt > 0) { %>
+      <button type="button" class="<%= btnPrimary %>" data-modal-open="#pay-dialog" data-action="/admin/receipts/<%= receipt.id %>/pay" data-title="Trả nợ phiếu <%= receipt.receipt_code %>" data-fill="<%= safeJson({ amount: debt }) %>">Trả nợ</button>
+    <% } %>
+  </div>
+</div>
+
+<section aria-label="Tóm tắt" class="mt-5 grid grid-cols-3 gap-3">
+  <div class="<%= card %> px-4 py-3"><p class="text-xs font-medium uppercase tracking-wide text-gray-500">Tổng tiền hàng</p><p class="mt-1 text-xl font-semibold tnum text-navy-darker sm:text-2xl"><%= money(receipt.total) %></p></div>
+  <div class="<%= card %> px-4 py-3"><p class="text-xs font-medium uppercase tracking-wide text-gray-500">Đã trả</p><p class="mt-1 text-xl font-semibold tnum text-emerald-700 sm:text-2xl"><%= money(receipt.paid) %></p></div>
+  <div class="<%= card %> px-4 py-3"><p class="text-xs font-medium uppercase tracking-wide text-gray-500">Còn nợ</p><p class="mt-1 text-xl font-semibold tnum sm:text-2xl <%= debt > 0 ? 'text-red-700' : 'text-navy-darker' %>"><%= money(debt) %></p></div>
+</section>
+
+<section class="<%= card %> mt-6 overflow-hidden" aria-labelledby="lines-h">
+  <h2 id="lines-h" class="border-b border-milk-200 px-4 py-4 text-base font-semibold text-navy-darker sm:px-5">Hàng đã nhập</h2>
+  <table class="rtable w-full border-collapse text-left text-sm lg:min-w-[760px]">
+    <caption class="sr-only">Các dòng hàng của phiếu nhập</caption>
+    <thead class="<%= ui.thead %>">
+      <tr>
+        <th scope="col" class="w-12 px-2 py-3 text-center sm:px-4">STT</th>
+        <th scope="col" class="px-4 py-3">Mặt hàng</th>
+        <th scope="col" class="px-4 py-3 text-right">Mua</th>
+        <th scope="col" class="px-4 py-3 text-right">Đơn giá mua</th>
+        <th scope="col" class="px-4 py-3 text-right">Vào kho</th>
+        <th scope="col" class="px-4 py-3 text-right">Giá vốn / đơn vị kho</th>
+        <th scope="col" class="px-4 py-3 text-right">Thành tiền</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% lines.forEach((l, idx) => { const pack = Number(l.pack_factor) !== 1; %>
+        <tr class="border-b border-milk-200 last:border-b-0 <%= (idx + 1) % 2 === 1 ? 'bg-blue-50/70' : '' %>">
+          <td data-label="" class="rt-no px-2 py-3 text-center font-mono text-xs text-milk-500 tnum sm:px-4"><%= idx + 1 %></td>
+          <td data-label="" class="rt-title px-4 py-3"><a href="/admin/inventory/<%= l.inventory_item_id %>" class="font-semibold text-blue-700 hover:underline"><%= l.item_name %></a></td>
+          <td data-label="Mua" class="px-4 py-3 text-right font-mono tnum"><%= num(l.pack_qty) %> <%= pack ? (l.pack_label || 'gói') : l.unit %><% if (pack) { %><span class="block text-xs text-gray-500">1 <%= l.pack_label || 'gói' %> = <%= num(l.pack_factor) %> <%= l.unit %></span><% } %></td>
+          <td data-label="Đơn giá mua" class="px-4 py-3 text-right font-mono tnum"><%= money(l.pack_price) %><span class="text-xs text-gray-500"> / <%= pack ? (l.pack_label || 'gói') : l.unit %></span></td>
+          <td data-label="Vào kho" class="px-4 py-3 text-right font-mono font-semibold tnum">+<%= num(l.quantity) %> <span class="font-normal text-gray-500"><%= l.unit %></span></td>
+          <td data-label="Giá vốn / đơn vị kho" class="px-4 py-3 text-right font-mono tnum"><%= Number(l.unit_cost) < 100 ? Number(l.unit_cost).toLocaleString('vi-VN', { maximumFractionDigits: 2 }) + 'đ' : money(l.unit_cost) %></td>
+          <td data-label="Thành tiền" class="px-4 py-3 text-right font-mono font-semibold tnum"><%= money(l.line_total) %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+    <tfoot>
+      <tr class="border-t border-milk-200 bg-milk-50"><td colspan="6" class="px-4 py-3 text-right text-sm font-semibold text-gray-600">Tổng cộng</td><td class="px-4 py-3 text-right font-mono text-base font-bold tnum text-navy-darker"><%= money(receipt.total) %></td></tr>
+    </tfoot>
+  </table>
+</section>
+
+<section class="<%= card %> mt-6 overflow-hidden" aria-labelledby="pay-h">
+  <h2 id="pay-h" class="border-b border-milk-200 px-4 py-4 text-base font-semibold text-navy-darker sm:px-5">Thanh toán</h2>
+  <table class="rtable w-full border-collapse text-left text-sm">
+    <thead class="<%= ui.thead %>"><tr><th scope="col" class="px-4 py-3">Thời gian</th><th scope="col" class="px-4 py-3">Hình thức</th><th scope="col" class="px-4 py-3 text-right">Số tiền</th><th scope="col" class="px-4 py-3">Ghi chú</th><th scope="col" class="px-4 py-3">Người ghi</th></tr></thead>
+    <tbody>
+      <% payments.forEach((p) => { %>
+        <tr class="border-b border-milk-200 last:border-b-0">
+          <td data-label="" class="rt-title px-4 py-3 tnum"><%= fmtTime(p.paid_at) %></td>
+          <td data-label="Hình thức" class="px-4 py-3"><%= METHOD[p.method] || p.method %></td>
+          <td data-label="Số tiền" class="px-4 py-3 text-right font-mono font-semibold tnum text-emerald-700"><%= money(p.amount) %></td>
+          <td data-label="Ghi chú" class="px-4 py-3 text-gray-600"><%= p.note || '' %></td>
+          <td data-label="Người ghi" class="px-4 py-3 text-gray-600"><%= p.user_name || '—' %></td>
+        </tr>
+      <% }) %>
+      <% if (!payments.length) { %><tr><td colspan="5" data-label="" class="px-4 py-8 text-center text-gray-500"><%= receipt.supplier_id ? 'Chưa trả khoản nào cho phiếu này.' : 'Mua lẻ: đã trả đủ khi nhập.' %></td></tr><% } %>
+    </tbody>
+  </table>
+</section>
+
+<%- include('../partials/pay_dialog', { backTo: `/admin/receipts/${receipt.id}` }) %>

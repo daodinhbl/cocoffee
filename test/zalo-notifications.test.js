@@ -243,7 +243,7 @@ test('menu aliases top-up', async (t) => {
       inserted, log,
       query: async (sql, params) => {
         log.push(sql.split(/\s+/).slice(0, 3).join(' '));
-        if (/FROM products/.test(sql)) return [[{ id: 1, name: 'Cà Phê Đen Pha Máy' }, { id: 2, name: 'Cà Phê Sữa Pha Máy' }, { id: 3, name: 'Nước Ép Cam' }, { id: 4, name: 'Bò Cụng (RedBull)' }]];
+        if (/FROM products/.test(sql)) return [[{ id: 1, name: 'Cà Phê Đen Pha Máy' }, { id: 2, name: 'Cà Phê Sữa Pha Máy' }, { id: 3, name: 'Nước Ép Cam' }, { id: 4, name: 'Bò Húc Thái (Redbull)' }]];
         if (/SELECT alias_norm FROM product_aliases/.test(sql)) return [aliases.map((alias_norm) => ({ alias_norm }))];
         if (/INSERT INTO product_aliases/.test(sql)) { inserted.push([params[0], params[1]]); return [{}]; }
         if (/GET_LOCK/.test(sql)) return [[{ ok: 1 }]];

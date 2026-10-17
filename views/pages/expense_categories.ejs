@@ -1,0 +1,64 @@
+<%
+  const { input, label, btnPrimary, btnSecondary, btnGhost, sheet, grabber } = ui;
+  const card = 'rounded-xl border border-milk-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,.04)]';
+  const tLabel = Object.fromEntries(treatments.map((t) => [t.code, t.label]));
+  const tTone = { deductible: 'good', non_deductible: 'neutral', capex: 'info' };
+%>
+<div class="flex flex-wrap items-end justify-between gap-4">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight text-navy-darker sm:text-2xl">Danh mục chi phí</h1>
+    <p class="mt-1 max-w-2xl text-sm text-gray-500">Mỗi danh mục quyết định khoản chi có được trừ khi tính thuế hay không, và mã sổ kế toán tương ứng (do kế toán đặt, có thể đổi khi quy định thay đổi). Khoản chi từ phiếu nhập kho vào “Nguyên vật liệu & hàng hóa”.</p>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    <a href="/admin/expenses" class="<%= btnSecondary %>">← Sổ chi phí</a>
+    <button type="button" data-modal-open="#cat-dialog" data-action="/admin/expense-categories" data-title="Thêm danh mục" data-fill="<%= safeJson({ tax_treatment: 'deductible', sort_order: 50 }) %>" class="<%= btnPrimary %>"><%- icon('plus', 'h-4 w-4') %> Thêm danh mục</button>
+  </div>
+</div>
+
+<div class="<%= card %> mt-5 overflow-hidden">
+  <table class="rtable w-full border-collapse text-left text-sm lg:min-w-[760px]">
+    <caption class="sr-only">Danh mục chi phí</caption>
+    <thead class="<%= ui.thead %>">
+      <tr>
+        <th scope="col" class="w-12 px-2 py-3 text-center sm:px-4">STT</th>
+        <th scope="col" class="px-4 py-3">Danh mục</th>
+        <th scope="col" class="px-4 py-3">Cách xử lý thuế</th>
+        <th scope="col" class="px-4 py-3">Mã sổ</th>
+        <th scope="col" class="px-4 py-3 text-right">Số khoản chi</th>
+        <th scope="col" class="px-4 py-3 text-right"><span class="sr-only">Hành động</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% rows.forEach((c, idx) => { const fill = { name: c.name, code: c.code, tax_treatment: c.tax_treatment, ledger_code: c.ledger_code || '', sort_order: c.sort_order, is_active: Boolean(c.is_active) }; %>
+        <tr data-row class="border-b border-milk-200 last:border-b-0 <%= (idx + 1) % 2 === 1 ? 'bg-blue-50/70' : '' %> <%= c.is_active ? '' : 'text-gray-400' %>">
+          <td data-label="" class="rt-no px-2 py-3 text-center font-mono text-xs text-milk-500 tnum sm:px-4"><%= idx + 1 %></td>
+          <td data-label="" class="rt-title px-4 py-3"><span class="font-semibold"><%= c.name %></span> <% if (!c.is_active) { %><%- badge('Ẩn', 'neutral') %><% } %><span class="block font-mono text-xs text-gray-500"><%= c.code %></span></td>
+          <td data-label="Cách xử lý thuế" class="px-4 py-3"><%- badge(tLabel[c.tax_treatment], tTone[c.tax_treatment]) %></td>
+          <td data-label="Mã sổ" class="px-4 py-3 font-mono"><%= c.ledger_code || '—' %></td>
+          <td data-label="Số khoản chi" class="px-4 py-3 text-right font-mono tnum"><%= c.uses %></td>
+          <td data-label="" class="rt-actions px-4 py-3 text-right"><button type="button" class="<%= btnGhost %>" aria-label="Sửa <%= c.name %>" title="Sửa" data-modal-open="#cat-dialog" data-action="/admin/expense-categories/<%= c.id %>" data-title="Sửa danh mục" data-fill="<%= safeJson(fill) %>"><%- icon('pencil', 'h-4 w-4') %></button></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<dialog id="cat-dialog" aria-labelledby="cat-title" class="max-w-md <%= sheet %>">
+  <form method="post" action="/admin/expense-categories" class="flex flex-col">
+    <%- include('../partials/csrf') %>
+    <input type="hidden" name="_back" value="/admin/expense-categories">
+    <%- grabber %>
+    <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 sm:px-6 sm:py-4"><h2 id="cat-title" data-dialog-title class="text-lg font-semibold">Danh mục</h2><button type="button" data-modal-close aria-label="Đóng" class="<%= btnGhost %>"><%- icon('x', 'h-5 w-5') %></button></div>
+    <div class="space-y-4 px-4 py-4 sm:px-6 sm:py-5">
+      <div><label for="k-name" class="<%= label %>">Tên danh mục</label><input id="k-name" name="name" required maxlength="100" class="<%= input %>" autocomplete="off"></div>
+      <div class="grid grid-cols-2 gap-4">
+        <div><label for="k-code" class="<%= label %>">Mã</label><input id="k-code" name="code" maxlength="40" class="<%= input %> font-mono read-only:bg-gray-50" autocomplete="off" data-create-only placeholder="tien-ve-sinh"><p class="mt-1 text-xs text-gray-500">Chỉ nhập khi thêm mới.</p></div>
+        <div><label for="k-sort" class="<%= label %>">Thứ tự</label><input id="k-sort" name="sort_order" type="number" min="-1000" max="1000" class="<%= input %> text-right font-mono"></div>
+      </div>
+      <div><label for="k-tax" class="<%= label %>">Cách xử lý thuế</label><select id="k-tax" name="tax_treatment" class="<%= input %>"><% treatments.forEach((t) => { %><option value="<%= t.code %>"><%= t.label %></option><% }) %></select></div>
+      <div><label for="k-ledger" class="<%= label %>">Mã sổ kế toán</label><input id="k-ledger" name="ledger_code" maxlength="20" class="<%= input %> font-mono" autocomplete="off" placeholder="Theo hướng dẫn của kế toán"></div>
+      <label class="flex items-center gap-2 text-sm" data-edit-only><input type="hidden" name="is_active" value="0"><input type="checkbox" name="is_active" value="1" checked class="h-4 w-4 rounded border-gray-300 accent-blue-700"> Đang dùng</label>
+    </div>
+    <div class="flex items-center justify-end gap-3 border-t border-gray-200 px-4 py-3 sm:px-6 sm:py-4"><button type="button" data-modal-close class="<%= btnSecondary %>">Hủy</button><button type="submit" class="<%= btnPrimary %>">Lưu</button></div>
+  </form>
+</dialog>

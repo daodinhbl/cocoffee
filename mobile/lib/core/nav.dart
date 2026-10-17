@@ -36,6 +36,8 @@ const navGroups = <NavGroup>[
   ]),
   NavGroup('Phân tích', [
     NavItem(key: 'reports', label: 'Báo cáo', icon: Icons.bar_chart_rounded, route: '/reports', adminOnly: true),
+    NavItem(key: 'expenses', label: 'Sổ chi phí', icon: Icons.account_balance_wallet_rounded, route: '/expenses', adminOnly: true),
+    NavItem(key: 'finance', label: 'Thuế & chi phí', icon: Icons.percent_rounded, route: '/finance', adminOnly: true),
     NavItem(key: 'zalo', label: 'Zalo OA', icon: Icons.chat_rounded, route: '/zalo', adminOnly: true),
   ]),
   NavGroup('Hệ thống', [

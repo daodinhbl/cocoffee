@@ -14,6 +14,7 @@ const pool = mysql.createPool({
   charset: 'utf8mb4',
   timezone: env.db.timezone,
   decimalNumbers: true,
+  dateStrings: ['DATE'],                    // DATE columns (expense_date, tax periods, rollup days) stay 'YYYY-MM-DD', never a timezone-shifted Date
   enableKeepAlive: true,
   keepAliveInitialDelay: 10000,
 });
