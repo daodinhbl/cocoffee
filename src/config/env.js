@@ -49,8 +49,10 @@ module.exports = {
   rootDir: path.resolve(__dirname, '../..'),
   publicBaseUrl: optional('PUBLIC_BASE_URL').replace(/\/+$/, ''),
   // iOS app for staff iPhones/iPads: TestFlight public link or App Store page, used while nothing is set in
-  // Web Admin > Cài đặt > Ứng dụng iOS (see services/iosApp.js).
-  iosAppUrl: optional('IOS_APP_URL'),
+  // Web Admin > Cài đặt > Ứng dụng iOS (see services/iosApp.js). The shop's TestFlight public link (2026-10-17)
+  // is the default while the variable is absent, so a fresh deploy shows the QR without any configuration;
+  // IOS_APP_URL= (empty) switches it off, a stored value in Cài đặt always wins.
+  iosAppUrl: process.env.IOS_APP_URL === undefined ? 'https://testflight.apple.com/join/REY5t43E' : optional('IOS_APP_URL'),
   apkpureUrl: optional('APKPURE_URL'),          // optional override of the APKPure page shown on the login page (services/apkpure.js)
   // Where Web Admin > Sao lưu keeps its .sql.gz files. A redeploy replaces the app folder, so the default is a
   // sibling folder OUTSIDE it (<app>/../cocoffee-backups); backupService falls back to <app>/backups (with a
