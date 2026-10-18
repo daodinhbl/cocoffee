@@ -44,3 +44,7 @@ mobile/ios/build/
 /dist/
 /desktop/build/
 /desktop/.dart_tool/
+
+# Third-party store APK kept for the APKPure submission (61 MB) and private reports: not source code
+/apkpure-release/
+/docs/*.docx

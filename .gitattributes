@@ -7,6 +7,22 @@ README.md        export-ignore
 .gitattributes   export-ignore
 .gitignore       export-ignore
 
+# One line-ending rule for everyone: text files are LF in the repo AND in the working tree (no more CRLF churn on Windows).
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.ico binary
+*.apk binary
+*.ipa binary
+*.zip binary
+*.docx binary
+*.ttf binary
+
 # shell scripts must keep LF line endings (they run on Linux)
 *.sh text eol=lf
 

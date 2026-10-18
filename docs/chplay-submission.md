@@ -47,7 +47,7 @@ Mục *Trang tổng quan* của ứng dụng liệt kê các việc còn thiếu
 
 | Mục | Điền |
 |---|---|
-| Quyền truy cập ứng dụng | *Toàn bộ hoặc một số chức năng bị hạn chế* → thêm hướng dẫn: địa chỉ máy chủ `https://fnb.tasotek-giaiphapso.com` (màn đăng nhập có nút *Đổi* địa chỉ) + **tài khoản dành cho người duyệt** (tạo riêng một tài khoản quản trị viên trên site fnb, ví dụ `googlereview`, mật khẩu ≥ 10 ký tự; không dùng tài khoản thật). |
+| Quyền truy cập ứng dụng | *Toàn bộ hoặc một số chức năng bị hạn chế* → thêm hướng dẫn: địa chỉ máy chủ `https://cocoffee.tasotek-giaiphapso.com` (màn đăng nhập có nút *Đổi* địa chỉ) + **tài khoản dành cho người duyệt** (tạo riêng một tài khoản quản trị viên trên site cocoffee, ví dụ `googlereview`, mật khẩu ≥ 10 ký tự; không dùng tài khoản thật). |
 | Quảng cáo | Không có quảng cáo. |
 | Xếp hạng nội dung | Bảng câu hỏi: loại *Tiện ích / năng suất*; trả lời *Không* cho mọi mục nhạy cảm. |
 | Đối tượng mục tiêu | 18 tuổi trở lên; không hướng tới trẻ em. |
@@ -57,7 +57,7 @@ Mục *Trang tổng quan* của ứng dụng liệt kê các việc còn thiếu
 | Ứng dụng chính phủ | Không. |
 | Tính năng tài chính | Không cung cấp dịch vụ tài chính (app chỉ ghi nhận thanh toán của quán; mã VietQR là thông tin chuyển khoản của quán). |
 | Ứng dụng sức khỏe | Không. |
-| Chính sách quyền riêng tư | `https://fnb.tasotek-giaiphapso.com/privacy` (trang đã có trên cả hai site). |
+| Chính sách quyền riêng tư | `https://cocoffee.tasotek-giaiphapso.com/privacy` (trang đã có trên site). |
 | Danh mục | Ứng dụng → *Kinh doanh*. Email liên hệ: email của bạn. |
 | Trang thông tin trên cửa hàng | Tên **POS Tasotek**; mô tả ở mục 5; đồ họa ở mục 6. |
 
