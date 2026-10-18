@@ -66,7 +66,7 @@ class _PrinterSettingsCardState extends ConsumerState<PrinterSettingsCard> {
   Widget build(BuildContext context) {
     final saved = ref.watch(savedPrinterProvider);
     return SectionCard(
-      title: 'Máy in hóa đơn',
+      title: 'Máy in của điện thoại này',
       subtitle: 'In trực tiếp từ điện thoại này lên máy in nhiệt 58/80 mm: qua Bluetooth hoặc qua mạng LAN/Wi-Fi (cổng 9100).',
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
