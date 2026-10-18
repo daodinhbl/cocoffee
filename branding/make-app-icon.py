@@ -21,6 +21,7 @@ RES = os.path.join(ROOT, 'mobile', 'android', 'app', 'src', 'main', 'res')
 BG = (255, 255, 255)
 NAVY, RED, GOLD = (31, 71, 150), (212, 38, 52), (240, 160, 40)
 SS = 4                                                                    # supersampling
+LABEL = 'POS'                                                             # the word under the logo (the licensing app uses 'KEY')
 ART_W, ART_H, ART_CX, ART_CY = 744.0, 635.0, 380.0, 362.5       # the whole group: logo on top, the F&B cup below it
 
 
@@ -65,7 +66,7 @@ def shapes(scale, ox, oy, size):
     font_file = next((f for f in (r'C:\Windows\Fonts\seguibl.ttf', r'C:\Windows\Fontsriblk.ttf', r'C:\Windows\Fontsrialbd.ttf') if os.path.exists(f)), None)
     font = ImageFont.truetype(font_file, round(215 * k))
     tx, ty = P(380, 680)
-    ImageDraw.Draw(navy).text((tx, ty), 'POS', font=font, fill=255, anchor='ms')
+    ImageDraw.Draw(navy).text((tx, ty), LABEL, font=font, fill=255, anchor='ms')
     down = lambda m: m.resize((size, size), Image.LANCZOS)
     return down(navy), down(red), down(gold)
 
@@ -94,7 +95,29 @@ def rounded(im, r):
     return out
 
 
+def write_ico(path, master):
+    master.convert('RGBA').save(path, format='ICO', sizes=[(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (24, 24), (16, 16)])
+
+
+def other_apps():
+    """The Windows manager (POS) and the licensing app (KEY): .ico for Windows, AppIcon set for the licensing app's iOS build."""
+    global LABEL
+    write_ico(os.path.join(ROOT, 'desktop', 'windows', 'runner', 'resources', 'app_icon.ico'), compose(256, 0.80).convert('RGB'))
+    LABEL = 'KEY'
+    lm = compose(1024, 0.80).convert('RGB')
+    write_ico(os.path.join(ROOT, 'license_manager', 'windows', 'runner', 'resources', 'app_icon.ico'), compose(256, 0.80).convert('RGB'))
+    lm_ios = os.path.join(ROOT, 'license_manager', 'ios', 'Runner', 'Assets.xcassets', 'AppIcon.appiconset')
+    for f in os.listdir(lm_ios):
+        if f.startswith('Icon-App-') and f.endswith('.png'):
+            base, _, sc = f[len('Icon-App-'):-4].partition('@')
+            px = round(float(base.split('x')[0]) * int(sc[:-1]))
+            lm.resize((px, px), Image.LANCZOS).save(os.path.join(lm_ios, f), optimize=True)
+    lm.save(os.path.join(ROOT, 'branding', 'app-icon-license-1024.png'))
+    LABEL = 'POS'
+
+
 def main():
+    other_apps()
     master = compose(1024, 0.80).convert('RGB')
     n = 0
     for f in os.listdir(IOS_DIR):
