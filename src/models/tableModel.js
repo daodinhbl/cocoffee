@@ -4,7 +4,7 @@ const db = (conn) => conn || pool;
 
 // merged_into / merged_order_id: a table merged into another one (ghép bàn) has no order of its own; it shares
 // the open order of its primary table.
-const COLUMNS = `t.id, t.code, t.name, t.capacity, t.status, t.current_order_id, t.merged_into, t.is_active,
+const COLUMNS = `t.id, t.code, t.name, t.capacity, t.status, t.current_order_id, t.merged_into, t.is_active, t.map_x, t.map_y, t.map_shape,
             o.order_code AS current_order_code, o.total AS current_order_total,
             p.current_order_id AS merged_order_id, p.name AS merged_into_name`;
 const FROM = `FROM dining_tables t
@@ -80,4 +80,11 @@ async function release(id, conn) {
   );
 }
 
-module.exports = { list, listAll, getById, create, update, setServing, setMerged, mergedInto, release };
+/** Saves the floor-plan positions: [{ id, x, y, shape }], x / y in 1/10 % of the floor (0..1000). */
+async function saveLayout(items, conn) {
+  for (const it of items) {
+    await db(conn).query('UPDATE dining_tables SET map_x = ?, map_y = ?, map_shape = ? WHERE id = ?', [it.x, it.y, it.shape, it.id]);
+  }
+}
+
+module.exports = { saveLayout, list, listAll, getById, create, update, setServing, setMerged, mergedInto, release };

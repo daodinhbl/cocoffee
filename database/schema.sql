@@ -124,6 +124,9 @@ CREATE TABLE dining_tables (
   status           ENUM('available','serving') NOT NULL DEFAULT 'available',
   current_order_id INT UNSIGNED NULL,
   merged_into      INT UNSIGNED NULL,               -- ghép bàn: this table shares the open order of table `merged_into`
+  map_x            SMALLINT UNSIGNED NULL,          -- floor plan (sơ đồ bàn 2.5D): position in 1/10 %, NULL = automatic grid
+  map_y            SMALLINT UNSIGNED NULL,
+  map_shape        ENUM('square','round','long') NOT NULL DEFAULT 'square',
   is_active        TINYINT(1)   NOT NULL DEFAULT 1,
   created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

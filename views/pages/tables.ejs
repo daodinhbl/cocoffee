@@ -8,7 +8,7 @@
     <h1 class="text-xl font-semibold tracking-tight sm:text-2xl">Bàn</h1>
     <p class="mt-1 text-sm text-gray-500"><%= activeCount %> bàn đang dùng · <%= serving %> bàn có khách. Trạng thái bàn do máy POS cập nhật khi mở và thanh toán đơn.</p>
   </div>
-  <button type="button" data-modal-open="#table-dialog" data-action="/admin/tables" data-title="Thêm bàn" class="<%= btnPrimary %>">+ Thêm bàn</button>
+  <div class="flex flex-wrap gap-2"><a href="/admin/tables/map" class="<%= btnSecondary %>">Sơ đồ 2.5D</a><button type="button" data-modal-open="#table-dialog" data-action="/admin/tables" data-title="Thêm bàn" class="<%= btnPrimary %>">+ Thêm bàn</button></div>
 </div>
 
 <% const freeCount = tables.filter((t) => t.is_active && t.status !== 'serving').length; %>

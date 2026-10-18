@@ -427,6 +427,9 @@ UPGRADES.push(
 /** Columns added to existing tables: [table, column, ALTER statement]. MySQL 8 has no ADD COLUMN IF NOT EXISTS. */
 const COLUMNS = [
   ['orders', 'customer_id', 'ALTER TABLE orders ADD COLUMN customer_id INT UNSIGNED NULL AFTER note, ADD KEY idx_orders_customer (customer_id)'],
+  ['dining_tables', 'map_x', 'ALTER TABLE dining_tables ADD COLUMN map_x SMALLINT UNSIGNED NULL AFTER merged_into'],
+  ['dining_tables', 'map_y', 'ALTER TABLE dining_tables ADD COLUMN map_y SMALLINT UNSIGNED NULL AFTER map_x'],
+  ['dining_tables', 'map_shape', "ALTER TABLE dining_tables ADD COLUMN map_shape ENUM('square','round','long') NOT NULL DEFAULT 'square' AFTER map_y"],
   ['dining_tables', 'merged_into', 'ALTER TABLE dining_tables ADD COLUMN merged_into INT UNSIGNED NULL AFTER current_order_id, ADD KEY idx_tables_merged (merged_into)'],
   ['products', 'image_url', 'ALTER TABLE products ADD COLUMN image_url VARCHAR(255) NULL'],
   ['products', 'tax_category_id', 'ALTER TABLE products ADD COLUMN tax_category_id INT UNSIGNED NULL'],

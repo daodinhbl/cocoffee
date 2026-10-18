@@ -1,0 +1,92 @@
+<%
+  const { btnPrimary, btnSecondary } = ui;
+%>
+<div class="flex flex-wrap items-start justify-between gap-4">
+  <div>
+    <h1 class="text-xl font-semibold tracking-tight sm:text-2xl">Sơ đồ bàn</h1>
+    <p class="mt-1 max-w-2xl text-sm text-gray-500">Mặt bằng quán nhìn nghiêng 2.5D. Chạm vào bàn để mở bán hàng. Bấm “Sửa bố cục” để kéo bàn đến đúng chỗ và đổi hình dạng, rồi “Lưu bố cục”.</p>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    <a href="/admin/tables" class="<%= btnSecondary %>">Danh sách bàn</a>
+    <button type="button" id="map-edit" class="<%= btnSecondary %>">Sửa bố cục</button>
+    <button type="button" id="map-save" class="<%= btnPrimary %> hidden">Lưu bố cục</button>
+  </div>
+</div>
+
+<div class="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-600">
+  <span class="inline-flex items-center gap-2"><span class="h-3 w-3 rounded-sm border border-emerald-300 bg-emerald-200"></span>Trống <b class="font-mono tnum text-navy-darker"><%= counts.free %></b></span>
+  <span class="inline-flex items-center gap-2"><span class="h-3 w-3 rounded-sm border border-amber-300 bg-amber-200"></span>Có khách <b class="font-mono tnum text-navy-darker"><%= counts.busy %></b></span>
+  <span class="inline-flex items-center gap-2"><span class="h-3 w-3 rounded-sm border border-sky-300 bg-sky-200"></span>Đã ghép <b class="font-mono tnum text-navy-darker"><%= counts.merged %></b></span>
+</div>
+
+<div id="map-tools" class="mt-3 hidden flex-wrap items-center gap-2 rounded-lg border border-milk-200 bg-white px-3 py-2 text-sm" aria-live="polite">
+  <span id="map-selected" class="font-semibold text-navy-darker">Chọn một bàn để đổi hình dạng</span>
+  <span class="text-gray-400">·</span>
+  <button type="button" data-shape="square" class="rounded border border-milk-200 px-2.5 py-1 hover:border-navy-accent disabled:opacity-40" disabled>Vuông</button>
+  <button type="button" data-shape="round" class="rounded border border-milk-200 px-2.5 py-1 hover:border-navy-accent disabled:opacity-40" disabled>Tròn</button>
+  <button type="button" data-shape="long" class="rounded border border-milk-200 px-2.5 py-1 hover:border-navy-accent disabled:opacity-40" disabled>Dài</button>
+  <button type="button" id="map-reset" class="ml-auto rounded border border-milk-200 px-2.5 py-1 text-gray-600 hover:border-navy-accent">Xếp lại lưới</button>
+</div>
+
+<style>
+  .fp-stage { perspective: 1400px; perspective-origin: 50% 20%; }
+  .fp-floor {
+    position: relative; width: 100%; aspect-ratio: 16 / 10; min-height: 360px; border-radius: 10px;
+    background: #F4F1EC;
+    background-image: linear-gradient(rgba(140,132,120,.22) 1px, transparent 1px), linear-gradient(90deg, rgba(140,132,120,.22) 1px, transparent 1px);
+    background-size: 5% 8%;
+    border: 1px solid #D6CFC3;
+    box-shadow: 0 18px 30px -12px rgba(15,23,42,.35), 0 0 0 10px #E8E3DA;
+    transform-origin: 50% 100%;
+    transform: rotateX(48deg) scale(.96);
+    transition: transform .45s ease;
+    touch-action: none;
+  }
+  .fp-floor[data-mode="edit"] { transform: rotateX(0deg) scale(1); }
+  .fp-table {
+    position: absolute; transform: translate(-50%, -50%); width: 9%; aspect-ratio: 1.15; cursor: pointer; user-select: none;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; line-height: 1.15;
+    border-radius: 8px; font-size: clamp(9px, 1.15vw, 14px);
+    border: 1px solid; box-shadow: 0 .55em 0 -1px var(--side), 0 .9em .9em -.2em rgba(15,23,42,.35);
+    transition: box-shadow .15s ease, filter .15s ease;
+  }
+  .fp-table:hover { filter: brightness(1.04); }
+  .fp-table[data-shape="round"] { border-radius: 999px; width: 8.4%; aspect-ratio: 1; }
+  .fp-table[data-shape="long"] { width: 15%; aspect-ratio: 2.4; }
+  .fp-table[data-state="free"] { background: #A7F3D0; border-color: #34D399; --side: #059669; color: #064E3B; }
+  .fp-table[data-state="busy"] { background: #FDE68A; border-color: #F59E0B; --side: #B45309; color: #78350F; }
+  .fp-table[data-state="merged"] { background: #BAE6FD; border-color: #38BDF8; --side: #0369A1; color: #0C4A6E; }
+  .fp-table[data-selected="true"] { outline: 3px solid #1D4ED8; outline-offset: 3px; }
+  .fp-floor[data-mode="edit"] .fp-table { cursor: grab; }
+  .fp-floor[data-mode="edit"] .fp-table:active { cursor: grabbing; }
+  /* chairs: small bumps around the table, drawn from capacity with CSS only */
+  .fp-code { font-weight: 700; font-size: 1.15em; }
+  .fp-info { font-size: .85em; opacity: .85; }
+  .fp-stage { margin-top: -2.5rem; }
+  .fp-floor { transform: rotateX(40deg) scale(.96); margin-top: 0; }
+  @media (max-width: 640px) {
+    .fp-floor { aspect-ratio: 4 / 5; min-height: 420px; }
+    .fp-table { width: 21%; font-size: 11px; }
+    .fp-table[data-shape="round"] { width: 19%; }
+    .fp-table[data-shape="long"] { width: 33%; aspect-ratio: 2; }
+  }
+  @media (prefers-reduced-motion: reduce) { .fp-floor { transition: none; } }
+</style>
+
+<div class="fp-stage mt-6">
+  <div id="floor" class="fp-floor" data-mode="view" role="application" aria-label="Sơ đồ bàn">
+    <% items.forEach((t) => { %>
+      <a href="/admin/pos?table=<%= t.id %>" class="fp-table" data-id="<%= t.id %>" data-x="<%= t.x %>" data-y="<%= t.y %>" data-shape="<%= t.shape %>" data-state="<%= t.state %>" data-name="<%= t.name %>"
+         style="left: <%= t.x / 10 %>%; top: <%= t.y / 10 %>%;" aria-label="<%= t.name %>, <%= t.state === 'busy' ? 'có khách' : t.state === 'merged' ? 'đã ghép' : 'trống' %>">
+        <span class="fp-code"><%= t.code %></span>
+        <span class="fp-info"><%= t.name %> · <%= t.capacity %> chỗ</span>
+        <% if (t.state === 'busy' && t.order) { %><span class="fp-info"><%= t.order %><% if (t.total != null) { %> · <%= money(t.total) %><% } %></span><% } %>
+        <% if (t.state === 'merged' && t.mergedInto) { %><span class="fp-info">ghép với <%= t.mergedInto %></span><% } %>
+      </a>
+    <% }) %>
+  </div>
+</div>
+<% if (!items.length) { %><p class="mt-6 rounded-lg border border-dashed border-milk-300 p-8 text-center text-sm text-gray-500">Chưa có bàn nào. Thêm bàn ở <a class="font-medium text-blue-700 underline" href="/admin/tables">Danh sách bàn</a> rồi quay lại đây.</p><% } %>
+
+<input type="hidden" id="map-csrf" value="<%= csrf %>">
+<script src="/admin/table-map.js?v=<%= assetV %>" defer></script>

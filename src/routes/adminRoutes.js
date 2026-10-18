@@ -69,6 +69,8 @@ router.post('/inventory/import', requireAdmin, requireCsrfHeader, (req, res, nex
   err ? res.status(err.status === 413 ? 413 : 400).json({ ok: false, error: err.status === 413 ? 'File quá lớn (tối đa 5 MB).' : 'Không đọc được file tải lên.' }) : next()
 )), inventory.importXlsx);
 
+router.post('/tables/layout', requireAdmin, requireCsrfHeader, tables.saveLayout);   // floor-plan drag & drop: JSON body, CSRF in a header
+
 router.use(requireAdmin, requireCsrf);
 router.use((req, res, next) => { res.locals.tenantAdmin = require('../services/tenantService').enabled() && !req.tenant; next(); });   // sidebar: "Đăng ký quán" on the main shop only
 
@@ -76,6 +78,7 @@ router.get('/', (_req, res) => res.redirect(302, '/admin/dashboard'));
 router.get('/dashboard', dashboard.dashboard);
 
 router.get('/tables', tables.page);
+router.get('/tables/map', tables.mapPage);
 router.post('/tables', act(tables.create));
 router.post('/tables/:id', act(tables.update));
 
