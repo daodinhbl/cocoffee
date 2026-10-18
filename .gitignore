@@ -15,6 +15,8 @@ public/uploads/*
 releases/android/*
 !releases/android/.gitkeep
 # iOS ad-hoc build published for direct installs on registered devices (scripts/publish-ipa.js adds it to the deploy archive)
+releases/windows/*
+!releases/windows/.gitkeep
 releases/ios/*
 !releases/ios/.gitkeep
 # deploy archives (scripts/package-deploy.js)

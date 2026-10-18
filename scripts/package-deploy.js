@@ -56,6 +56,14 @@ function main() {
     console.log('iOS app: no ad-hoc build in releases/ios/; /download/ios offers the TestFlight / App Store link only.');
   }
 
+  const winExe = !args.includes('--no-windows') ? require('../src/services/windowsRelease').current() : null;
+  if (winExe) {
+    extra.push('--prefix=releases/windows/', `--add-file=${winExe.path}`, '--prefix=');
+    console.log(`Windows installer: ${winExe.file}, ${(winExe.size / 1048576).toFixed(1)} MB`);
+  } else {
+    console.log('Windows installer: none in releases/windows/ (or --no-windows); the login page shows no Windows link.');
+  }
+
   fs.mkdirSync(path.dirname(out), { recursive: true });
   // --prefix applies to the --add-file entries after it and, with its last value, to the tree: hence the reset to "".
   execFileSync('git', ['archive', '--format=zip', '-9', '-o', out, ...extra, 'HEAD'], { cwd: ROOT, stdio: 'inherit' });

@@ -6,6 +6,7 @@ const appRelease = require('../../services/appRelease');
 const iosApp = require('../../services/iosApp');
 const iosRelease = require('../../services/iosRelease');
 const apkpure = require('../../services/apkpure');
+const windowsRelease = require('../../services/windowsRelease');
 const { startSession, endSession, safeBack } = require('../../middlewares/adminAuth');
 
 // Constant-time-ish: always run bcrypt, even for unknown users.
@@ -20,7 +21,7 @@ const demoCredentials = () => (env.demo.enabled ? { username: env.demo.username,
 const renderLogin = async (res, { status = 200, error = null, username = '', next = '' } = {}) =>
   res.status(status).render('login', {
     shopName: env.business.shopName, error, username, next: safeBack(next, ''), demo: demoCredentials(),
-    appDownload: appRelease.loginCard(), iosApp: await iosApp.get(), iosMeta: iosApp.APP, iosRelease: iosRelease.loginCard(), apkpure: apkpure.card(),
+    appDownload: appRelease.loginCard(), iosApp: await iosApp.get(), iosMeta: iosApp.APP, iosRelease: iosRelease.loginCard(), apkpure: apkpure.card(), windowsApp: windowsRelease.loginCard(),
   });
 
 function loginForm(req, res) {

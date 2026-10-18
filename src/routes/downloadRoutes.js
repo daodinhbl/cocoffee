@@ -5,6 +5,7 @@ const appRelease = require('../services/appRelease');
 const iosApp = require('../services/iosApp');
 const apkpure = require('../services/apkpure');
 const iosRelease = require('../services/iosRelease');
+const windowsRelease = require('../services/windowsRelease');
 const env = require('../config/env');
 const { formatShopTime } = require('../utils/text');
 
@@ -179,6 +180,16 @@ router.get('/ios/app.ipa', ipaLimit, (req, res, next) => {
   if (!r) return res.status(404).type('text').send('Chưa có bản cài đặt iOS nào.');
   res.set({ 'Cache-Control': 'no-cache', 'X-Checksum-SHA256': r.sha256, 'X-Content-Type-Options': 'nosniff' });
   return res.download(r.path, iosRelease.downloadName(r), { headers: { 'Content-Type': iosRelease.IPA_MIME }, cacheControl: false, dotfiles: 'deny' }, (err) => {
+    if (err && !res.headersSent) next(err);
+  });
+});
+
+// Windows installer: /download/windows/POS-Tasotek-Server-Setup-<version>.exe (only the file the folder holds is served).
+router.get('/windows/:file', ipaLimit, (req, res, next) => {
+  const r = windowsRelease.current();
+  if (!r || req.params.file !== r.file) return res.status(404).type('text').send('Không có bản cài đặt Windows này.');
+  res.set({ 'Cache-Control': 'no-cache', 'X-Checksum-SHA256': r.sha256, 'X-Content-Type-Options': 'nosniff' });
+  return res.download(r.path, r.file, { headers: { 'Content-Type': windowsRelease.EXE_MIME }, cacheControl: false, dotfiles: 'deny' }, (err) => {
     if (err && !res.headersSent) next(err);
   });
 });
