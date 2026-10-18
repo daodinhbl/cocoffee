@@ -130,3 +130,34 @@ String? ngrokErrorFromLog(String line) {
     return null;
   }
 }
+
+/// The vendor's broker (POST /api/ngrok/claim on the update server): a shop with a valid licence gets its own domain and a tunnel token
+/// limited to that domain, so it needs no ngrok account of its own. Returns the domain and the token.
+Future<({String domain, String authtoken})> claimBrokerDomain({
+  required String server,
+  required String machineId,
+  required String licenseCode,
+  required String shopName,
+  HttpCall http = realHttp,
+}) async {
+  if (licenseCode.trim().isEmpty) throw NgrokException('Cần nhập mã kích hoạt ở tab Giấy phép trước (tên miền chỉ cấp cho máy có giấy phép).');
+  final base = server.trim().replaceAll(RegExp(r'/+$'), '');
+  if (!base.startsWith('https://') && !base.startsWith('http://127.0.0.1')) throw NgrokException('Địa chỉ máy chủ cấp tên miền phải là https://');
+  HttpAnswer r;
+  try {
+    r = await http('POST', Uri.parse('$base/api/ngrok/claim'), headers: {'Accept': 'application/json'}, body: jsonEncode({'machine': machineId, 'code': licenseCode.trim(), 'shopName': shopName}));
+  } catch (_) {
+    throw NgrokException('Không kết nối được máy chủ cấp tên miền. Kiểm tra mạng.');
+  }
+  Map<String, dynamic>? j;
+  try {
+    j = jsonDecode(r.body) as Map<String, dynamic>;
+  } catch (_) {/* not JSON */}
+  if (r.status != 200) {
+    final msg = j?['error'] is Map ? '${(j!['error'] as Map)['message'] ?? ''}' : '';
+    throw NgrokException(msg.isNotEmpty ? msg : 'Máy chủ cấp tên miền trả lỗi ${r.status}.');
+  }
+  final domain = '${j?['domain'] ?? ''}', token = '${j?['authtoken'] ?? ''}';
+  if (!RegExp(r'^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$').hasMatch(domain) || token.isEmpty) throw NgrokException('Máy chủ cấp tên miền trả dữ liệu không hợp lệ.');
+  return (domain: domain, authtoken: token);
+}

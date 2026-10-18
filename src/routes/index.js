@@ -24,6 +24,15 @@ const admin = requireRole('admin');
 router.use('/payon', payonRoutes);                                          // POST /api/payon/ipn (PayOn notification, checksum-verified, no JWT)
 router.use('/facebook', facebookRoutes);                                  // /api/facebook/webhook (Messenger bot; signature-verified, no JWT)
 router.use('/zalo', zaloWebhookRoutes);                                  // POST /api/zalo/webhook (signature-verified, no JWT)
+// Windows installs ask for their own ngrok domain + tunnel token here (licence-checked, see services/ngrokBroker.js). Body: { machine, code, shopName? }.
+router.post('/ngrok/claim', rateLimit({ windowMs: 60 * 60 * 1000, max: 20 }), async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const r = await require('../services/ngrokBroker').claim({ machine: String(b.machine || '').slice(0, 60), code: String(b.code || '').slice(0, 2000), shopName: typeof b.shopName === 'string' ? b.shopName.slice(0, 60) : undefined });
+    res.set('Cache-Control', 'no-store');
+    return res.json({ domain: r.domain, authtoken: r.authtoken });
+  } catch (err) { return next(err); }
+});
 router.post('/auth/login', rateLimit({ windowMs: 15 * 60 * 1000, max: 60 }), rateLimit({ windowMs: 15 * 60 * 1000, max: 8, key: rateLimit.accountKey }), auth.login);
 
 // ---- everything below needs a bearer token ----------------------------------

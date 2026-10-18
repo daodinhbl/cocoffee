@@ -79,12 +79,22 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _autoDomain() async {
-    if (_api.text.trim().isEmpty) {
-      _say('Nhập ngrok API key trước (dashboard.ngrok.com > API).');
-      return;
-    }
     setState(() => _busy = true);
     try {
+      if (_api.text.trim().isEmpty) {
+        // No API key of the shop's own: the vendor's broker issues a domain and a token bound to it (needs the licence).
+        final got = await claimBrokerDomain(
+          server: c.updateServer,
+          machineId: widget.stack.machineId ?? '',
+          licenseCode: c.licenseCode,
+          shopName: _shop.text.trim().isEmpty ? c.shopName : _shop.text.trim(),
+        );
+        _domain.text = got.domain;
+        _token.text = got.authtoken;
+        _say('Đã lấy tên miền ${got.domain} và mã tunnel. Bấm "Lưu và áp dụng" để dùng.');
+        if (mounted) setState(() => _busy = false);
+        return;
+      }
       final d = await pickDomain(NgrokApi(_api.text.trim()), current: _domain.text.trim(), shopName: _shop.text.trim().isEmpty ? c.shopName : _shop.text.trim());
       _domain.text = d;
       _say('Đã lấy tên miền: $d. Bấm "Lưu và áp dụng" để dùng.');
@@ -133,7 +143,8 @@ class _SettingsPageState extends State<SettingsPage> {
       const SizedBox(height: 4),
       Text(
         'Để điện thoại ngoài quán và trang web vào được POS. Cần tài khoản ngrok (miễn phí): lấy Authtoken ở dashboard.ngrok.com > Your Authtoken. '
-        'API key (không bắt buộc) cho phép chương trình tự tìm hoặc đăng ký tên miền cố định cho quán.',
+        'Chưa có tài khoản ngrok? Bấm "Tự lấy tên miền" khi để trống API key: máy có giấy phép sẽ được cấp tên miền và mã tunnel riêng. '
+        'Nếu có API key ngrok của riêng bạn, nhập vào để chương trình tự tìm hoặc đăng ký tên miền cố định.',
         style: t.bodySmall,
       ),
       const SizedBox(height: 8),
