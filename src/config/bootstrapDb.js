@@ -90,6 +90,28 @@ async function isUnfinishedBootstrap(conn, names) {
 }
 
 /**
+ * DEMO_MODE: make sure the demo account exists as an active admin with the published password. The hash is
+ * rewritten only when the password does not match, so restarts do not end everyone's demo session.
+ * @returns {Promise<'disabled'|'ok'|'reset'|'missing'|'failed'>}
+ */
+async function ensureDemoAccount() {
+  if (!env.demo.enabled) return 'disabled';
+  const userModel = require('../models/userModel');
+  try {
+    const user = await userModel.findByUsername(env.demo.username);
+    if (!user) { logger.warn(`DEMO_MODE: account "${env.demo.username}" does not exist`); return 'missing'; }
+    if (user.is_active && user.role === 'admin' && bcrypt.compareSync(env.demo.password, user.password_hash)) return 'ok';
+    await userModel.setPassword(user.id, bcrypt.hashSync(env.demo.password, 12));
+    await userModel.setActive(user.id, true);
+    logger.info(`DEMO_MODE: demo account "${env.demo.username}" reset`);
+    return 'reset';
+  } catch (err) {
+    logger.error('DEMO_MODE: could not prepare the demo account', err);
+    return 'failed';
+  }
+}
+
+/**
  * Additive schema upgrades for databases created by an older schema.sql (production keeps its data, so
  * schema.sql is never re-applied there). Only CREATE TABLE IF NOT EXISTS / additive statements belong here.
  * Never throws: a failure is logged and the feature that needs the table degrades to its defaults.
@@ -528,4 +550,4 @@ async function ensureFirstAdmin() {
   }
 }
 
-module.exports = { bootstrapIfEmpty, ensureSchemaUpgrades, ensureFirstAdmin };
+module.exports = { bootstrapIfEmpty, ensureDemoAccount, ensureSchemaUpgrades, ensureFirstAdmin };

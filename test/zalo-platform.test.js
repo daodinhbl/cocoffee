@@ -8,6 +8,7 @@ process.env.ZALO_MODE = '';
 process.env.ZALO_BOT_TOKEN = '123456:SECRET-TOKEN';
 process.env.BOT_WEBHOOK_SECRET = 'platform-secret-123';
 process.env.PUBLIC_BASE_URL = 'https://cafe.example.test';   // sendPhoto needs a public picture URL
+process.env.DEMO_MODE = 'false';
 process.env.RECEIPT_SAVE_DIR = require('node:path').join(require('node:os').tmpdir(), 'cc-bills-' + process.pid);   // never write into the real uploads folder
 
 const test = require('node:test');

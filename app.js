@@ -8,7 +8,7 @@ const helmet = require('helmet');
 
 const env = require('./src/config/env');
 const { pool } = require('./src/config/db');
-const { bootstrapIfEmpty, ensureSchemaUpgrades, ensureFirstAdmin } = require('./src/config/bootstrapDb');
+const { bootstrapIfEmpty, ensureDemoAccount, ensureSchemaUpgrades, ensureFirstAdmin } = require('./src/config/bootstrapDb');
 const { ensureMenuSeed, ensureMenuAliases } = require('./src/config/menuSeed');
 const { ensureMenuPhotos } = require('./src/config/menuPhotos');
 const productModel = require('./src/models/productModel');
@@ -115,6 +115,7 @@ async function start() {
     if (bootstrap === 'applied') productModel.invalidateCatalog();
     await ensureSchemaUpgrades();                       // additive tables for older databases; never throws
     if (require('./src/services/tenantService').enabled()) await require('./src/models/tenantModel').ensureMasterSchema().catch((err) => logger.error('Tenant registry tables failed', err));   // shops + their databases (main DB only)
+    await ensureDemoAccount();                          // DEMO_MODE only; never throws
     await ensureFirstAdmin();                           // empty users table + BOOTSTRAP_ADMIN_PASSWORD: the first admin account; never throws
     if (env.db.seedMenu && await require('./src/services/installService').isInstalled()) {   // before the setup wizard has run, the owner still chooses blank or sample data
     await ensureMenuSeed();                             // printed menu, once per database; never throws

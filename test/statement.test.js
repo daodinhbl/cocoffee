@@ -8,6 +8,7 @@ process.env.DB_NAME ||= 'x'; process.env.DB_USER ||= 'x'; process.env.DB_PASSWOR
 process.env.ZALO_MODE = 'bot';
 process.env.BOT_WEBHOOK_SECRET = 'test-bot-secret-0123456789';
 process.env.PUBLIC_BASE_URL = 'https://cafe.example.test';
+process.env.DEMO_MODE = 'false';
 
 const test = require('node:test');
 const assert = require('node:assert/strict');

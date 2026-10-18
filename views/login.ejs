@@ -102,6 +102,14 @@
           <% } %>
 
 
+          <% if (locals.demo) { %>
+            <div class="mt-5 rounded-md border border-amber-300 bg-amber-50 px-3.5 py-3 text-sm text-amber-900" role="note">
+              <p class="font-semibold">Tài khoản demo</p>
+              <p class="mt-1">Tên đăng nhập: <b class="font-mono select-all"><%= demo.username %></b> &nbsp;·&nbsp; Mật khẩu: <b class="font-mono select-all"><%= demo.password %></b></p>
+              <p class="mt-1 text-xs text-amber-800">Vui lòng không đổi mật khẩu của tài khoản này (hệ thống sẽ không cho đổi).</p>
+            </div>
+          <% } %>
+
           <form method="post" action="/admin/login" class="mt-5 space-y-3.5">
             <input type="hidden" name="next" value="<%= next %>">
             <div class="field">

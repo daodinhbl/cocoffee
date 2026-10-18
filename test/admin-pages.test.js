@@ -323,12 +323,28 @@ test('admin pages', async (t) => {
     assert.match(await res.text(), /01\/10\/2026 – 13\/10\/2026/);
   });
 
-  await t.test('no demo mode: the login page publishes no credentials and the factory admin/admin must change its password', async () => {
+  await t.test('DEMO_MODE: credentials on the login page, no forced change, account cannot be changed or locked', async () => {
+    const env = require('../src/config/env');
+    const before = { ...env.demo };
+    Object.assign(env.demo, { enabled: true, username: 'admin', password: 'admin' });
     fx.resetPasswords();                       // an earlier test changed admin's password
-    const html = await (await fx.client().get('/admin/login')).text();
-    assert.doesNotMatch(html, /Tài khoản demo|demo-fill/);
-    const { res } = await fx.login('admin', 'admin');
-    assert.equal(res.headers.get('location'), '/admin/settings/password', 'a short password is always sent to the change-password page');
+    try {
+      const html = await (await fx.client().get('/admin/login')).text();
+      assert.match(html, /Tài khoản demo/);
+      const { c, res } = await fx.login('admin', 'admin');
+      assert.equal(res.headers.get('location'), '/admin/dashboard', 'demo account is not sent to the change-password page');
+      assert.equal((await c.get('/admin/orders')).status, 200);
+      const tok = await fx.csrfOf(c);
+      reset();
+      await c.post('/admin/settings/password', { _csrf: tok, _back: '/admin/settings', current_password: 'admin', new_password: 'A-much-better-pw1', confirm_password: 'A-much-better-pw1' });
+      await c.post('/admin/settings/users/3/password', { _csrf: tok, _back: '/admin/settings', password: 'A-much-better-pw1' });
+      await admin.post('/admin/settings/users/3/active', { _csrf: token, _back: '/admin/settings', active: '0' });
+      assert.equal(called('user.setPassword').length, 0);
+      assert.equal(called('user.setActive').length, 0);
+    } finally {
+      Object.assign(env.demo, before);
+    }
+    assert.doesNotMatch(await (await fx.client().get('/admin/login')).text(), /Tài khoản demo/, 'hidden when DEMO_MODE is off');
   });
 
   await t.test('POS: cashier signs in straight to the POS and cannot open management pages', async () => {

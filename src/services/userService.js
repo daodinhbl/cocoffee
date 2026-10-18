@@ -2,7 +2,7 @@ const bcrypt = require('bcryptjs');
 const userModel = require('../models/userModel');
 const { AppError } = require('../utils/httpError');
 const v = require('../utils/validate');
-const { checkNewPassword } = require('../controllers/admin/authPages');
+const { checkNewPassword, isDemoAccount } = require('../controllers/admin/authPages');
 
 /** Staff accounts (Web Admin > Cài đặt and /api/admin/users): create, reset a password, lock / unlock. */
 
@@ -22,16 +22,18 @@ async function create({ username: rawUsername, password, full_name: rawFullName,
 async function resetPassword(id, password) {
   const target = await userModel.findById(id);
   if (!target) throw new AppError(404, 'NOT_FOUND', 'Không tìm thấy tài khoản.');
+  if (isDemoAccount(target)) throw new AppError(403, 'DEMO_ACCOUNT', 'Tài khoản demo không đổi được mật khẩu.');
   checkNewPassword(password);
   await userModel.setPassword(id, await bcrypt.hash(password, 12));
   return target;
 }
 
-/** Lock or unlock an account. Never yourself, and one active admin must remain. */
+/** Lock or unlock an account. Never yourself, never the demo account, and one active admin must remain. */
 async function setActive(id, active, actorId) {
   const target = await userModel.findById(id);
   if (!target) throw new AppError(404, 'NOT_FOUND', 'Không tìm thấy tài khoản.');
   if (!active) {
+    if (isDemoAccount(target)) throw new AppError(403, 'DEMO_ACCOUNT', 'Không thể vô hiệu hóa tài khoản demo.');
     if (target.id === actorId) throw new AppError(409, 'CONFLICT', 'Không thể tự vô hiệu hóa tài khoản đang đăng nhập.');
     if (target.role === 'admin' && target.is_active && (await userModel.countActiveAdmins()) <= 1) {
       throw new AppError(409, 'CONFLICT', 'Phải còn ít nhất một quản trị viên hoạt động.');
