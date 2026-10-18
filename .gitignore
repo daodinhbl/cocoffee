@@ -39,3 +39,6 @@ mobile/ios/build/
 
 # Tax books built by the export worker (TAX_EXPORT_DIR)
 /exports/
+/dist/
+/desktop/build/
+/desktop/.dart_tool/
