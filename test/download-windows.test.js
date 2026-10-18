@@ -20,6 +20,7 @@ test('Windows installer download', async (t) => {
   await t.test('no installer: no card, the file URL is 404', async () => {
     assert.ok(!(await login()).includes('Tải bản cài Windows'));
     assert.equal((await fetch(`${fx.base}/download/windows/POS-Tasotek-Server-Setup-1.0.0.exe`)).status, 404);
+    assert.equal((await fetch(`${fx.base}/download/windows/manifest.json`)).status, 404);
   });
 
   await t.test('with an installer: card shows version and size, download is the file with its SHA-256', async () => {
@@ -35,6 +36,11 @@ test('Windows installer download', async (t) => {
     assert.equal(r.status, 200);
     assert.equal(r.headers.get('x-checksum-sha256'), crypto.createHash('sha256').update(body).digest('hex'));
     assert.equal(Buffer.compare(Buffer.from(await r.arrayBuffer()), body), 0);
+    const m = await (await fetch(`${fx.base}/download/windows/manifest.json`)).json();
+    assert.equal(m.version_name, '1.2.0');
+    assert.equal(m.file, 'POS-Tasotek-Server-Setup-1.2.0.exe');
+    assert.equal(m.size, body.length);
+    assert.equal(m.sha256, crypto.createHash('sha256').update(body).digest('hex'));
     assert.equal((await fetch(`${fx.base}/download/windows/POS-Tasotek-Server-Setup-1.0.0.exe`)).status, 404, 'only the published file is served');
     assert.equal((await fetch(`${fx.base}/download/windows/other.exe`)).status, 404);
     assert.equal((await fetch(`${fx.base}/download/windows/..%2Fother.exe`)).status, 404);

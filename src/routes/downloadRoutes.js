@@ -184,6 +184,14 @@ router.get('/ios/app.ipa', ipaLimit, (req, res, next) => {
   });
 });
 
+// What the Windows manager's updater reads: version, size, SHA-256 and the file name (the app rebuilds the URL from its own server address).
+router.get('/windows/manifest.json', pageLimit, (_req, res) => {
+  const r = windowsRelease.current();
+  if (!r) return res.status(404).json({ error: { code: 'NO_RELEASE', message: 'Chưa có bản cài Windows.' } });
+  res.set('Cache-Control', 'no-cache');
+  return res.json({ app_name: 'POS Tasotek Server', version_name: r.version, file: r.file, size: r.size, sha256: r.sha256, built_at: r.builtAt.toISOString() });
+});
+
 // Windows installer: /download/windows/POS-Tasotek-Server-Setup-<version>.exe (only the file the folder holds is served).
 router.get('/windows/:file', ipaLimit, (req, res, next) => {
   const r = windowsRelease.current();

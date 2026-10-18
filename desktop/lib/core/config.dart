@@ -103,6 +103,8 @@ class AppConfig {
     this.firstRunAt = '',
     this.lastSeenAt = '',
     this.licenseCode = '',
+    this.updateServer = 'https://cocoffee.tasotek-giaiphapso.com',
+    this.autoUpdateCheck = true,
   })  : ngrok = ngrok ?? NgrokConfig(),
         cloud = cloud ?? CloudConfig();
 
@@ -123,6 +125,8 @@ class AppConfig {
         firstRunAt: '${j['firstRunAt'] ?? ''}',
         lastSeenAt: '${j['lastSeenAt'] ?? ''}',
         licenseCode: '${j['licenseCode'] ?? ''}',
+        updateServer: '${j['updateServer'] ?? 'https://cocoffee.tasotek-giaiphapso.com'}',
+        autoUpdateCheck: j['autoUpdateCheck'] != false,
       );
 
   String shopName;
@@ -140,10 +144,14 @@ class AppConfig {
   /// and the vendor's activation code once entered (core/license.dart).
   String firstRunAt, lastSeenAt, licenseCode;
 
+  /// Where new versions of this program come from (the vendor's site, GET /download/windows/manifest.json) and whether to look by itself.
+  String updateServer;
+  bool autoUpdateCheck;
+
   Map<String, dynamic> toJson() => {
         'shopName': shopName, 'serverPort': serverPort, 'dbPort': dbPort, 'dbName': dbName, 'dbUser': dbUser, 'dbPassword': dbPassword,
         'dbRootPassword': dbRootPassword, 'ngrok': ngrok.toJson(), 'cloud': cloud.toJson(), 'autoStartServices': autoStartServices, 'installToken': installToken,
-        'firstRunAt': firstRunAt, 'lastSeenAt': lastSeenAt, 'licenseCode': licenseCode,
+        'firstRunAt': firstRunAt, 'lastSeenAt': lastSeenAt, 'licenseCode': licenseCode, 'updateServer': updateServer, 'autoUpdateCheck': autoUpdateCheck,
       };
 }
 

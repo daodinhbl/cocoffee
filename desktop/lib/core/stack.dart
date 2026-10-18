@@ -7,6 +7,7 @@ import 'env_builder.dart';
 import 'license.dart';
 import 'ngrok.dart';
 import 'supervisor.dart';
+import 'updater.dart';
 
 typedef TcpProbe = Future<bool> Function(String host, int port);
 typedef HealthProbe = Future<bool> Function(int port);
@@ -222,6 +223,14 @@ class StackController {
     await tunnel.stop();
     await web.stop();
     await db.stop();
+  }
+
+  /// Update: stop the services (the installer replaces the files they hold open), start the installer, leave. The installer
+  /// restarts the manager, which starts the services again.
+  Future<void> installUpdate(String installerFile) async {
+    await stopAll();
+    await WindowsUpdater.launchInstaller(installerFile);
+    exit(0);
   }
 
   Future<void> restartWeb() async {

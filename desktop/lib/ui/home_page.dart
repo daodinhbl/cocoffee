@@ -12,6 +12,7 @@ import '../core/supervisor.dart';
 import 'license_page.dart';
 import 'settings_page.dart';
 import 'sync_page.dart';
+import 'update_card.dart';
 
 /// Private IPv4 addresses of this PC: what the phones on the same Wi-Fi type in.
 Future<List<String>> lanAddresses() async {
@@ -137,6 +138,7 @@ class _HomePageState extends State<HomePage> {
     final busy = s.db.current == ServiceState.starting || s.web.current == ServiceState.starting;
     final lic = s.license;
     return ListView(padding: const EdgeInsets.all(20), children: [
+      UpdateCard(stack: s),
       if (lic != null && (!lic.allowed || lic.state == LicenseState.trial || (lic.state == LicenseState.licensed && lic.daysLeft <= 14)))
         Padding(
           padding: const EdgeInsets.only(bottom: 12),

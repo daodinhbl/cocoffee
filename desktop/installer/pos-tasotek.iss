@@ -57,6 +57,8 @@ Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 [Run]
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""POS Tasotek Server"" dir=in action=allow protocol=TCP localport=3000 profile=private"; Flags: runhidden; Tasks: firewall
 Filename: "{app}\manager\pos_tasotek_server.exe"; Description: "Mở POS Tasotek Server"; Flags: nowait postinstall skipifsilent; WorkingDir: "{app}\manager"
+; the in-app updater runs this installer silently with /RELAUNCH=1 and wants the manager back afterwards
+Filename: "{app}\manager\pos_tasotek_server.exe"; Flags: nowait; WorkingDir: "{app}\manager"; Check: RelaunchRequested
 
 [UninstallRun]
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall delete rule name=""POS Tasotek Server"""; Flags: runhidden; RunOnceId: "DelFirewall"
@@ -66,6 +68,11 @@ Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM pos_tasotek_server.exe /IM n
 ; the database and settings in {commonappdata}\TasotekPOS are deliberately NOT removed: reinstalling brings the shop back as it was
 
 [Code]
+function RelaunchRequested(): Boolean;
+begin
+  Result := ExpandConstant('{param:RELAUNCH|0}') = '1';
+end;
+
 function InitializeSetup(): Boolean;
 begin
   Result := True;
