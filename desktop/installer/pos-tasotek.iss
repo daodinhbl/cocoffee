@@ -52,7 +52,7 @@ Name: "{commondesktop}\POS Tasotek Server"; Filename: "{app}\manager\pos_tasotek
 Name: "{group}\Thư mục dữ liệu"; Filename: "{commonappdata}\TasotekPOS"
 
 [Registry]
-Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "TasotekPOSServer"; ValueData: """{app}\manager\pos_tasotek_server.exe"""; Flags: uninsdeletevalue; Tasks: autostart
+Root: HKLM; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "TasotekPOSServer"; ValueData: """{app}\manager\pos_tasotek_server.exe"""; Flags: uninsdeletevalue; Tasks: autostart
 
 [Run]
 Filename: "{sys}\netsh.exe"; Parameters: "advfirewall firewall add rule name=""POS Tasotek Server"" dir=in action=allow protocol=TCP localport=3000 profile=private"; Flags: runhidden; Tasks: firewall
