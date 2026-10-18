@@ -107,6 +107,19 @@ module.exports = {
     oauthUrl: 'https://oauth.zaloapp.com/v4/oa/access_token',
   },
 
+  // Daily database backup by e-mail (services/backupMailService.js). Sent only when the SMTP host, user and password are set.
+  backupMail: {
+    to: optional('BACKUP_MAIL_TO', 'dinhxuandaodc.435@gmail.com'),
+    hour: int('BACKUP_MAIL_HOUR', 2),                         // shop time (UTC+7); sent in the first half hour of this hour
+    smtpHost: optional('SMTP_HOST'),                          // e.g. smtp.gmail.com (Gmail needs an app password) or smtp.hostinger.com
+    smtpPort: int('SMTP_PORT', 465),
+    smtpSecure: bool('SMTP_SECURE', true),
+    smtpUser: optional('SMTP_USER'),
+    smtpPass: optional('SMTP_PASS'),
+    from: optional('SMTP_FROM'),                              // default: the SMTP user
+    maxAttachmentMb: int('BACKUP_MAIL_MAX_MB', 20),
+  },
+
   // Multi-shop (tenant) mode, docs/da-tenant.md. Off until TENANT_BASE_DOMAIN is set: then <slug>.<base domain> is a shop
   // with its own database, and the main site (defaultSlug) keeps the database in DB_*.
   tenancy: {

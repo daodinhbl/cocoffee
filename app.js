@@ -123,6 +123,7 @@ async function start() {
     }
     require('./src/services/taxExportService').startWorker();   // builds the tax books queued from the web / app, one at a time
     require('./src/services/rollupService').startScheduler();   // 02:30 rebuild of the last days' revenue / expense rollups (fallback to the hPanel cron job)
+    require('./src/services/backupMailService').startScheduler();   // 02:00 database backup by e-mail (needs SMTP_*); never throws
     backupService.startScheduler();                     // automatic database backups (Admin > Sao lưu); never throws
     webhookGuard.ensure().catch(() => {});              // Zalo Bot Platform: re-register the webhook when its URL / secret changed; never throws, not awaited
     payonService.startRecovery();                       // PayOn: finishes claims a dead process left half-applied; never throws
