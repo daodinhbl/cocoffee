@@ -36,6 +36,8 @@ router.use(adminSecurity, pageRenderer, express.urlencoded({ extended: false, li
 
 router.get('/login', auth.loginForm);
 router.post('/login', rateLimit({ windowMs: 15 * 60 * 1000, max: 60 }), rateLimit({ windowMs: 15 * 60 * 1000, max: 8, key: rateLimit.accountKey }), auth.login);
+router.get('/forgot', auth.forgotForm);
+router.post('/forgot', rateLimit({ windowMs: 15 * 60 * 1000, max: 20 }), auth.forgot);
 
 // POS screen: admins and cashiers. JSON endpoints echo the session CSRF token in the body (_csrf).
 router.post('/logout', requireStaff, requireCsrf, auth.logout);
@@ -171,6 +173,7 @@ router.post('/zalo/chatbot-info', act(zalo.saveChatbotInfo));
 router.get('/settings', settings.page);
 router.get('/settings/password', settings.page);
 router.post('/settings/password', act(auth.changeOwnPassword));
+router.post('/settings/recovery-code', auth.newRecoveryCode);
 router.post('/settings/printer', act(settings.savePrinter));
 router.post('/settings/shop', act(settings.saveShop));
 router.post('/settings/public-url', act(settings.savePublicUrl));

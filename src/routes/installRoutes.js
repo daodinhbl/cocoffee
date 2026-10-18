@@ -22,7 +22,8 @@ router.post('/', rateLimit({ windowMs: 60 * 60 * 1000, max: 20 }), async (req, r
   const keep = { shopName: b.shopName, fullName: b.fullName, username: b.username, email: b.email, data: b.data === 'sample' ? 'sample' : 'blank' };
   try {
     const r = await installService.install(b);
-    res.render('install_done', { shopName: r.shopName, sample: r.sample });
+    res.set('Cache-Control', 'no-store');
+    res.render('install_done', { shopName: r.shopName, sample: r.sample, recoveryCode: r.recoveryCode });
   } catch (err) {
     if (err.status && err.status < 500) return page(res, keep, err.message, err.field || null, err.status === 409 ? 409 : 400);
     logger.error('Install failed', err);

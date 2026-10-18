@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Quên mật khẩu · <%= shopName %></title>
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <style>
+    :root { --navy: #172554; --navy2: #1E3A8A; --milk: #FAF8F5; --line: #E8E3DA; --bad: #B91C1C; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--milk); color: #1f1f1f; font: 16px/1.55 "Times New Roman", Times, serif; }
+    header { background: var(--navy); color: #fff; padding: 1.3rem 1rem; text-align: center; }
+    header h1 { margin: 0; font-size: 1.45rem; }
+    header p { margin: .25rem 0 0; color: #CBD5E1; }
+    main { max-width: 32rem; margin: 0 auto; padding: 1.4rem 1rem 3rem; }
+    form, .box { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 1.25rem; }
+    label.f { display: block; font-weight: 600; margin: .8rem 0 .25rem; }
+    input[type=text], input[type=password] { width: 100%; padding: .6rem .7rem; border: 1px solid #D6CFC3; border-radius: 6px; font: inherit; background: #fff; }
+    input.code { font: 600 1.05rem Consolas, monospace; letter-spacing: .06em; text-transform: uppercase; }
+    input:focus-visible { outline: 2px solid var(--navy2); outline-offset: 1px; }
+    input[aria-invalid="true"] { border-color: var(--bad); }
+    .hint { font-size: .88rem; color: #6b6b6b; margin: .25rem 0 0; }
+    .err { background: #FEE2E2; color: var(--bad); border-radius: 6px; padding: .6rem .8rem; margin-bottom: 1rem; }
+    .showpw { display: flex; align-items: center; gap: .5rem; margin-top: .5rem; font-weight: 400; cursor: pointer; }
+    button, .btn { display: block; width: 100%; margin-top: 1.2rem; padding: .8rem; border: 0; border-radius: 8px; background: var(--navy2); color: #fff; font: 700 1.05rem "Times New Roman", serif; cursor: pointer; text-align: center; text-decoration: none; }
+    .back { display: block; text-align: center; margin-top: 1rem; color: var(--navy2); }
+    .code-box { background: #F1EEE8; border: 2px dashed var(--navy2); border-radius: 8px; padding: 1rem; text-align: center; font: 700 1.5rem Consolas, monospace; letter-spacing: .08em; user-select: all; margin: 1rem 0; }
+    .warn { background: #FEF3C7; border-radius: 8px; padding: .8rem 1rem; }
+    .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Quên mật khẩu</h1>
+  <p><%= shopName %></p>
+</header>
+<main>
+<% if (done) { %>
+  <div class="box">
+    <h2 style="margin-top:0;color:var(--navy2)">Đã đặt lại mật khẩu cho “<%= done.username %>”</h2>
+    <p>Đăng nhập bằng mật khẩu mới. Mã khôi phục cũ đã hết hiệu lực; đây là <b>mã khôi phục mới</b>, chỉ hiện <b>một lần</b>:</p>
+    <div class="code-box" id="new-code"><%= done.newCode %></div>
+    <p class="warn">Chụp ảnh hoặc ghi lại mã này và cất ở nơi an toàn (không để trên máy tính của quán). Quên mật khẩu lần sau sẽ cần nó.</p>
+    <a class="btn" href="/admin/login">Đến trang đăng nhập</a>
+  </div>
+<% } else { %>
+  <form method="post" action="/admin/forgot" autocomplete="off" novalidate>
+    <% if (error) { %><div class="err" role="alert"><%= error %></div><% } %>
+    <p class="hint" style="margin-top:0">Nhập tên đăng nhập quản trị và <b>mã khôi phục</b> (dạng XXXX-XXXX-XXXX-XXXX) bạn nhận khi cài đặt hoặc khi tạo mã trong Cài đặt. Chưa có mã? Người quản trị máy tính của quán có thể đặt lại bằng chương trình POS Tasotek Server.</p>
+    <label class="f" for="username">Tên đăng nhập</label>
+    <input id="username" name="username" type="text" maxlength="50" required autocapitalize="none" spellcheck="false" value="<%= values.username || '' %>" <%- field === 'username' ? 'aria-invalid="true"' : '' %>>
+    <label class="f" for="code">Mã khôi phục</label>
+    <input id="code" class="code" name="code" type="text" maxlength="40" required autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX-XXXX-XXXX" <%- field === 'code' ? 'aria-invalid="true"' : '' %>>
+    <label class="f" for="password">Mật khẩu mới</label>
+    <input id="password" name="password" type="password" minlength="10" maxlength="200" required autocomplete="new-password" <%- field === 'password' ? 'aria-invalid="true"' : '' %>>
+    <p class="hint">Ít nhất 10 ký tự.</p>
+    <label class="f" for="password2">Nhập lại mật khẩu mới</label>
+    <input id="password2" name="password2" type="password" minlength="10" maxlength="200" required autocomplete="new-password" <%- field === 'password2' ? 'aria-invalid="true"' : '' %>>
+    <label class="showpw"><input type="checkbox" id="show-pw"> Hiện mật khẩu</label>
+    <div class="hp" aria-hidden="true"><label for="website">Để trống</label><input id="website" name="website" type="text" tabindex="-1" autocomplete="off"></div>
+    <button type="submit">Đặt lại mật khẩu</button>
+  </form>
+  <a class="back" href="/admin/login">← Quay lại đăng nhập</a>
+<% } %>
+</main>
+<script src="/install/install.js" defer></script>
+</body>
+</html>

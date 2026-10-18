@@ -86,11 +86,12 @@ async function install(body) {
   const values = { 'shop.name': f.shopName, 'shop.ownerName': f.fullName };
   if (f.email) values['shop.email'] = f.email;
   await settingsModel.setMany(values, res.insertId);
+  const recoveryCode = await require('./passwordRecovery').issueFor(res.insertId, { actorId: res.insertId });
   if (f.sample) await loadSample();
   else await settingsModel.setMany({ 'seed.menu_v1': '"skipped-empty"' }, res.insertId);   // blank means blank: the printed menu is never injected later (same marker menuSeed writes for an empty database)
   known.set(tenantContext.key(), { installed: true, at: Date.now() });
   logger.info(`Install finished for "${f.shopName}" (${f.sample ? 'sample data' : 'blank'})`);
-  return { shopName: f.shopName, sample: f.sample };
+  return { shopName: f.shopName, sample: f.sample, recoveryCode };
 }
 
 async function loadSample() {

@@ -18,6 +18,11 @@
 <main>
   <h1>“<%= shopName %>” đã sẵn sàng</h1>
   <p><%= sample ? 'Đã nạp dữ liệu mẫu: thực đơn, nguyên liệu, công thức và bàn.' : 'Quán bắt đầu với dữ liệu trống.' %> Đăng nhập bằng tên đăng nhập và mật khẩu vừa tạo.</p>
+  <% if (recoveryCode) { %>
+  <p style="margin-top:1.4rem"><b>Mã khôi phục mật khẩu</b> (chỉ hiện một lần):</p>
+  <div style="background:#F1EEE8;border:2px dashed #1E3A8A;border-radius:8px;padding:1rem;font:700 1.45rem Consolas,monospace;letter-spacing:.08em;user-select:all"><%= recoveryCode %></div>
+  <p style="background:#FEF3C7;border-radius:8px;padding:.7rem 1rem;font-size:.92rem">Chụp ảnh hoặc ghi lại mã này và cất nơi an toàn. Quên mật khẩu, bạn vào trang đăng nhập bấm “Quên mật khẩu?” và nhập mã này để đặt lại.</p>
+  <% } %>
   <a class="btn" href="/admin/login">Vào trang quản lý</a>
 </main>
 </body>

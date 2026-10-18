@@ -75,4 +75,42 @@ async function changeOwnPassword(req, res) {
   return { message: 'Đã đổi mật khẩu.', to: '/admin/settings' };
 }
 
-module.exports = { loginForm, login, logout, changeOwnPassword, checkNewPassword, isDemoAccount, MIN_PASSWORD, DUMMY_HASH };
+const renderForgot = (res, { status = 200, error = null, field = null, values = {}, done = null } = {}) => {
+  res.set('Cache-Control', 'no-store');
+  return res.status(status).render('forgot', { shopName: env.business.shopName, error, field, values, done });
+};
+
+function forgotForm(_req, res) {
+  return renderForgot(res);
+}
+
+/** Public: user name + recovery code + new password. Never says whether the user name exists. */
+async function forgot(req, res) {
+  const b = req.body || {};
+  const str = (v, n) => (typeof v === 'string' ? v.slice(0, n) : '');
+  const values = { username: str(b.username, 50).trim() };
+  if (b.website) return renderForgot(res, { status: 400, error: 'Yêu cầu không hợp lệ.', values });       // honeypot
+  try {
+    const done = await require('../../services/passwordRecovery').reset({
+      username: values.username, code: str(b.code, 40), newPassword: str(b.password, 201), confirm: str(b.password2, 201), ip: req.ip,
+    });
+    return renderForgot(res, { done });
+  } catch (err) {
+    if (!(err instanceof AppError)) throw err;
+    const field = { WEAK_PASSWORD: 'password', VALIDATION: 'password2', BAD_RECOVERY: 'code' }[err.code] || null;
+    return renderForgot(res, { status: err.status || 400, error: err.message, field, values });
+  }
+}
+
+/** Signed-in admin makes a new recovery code (needs the current password); the code is shown once. */
+async function newRecoveryCode(req, res) {
+  const user = await userModel.findByUsername(req.user.username);
+  const typed = req.body.admin_password;
+  if (isDemoAccount(user)) throw new AppError(403, 'DEMO_ACCOUNT', 'Tài khoản demo không tạo được mã khôi phục.');
+  if (typeof typed !== 'string' || !typed || !(await bcrypt.compare(typed, user.password_hash))) throw new AppError(400, 'BAD_CREDENTIALS', 'Mật khẩu không đúng.');
+  const code = await require('../../services/passwordRecovery').issueFor(user.id, { actorId: user.id });
+  res.set('Cache-Control', 'no-store');
+  return res.page('recovery_code', { code });
+}
+
+module.exports = { forgotForm, forgot, newRecoveryCode, loginForm, login, logout, changeOwnPassword, checkNewPassword, isDemoAccount, MIN_PASSWORD, DUMMY_HASH };

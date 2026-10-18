@@ -1,0 +1,11 @@
+<div class="mx-auto max-w-xl">
+  <h1 class="text-xl font-semibold tracking-tight sm:text-2xl">Mã khôi phục mật khẩu mới</h1>
+  <p class="mt-2 text-sm text-gray-600">Mã này chỉ hiện <b>một lần</b>. Mã cũ (nếu có) đã hết hiệu lực. Khi quên mật khẩu, mở <span class="font-mono">/admin/forgot</span> (liên kết “Quên mật khẩu?” ở trang đăng nhập) và nhập tên đăng nhập kèm mã này.</p>
+  <div id="new-recovery-code" class="mt-5 select-all rounded-lg border-2 border-dashed border-navy bg-milk-100 p-5 text-center font-mono text-2xl font-bold tracking-widest"><%= code %></div>
+  <div class="mt-3 flex flex-wrap items-center gap-3">
+    <button type="button" data-copy-from="#new-recovery-code" data-copy-note="#copy-note" class="<%= ui.btnSecondary %>">Sao chép mã</button>
+    <span id="copy-note" class="text-xs text-gray-500" aria-live="polite"></span>
+  </div>
+  <p class="mt-4 rounded bg-amber-50 p-3 text-sm text-amber-900">Ghi lại hoặc chụp ảnh mã này và cất ở nơi an toàn, không để trên máy tính của quán. Ai có mã và biết tên đăng nhập quản trị đều đặt lại được mật khẩu.</p>
+  <a href="/admin/settings" class="<%= ui.btnPrimary %> mt-5 inline-flex">Tôi đã lưu mã</a>
+</div>
