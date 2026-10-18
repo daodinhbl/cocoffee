@@ -100,6 +100,9 @@ class AppConfig {
     CloudConfig? cloud,
     this.autoStartServices = true,
     this.installToken = '',
+    this.firstRunAt = '',
+    this.lastSeenAt = '',
+    this.licenseCode = '',
   })  : ngrok = ngrok ?? NgrokConfig(),
         cloud = cloud ?? CloudConfig();
 
@@ -117,6 +120,9 @@ class AppConfig {
         cloud: CloudConfig.fromJson(Map<String, dynamic>.from(j['cloud'] as Map? ?? const {})),
         autoStartServices: j['autoStartServices'] != false,
         installToken: '${j['installToken'] ?? ''}',
+        firstRunAt: '${j['firstRunAt'] ?? ''}',
+        lastSeenAt: '${j['lastSeenAt'] ?? ''}',
+        licenseCode: '${j['licenseCode'] ?? ''}',
       );
 
   String shopName;
@@ -130,9 +136,14 @@ class AppConfig {
   /// Asked on the web setup page (/cai-dat) so nobody else on the network can claim a fresh box before the owner does.
   String installToken;
 
+  /// Licence: when this installation first ran (starts the trial), the latest time the manager saw (catches a clock set back),
+  /// and the vendor's activation code once entered (core/license.dart).
+  String firstRunAt, lastSeenAt, licenseCode;
+
   Map<String, dynamic> toJson() => {
         'shopName': shopName, 'serverPort': serverPort, 'dbPort': dbPort, 'dbName': dbName, 'dbUser': dbUser, 'dbPassword': dbPassword,
         'dbRootPassword': dbRootPassword, 'ngrok': ngrok.toJson(), 'cloud': cloud.toJson(), 'autoStartServices': autoStartServices, 'installToken': installToken,
+        'firstRunAt': firstRunAt, 'lastSeenAt': lastSeenAt, 'licenseCode': licenseCode,
       };
 }
 
@@ -158,7 +169,7 @@ class ConfigStore {
         f.copySync('${paths.configFile}.broken-${DateTime.now().millisecondsSinceEpoch}'); // keep what was there, start clean
       }
     }
-    final c = AppConfig.fresh();
+    final c = AppConfig.fresh()..firstRunAt = DateTime.now().toUtc().toIso8601String();
     save(c);
     return c;
   }

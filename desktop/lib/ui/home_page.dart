@@ -6,8 +6,10 @@ import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../core/license.dart';
 import '../core/stack.dart';
 import '../core/supervisor.dart';
+import 'license_page.dart';
 import 'settings_page.dart';
 import 'sync_page.dart';
 
@@ -38,6 +40,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   StackController get s => widget.stack;
   Timer? _tick;
+  Timer? _licenseTimer;
   List<String> _lan = const [];
   int _tab = 0;
 
@@ -45,12 +48,15 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _tick = Timer.periodic(const Duration(seconds: 2), (_) => mounted ? setState(() {}) : null);
+    _licenseTimer = Timer.periodic(const Duration(minutes: 10), (_) => s.recheckLicense());
+    s.recheckLicense().then((_) => mounted ? setState(() {}) : null);
     lanAddresses().then((v) => mounted ? setState(() => _lan = v) : null);
   }
 
   @override
   void dispose() {
     _tick?.cancel();
+    _licenseTimer?.cancel();
     super.dispose();
   }
 
@@ -58,7 +64,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final pages = [_overview(context), SettingsPage(stack: s), SyncPage(stack: s), _logs(context)];
+    final pages = [_overview(context), SettingsPage(stack: s), SyncPage(stack: s), LicenseScreen(stack: s), _logs(context)];
     return Scaffold(
       appBar: AppBar(title: Text('POS Tasotek Server · ${s.config.shopName}'), backgroundColor: const Color(0xFF172554), foregroundColor: Colors.white),
       body: Row(children: [
@@ -70,6 +76,7 @@ class _HomePageState extends State<HomePage> {
             NavigationRailDestination(icon: Icon(Icons.dashboard_rounded), label: Text('Tổng quan')),
             NavigationRailDestination(icon: Icon(Icons.tune_rounded), label: Text('Cài đặt')),
             NavigationRailDestination(icon: Icon(Icons.cloud_sync_rounded), label: Text('Hostinger')),
+            NavigationRailDestination(icon: Icon(Icons.verified_user_rounded), label: Text('Giấy phép')),
             NavigationRailDestination(icon: Icon(Icons.article_outlined), label: Text('Nhật ký')),
           ],
         ),
@@ -128,9 +135,22 @@ class _HomePageState extends State<HomePage> {
   Widget _overview(BuildContext context) {
     final running = s.web.current == ServiceState.running;
     final busy = s.db.current == ServiceState.starting || s.web.current == ServiceState.starting;
+    final lic = s.license;
     return ListView(padding: const EdgeInsets.all(20), children: [
+      if (lic != null && (!lic.allowed || lic.state == LicenseState.trial || (lic.state == LicenseState.licensed && lic.daysLeft <= 14)))
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Card(
+            color: lic.allowed ? Colors.amber.shade50 : Colors.red.shade50,
+            child: ListTile(
+              leading: Icon(lic.allowed ? Icons.info_outline_rounded : Icons.lock_rounded, color: lic.allowed ? Colors.amber.shade800 : Colors.red.shade700),
+              title: Text(lic.message),
+              trailing: TextButton(onPressed: () => setState(() => _tab = 3), child: const Text('Mở Giấy phép')),
+            ),
+          ),
+        ),
       Row(children: [
-        FilledButton.icon(onPressed: busy || running ? null : () => s.startAll(), icon: const Icon(Icons.play_arrow_rounded), label: const Text('Bật tất cả')),
+        FilledButton.icon(onPressed: busy || running || (lic != null && !lic.allowed) ? null : () => s.startAll(), icon: const Icon(Icons.play_arrow_rounded), label: const Text('Bật tất cả')),
         const SizedBox(width: 8),
         OutlinedButton.icon(onPressed: running ? () => s.restartWeb() : null, icon: const Icon(Icons.restart_alt_rounded), label: const Text('Khởi động lại máy chủ web')),
         const SizedBox(width: 8),

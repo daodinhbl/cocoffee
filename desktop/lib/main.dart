@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import 'core/config.dart';
+import 'core/license.dart';
+import 'core/machine_id.dart';
 import 'core/stack.dart';
 import 'ui/home_page.dart';
 
@@ -11,7 +13,24 @@ Future<void> main() async {
   final paths = InstallPaths.detect();
   final store = ConfigStore(paths);
   final config = store.loadOrCreate();
-  final stack = StackController(paths: paths, store: store, config: config);
+  final machine = await readMachineId();
+  late final StackController stack;
+  Future<LicenseStatus> check() async {
+    final status = await evaluateLicense(config, machineId: machine);
+    if (status.allowed || status.state == LicenseState.expired || status.state == LicenseState.wrongMachine) {
+      // the "latest time seen" mark only moves forward, so setting the clock back is noticed
+      final now = DateTime.now().toUtc();
+      final seen = DateTime.tryParse(config.lastSeenAt)?.toUtc();
+      if (seen == null || now.isAfter(seen)) {
+        config.lastSeenAt = now.toIso8601String();
+        store.save(config);
+      }
+    }
+    return status;
+  }
+
+  stack = StackController(paths: paths, store: store, config: config, licenseCheck: check);
+  stack.machineId = machine;
   runApp(ServerManagerApp(stack: stack));
   // Start everything at launch, like a service: the shop opens the box and the POS is there.
   if (config.autoStartServices && File(paths.node).existsSync()) {

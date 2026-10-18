@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'config.dart';
 import 'env_builder.dart';
+import 'license.dart';
 import 'ngrok.dart';
 import 'supervisor.dart';
 
@@ -42,6 +43,7 @@ class StackController {
     this.tcp = realTcpProbe,
     this.health = realHealthProbe,
     this.pollEvery = const Duration(milliseconds: 500),
+    this.licenseCheck,
   }) : launcher = launcher ?? RealLauncher() {
     db = ManagedService('mariadb', onLine: _log);
     web = ManagedService('web', restartOnExit: true, onLine: _log);
@@ -57,7 +59,14 @@ class StackController {
   final HealthProbe health;
   final Duration pollEvery;
 
+  /// Works out the licence status (core/license.dart); null = no licensing (tests). Services only start while it allows them.
+  final Future<LicenseStatus> Function()? licenseCheck;
+  LicenseStatus? license;
+
   late final ManagedService db, web, tunnel;
+
+  /// The id of this PC (core/machine_id.dart), null when it could not be read.
+  String? machineId;
 
   final events = StreamController<String>.broadcast();
   final List<String> allLog = [];
@@ -189,7 +198,21 @@ class StackController {
   }
 
   // ---------------------------------------------------------------- everything
+  /// Re-evaluates the licence and stops everything if it no longer allows running (expired while the PC stayed on).
+  Future<bool> recheckLicense() async {
+    final check = licenseCheck;
+    if (check == null) return true;
+    license = await check();
+    if (!license!.allowed) {
+      _log('[giấy phép] ${license!.message}');
+      if (db.isActive || web.isActive || tunnel.isActive) await stopAll();
+      return false;
+    }
+    return true;
+  }
+
   Future<void> startAll() async {
+    if (!await recheckLicense()) return;
     if (!await startDatabase()) return;
     if (!await startWeb()) return;
     unawaited(startTunnel());
