@@ -108,6 +108,8 @@ async function start() {
   // SKIP_BOOT_TASKS=true: run the UI on your own machine against a live database without any of the write-y boot
   // steps below (schema/menu/photos/backups, Zalo webhook re-registration, PayOn recovery).
   const skipBoot = /^(1|true|yes)$/i.test(process.env.SKIP_BOOT_TASKS || '');
+  await require('./src/services/demoState').load();      // demo switch kept in the database (scripts/demo-mode.js), read-only; never throws
+  require('./src/services/demoState').startRefresh();
   await require('./src/services/shopProfile').apply();   // shop name / address / phone saved in Cài đặt (read-only; also with SKIP_BOOT_TASKS)
   let bootstrap = 'skipped';
   if (!skipBoot) {

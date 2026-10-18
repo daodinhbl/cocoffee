@@ -44,7 +44,11 @@ const jwtSecret = () => {
   return crypto.createHmac('sha256', required('DB_PASSWORD')).update('cocoffee-fnb:jwt:v1').digest('hex');
 };
 
+const demoEnv = bool('DEMO_MODE', false);
+const demoRuntime = { on: false };
+
 module.exports = {
+  demoRuntime,
   nodeEnv: optional('NODE_ENV', 'development'),
   rootDir: path.resolve(__dirname, '../..'),
   publicBaseUrl: optional('PUBLIC_BASE_URL').replace(/\/+$/, ''),
@@ -83,8 +87,10 @@ module.exports = {
 
   // Public demo: the login page shows these credentials, the account is (re)set to them at startup and
   // cannot be locked, renamed away from its password or forced to change it. Anyone can sign in: demo data only.
+  // DEMO_MODE=true in the environment, or the app_settings row demo.enabled = 1 (scripts/demo-mode.js on|off; services/demoState.js
+  // reads it at start and every minute), turns it on.
   demo: {
-    enabled: bool('DEMO_MODE', false),
+    get enabled() { return demoEnv || demoRuntime.on; },
     username: optional('DEMO_USERNAME', 'admin'),
     password: optional('DEMO_PASSWORD', 'admin'),
   },
