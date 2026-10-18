@@ -35,7 +35,7 @@
   <% if (!forced) { %>
   <section class="col-span-12 rounded border border-gray-200 p-5 lg:col-span-7" aria-labelledby="cfg-title">
     <h2 id="cfg-title" class="text-base font-semibold">Cấu hình hệ thống</h2>
-    <p class="mt-1 text-xs text-gray-500">Chỉ đọc. Thay đổi trong biến môi trường của ứng dụng (hPanel) rồi khởi động lại.</p>
+    <p class="mt-1 text-xs text-gray-500">Tên miền công khai sửa được ngay bên dưới; các mục còn lại chỉ đọc, đổi trong biến môi trường của ứng dụng (hPanel) rồi khởi động lại.</p>
     <dl class="mt-3 space-y-2 text-sm">
       <div class="flex justify-between gap-3"><dt class="text-gray-500">Tên quán (SHOP_NAME)</dt><dd><%= shopName %></dd></div>
       <div class="flex justify-between gap-3"><dt class="text-gray-500">Tên miền công khai</dt><dd class="break-all text-right font-mono text-xs"><%= config.publicBaseUrl %></dd></div>
@@ -46,7 +46,94 @@
       <div class="flex justify-between gap-3"><dt class="text-gray-500">Múi giờ cơ sở dữ liệu</dt><dd class="font-mono"><%= config.timezone %></dd></div>
       <div class="flex justify-between gap-3"><dt class="text-gray-500">Phiên đăng nhập</dt><dd class="font-mono"><%= config.sessionHours %></dd></div>
     </dl>
+    <form method="post" action="/admin/settings/public-url" class="mt-4 border-t border-milk-200 pt-4" autocomplete="off">
+      <%- include('../partials/csrf') %>
+      <input type="hidden" name="_back" value="/admin/settings">
+      <label for="public-url" class="text-sm font-medium">Sửa tên miền công khai</label>
+      <p class="mt-0.5 text-xs text-gray-500">Địa chỉ mà mã QR, webhook Zalo, PayOn và hóa đơn dạng ảnh dùng để quay về quán (ví dụ <span class="font-mono">https://quan-cua-toi.ngrok-free.app</span>). Địa chỉ lưu ở đây được ưu tiên hơn biến <span class="font-mono">PUBLIC_BASE_URL</span><%= config.publicBaseUrlEnv ? ` (${config.publicBaseUrlEnv})` : '' %>; để trống rồi lưu để dùng lại biến đó.</p>
+      <div class="mt-2 flex flex-wrap gap-2">
+        <input id="public-url" name="public_url" type="text" inputmode="url" autocapitalize="none" spellcheck="false" maxlength="200" value="<%= config.publicBaseUrlSource === 'settings' ? config.publicBaseUrl : '' %>" placeholder="<%= config.publicBaseUrlEnv || 'https://ten-mien-cua-ban.com' %>" class="<%= input %> min-w-0 flex-1 font-mono text-sm">
+        <button type="submit" class="<%= btnPrimary %>">Lưu</button>
+      </div>
+      <p class="mt-1 text-xs text-gray-500">Đang dùng: <b class="font-mono"><%= config.publicBaseUrl %></b><%= config.publicBaseUrlSource === 'settings' ? ' (đã lưu trong Cài đặt)' : config.publicBaseUrlSource === 'env' ? ' (biến môi trường)' : '' %></p>
+    </form>
   </section>
+
+  <% if (heli) { %>
+  <section class="col-span-12 rounded border border-gray-200 bg-white p-5" aria-labelledby="heli-title">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h2 id="heli-title" class="text-base font-semibold">Trợ lý Heli (ChatGPT / OpenAI)</h2>
+        <p class="mt-1 max-w-3xl text-xs text-gray-500">Khóa API để trợ lý giọng nói Heli trả lời câu hỏi về quán. Lấy khóa tại <span class="font-mono">platform.openai.com/api-keys</span>. Khóa lưu ở đây được ưu tiên hơn biến <span class="font-mono">OPENAI_API_KEY</span>; ô để trống thì giữ nguyên khóa hiện có. Khóa không bao giờ hiện lại sau khi lưu.</p>
+      </div>
+      <%- badge(heli.enabled ? 'Đang bật' : 'Chưa có khóa', heli.enabled ? 'good' : 'neutral') %>
+    </div>
+    <form method="post" action="/admin/settings/heli" class="mt-4 grid gap-3 sm:grid-cols-2" autocomplete="off">
+      <%- include('../partials/csrf') %>
+      <input type="hidden" name="_back" value="/admin/settings">
+      <div class="sm:col-span-2">
+        <label for="heli-key" class="<%= label %>">Khóa API<%= heli.hint ? ` (đang dùng ${heli.hint}, ${heli.source === 'settings' ? 'đã lưu trong Cài đặt' : 'từ biến môi trường'})` : '' %></label>
+        <input id="heli-key" name="api_key" type="password" maxlength="320" autocomplete="new-password" spellcheck="false" placeholder="<%= heli.hint ? 'Để trống để giữ khóa hiện tại' : 'sk-…' %>" class="<%= input %> font-mono text-sm">
+      </div>
+      <div>
+        <label for="heli-model" class="<%= label %>">Mô hình trả lời</label>
+        <input id="heli-model" name="model" list="heli-models" maxlength="60" value="<%= heli.model %>" class="<%= input %> font-mono text-sm">
+        <datalist id="heli-models"><% heli.models.forEach((m) => { %><option value="<%= m %>"><% }) %></datalist>
+      </div>
+      <div class="flex flex-wrap items-end gap-2">
+        <button type="submit" class="<%= btnPrimary %>">Lưu</button>
+        <button type="submit" formaction="/admin/settings/heli/test" class="<%= btnSecondary %>">Kiểm tra khóa</button>
+        <% if (heli.source === 'settings') { %><button type="submit" name="clear" value="1" class="<%= btnGhost %> text-red-700" data-confirm="Xóa khóa API đã lưu?">Xóa khóa đã lưu</button><% } %>
+      </div>
+    </form>
+  </section>
+  <% } %>
+
+  <% if (dbConn) { %>
+  <section class="col-span-12 rounded border border-gray-200 bg-white p-5" aria-labelledby="dbconn-title">
+    <h2 id="dbconn-title" class="text-base font-semibold">Kết nối cơ sở dữ liệu</h2>
+    <p class="mt-1 max-w-3xl text-xs text-gray-500">Đổi máy chủ, tên, người dùng và mật khẩu CSDL không cần vào hPanel. Kết nối được thử trước khi lưu; lưu xong phải <b>khởi động lại ứng dụng</b> mới áp dụng. Mỗi thao tác cần nhập lại mật khẩu quản trị của bạn. Mật khẩu CSDL không bao giờ hiện lại.</p>
+    <div class="mt-4 grid gap-5 lg:grid-cols-2">
+    <% [['db', 'CSDL của ứng dụng này', 'Nơi ứng dụng đọc và ghi dữ liệu (CSDL cục bộ của máy cài đặt, hoặc của Hostinger).'], ['cloud', 'CSDL đám mây (Hostinger)', 'Nơi máy cục bộ sao chép dữ liệu lên khi có mạng (đồng bộ ngoại tuyến). Để trống nếu không dùng.']].forEach(([sec, title, hint]) => {
+         const info = dbConn.sections[sec]; const cur = info.saved || info.running || {}; %>
+      <form method="post" action="/admin/settings/db/save" class="rounded-lg border border-milk-200 p-4" autocomplete="off">
+        <%- include('../partials/csrf') %>
+        <input type="hidden" name="_back" value="/admin/settings">
+        <input type="hidden" name="section" value="<%= sec %>">
+        <div class="flex flex-wrap items-start justify-between gap-2">
+          <h3 class="text-sm font-semibold"><%= title %></h3>
+          <% if (info.restartNeeded) { %><%- badge('Cần khởi động lại', 'warn') %><% } else if (info.source === 'file') { %><%- badge('Đã lưu trong Cài đặt', 'info') %><% } else if (info.source === 'env') { %><%- badge('Từ biến môi trường', 'neutral') %><% } %>
+        </div>
+        <p class="mt-0.5 text-xs text-gray-500"><%= hint %></p>
+        <div class="mt-3 grid gap-3 sm:grid-cols-3">
+          <div class="sm:col-span-2"><label class="<%= label %>" for="db-<%= sec %>-host">Máy chủ</label><input id="db-<%= sec %>-host" name="host" value="<%= cur.host || '' %>" maxlength="120" class="<%= input %> font-mono text-sm" placeholder="127.0.0.1"></div>
+          <div><label class="<%= label %>" for="db-<%= sec %>-port">Cổng</label><input id="db-<%= sec %>-port" name="port" type="number" min="1" max="65535" value="<%= cur.port || 3306 %>" class="<%= input %> font-mono text-sm"></div>
+          <div><label class="<%= label %>" for="db-<%= sec %>-name">Tên CSDL</label><input id="db-<%= sec %>-name" name="name" value="<%= cur.name || '' %>" maxlength="64" class="<%= input %> font-mono text-sm"></div>
+          <div><label class="<%= label %>" for="db-<%= sec %>-user">Người dùng</label><input id="db-<%= sec %>-user" name="user" value="<%= cur.user || '' %>" maxlength="64" class="<%= input %> font-mono text-sm"></div>
+          <div><label class="<%= label %>" for="db-<%= sec %>-pass">Mật khẩu CSDL</label><input id="db-<%= sec %>-pass" name="password" type="password" maxlength="200" autocomplete="new-password" placeholder="<%= cur.hasPassword ? 'Để trống để giữ mật khẩu hiện tại' : '' %>" class="<%= input %> font-mono text-sm"></div>
+          <div class="sm:col-span-3"><label class="<%= label %>" for="db-<%= sec %>-admin">Mật khẩu quản trị của bạn (xác nhận)</label><input id="db-<%= sec %>-admin" name="admin_password" type="password" required maxlength="200" autocomplete="current-password" class="<%= input %>"></div>
+        </div>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <button type="submit" formaction="/admin/settings/db/test" class="<%= btnSecondary %>">Kiểm tra kết nối</button>
+          <button type="submit" class="<%= btnPrimary %>">Lưu</button>
+          <% if (info.source === 'file') { %><button type="submit" formaction="/admin/settings/db/reset" class="<%= btnGhost %> text-red-700" data-confirm="Bỏ kết nối đã lưu và dùng lại biến môi trường sau khi khởi động lại?">Bỏ kết nối đã lưu</button><% } %>
+        </div>
+      </form>
+    <% }) %>
+    </div>
+    <% if (dbConn.sections.db.restartNeeded || dbConn.sections.cloud.restartNeeded) { %>
+      <form method="post" action="/admin/settings/db/restart" class="mt-4 flex flex-wrap items-end gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3" autocomplete="off">
+        <%- include('../partials/csrf') %>
+        <input type="hidden" name="_back" value="/admin/settings">
+        <p class="w-full text-sm text-amber-900">Có thay đổi kết nối chưa áp dụng. <%= dbConn.canRestart ? 'Bấm khởi động lại (cần mật khẩu quản trị).' : 'Ứng dụng đang chạy trực tiếp: hãy tắt và mở lại ứng dụng, hoặc khởi động lại trong hPanel.' %></p>
+        <% if (dbConn.canRestart) { %>
+          <input name="admin_password" type="password" required maxlength="200" placeholder="Mật khẩu quản trị" autocomplete="current-password" class="<%= input %> max-w-xs">
+          <button type="submit" class="<%= btnPrimary %>">Khởi động lại ngay</button>
+        <% } %>
+      </form>
+    <% } %>
+  </section>
+  <% } %>
 
   <% if (shop) { %>
   <section class="col-span-12 rounded border border-gray-200 bg-white p-5" aria-labelledby="shop-title">

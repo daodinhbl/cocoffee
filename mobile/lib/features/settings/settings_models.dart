@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'heli_card.dart';
 import '../../core/session.dart';
 
 /// Shown under "Ứng dụng"; keep in step with `version:` in pubspec.yaml.
@@ -59,6 +60,8 @@ class SystemConfig {
   const SystemConfig({
     required this.shopName,
     required this.publicBaseUrl,
+    this.publicBaseUrlSource = '',
+    this.publicBaseUrlEnv = '',
     required this.allowNegativeStock,
     required this.draftTtlMinutes,
     required this.verifySignature,
@@ -72,6 +75,8 @@ class SystemConfig {
     return SystemConfig(
       shopName: _str(shopName ?? _pick(j, 'shopName')),
       publicBaseUrl: url.isEmpty ? '(chưa đặt)' : url,
+      publicBaseUrlSource: _str(_pick(j, 'publicBaseUrlSource')),
+      publicBaseUrlEnv: _str(_pick(j, 'publicBaseUrlEnv')),
       allowNegativeStock: _bool(_pick(j, 'allowNegativeStock')),
       draftTtlMinutes: _int(_pick(j, 'draftTtlMinutes'), 0),
       verifySignature: _bool(_pick(j, 'verifySignature')),
@@ -83,6 +88,10 @@ class SystemConfig {
 
   final String shopName;
   final String publicBaseUrl;
+
+  /// Who set it: 'settings' (saved in Cài đặt, wins), 'env' (PUBLIC_BASE_URL) or '' (not set).
+  final String publicBaseUrlSource;
+  final String publicBaseUrlEnv;
   final bool allowNegativeStock;
   final int draftTtlMinutes;
   final bool verifySignature;
@@ -202,7 +211,7 @@ class PayonSettings {
 }
 
 class AdminSettings {
-  const AdminSettings({required this.printer, required this.config, this.iosApp, this.payon});
+  const AdminSettings({required this.printer, required this.config, this.iosApp, this.payon, this.heli});
 
   /// GET /api/admin/settings -> { printer, config, shop_name, ios_app, payon } (the last two are missing on older servers).
   factory AdminSettings.fromJson(Map<String, dynamic> res) {
@@ -212,6 +221,7 @@ class AdminSettings {
       config: SystemConfig.fromJson(map(res['config']), shopName: res['shop_name'] ?? res['shopName']),
       iosApp: res['ios_app'] is Map ? IosAppSetting.fromJson(map(res['ios_app'])) : null,
       payon: res['payon'] is Map ? PayonSettings.fromJson(map(res['payon'])) : null,
+      heli: res['heli'] is Map ? HeliSetting.fromJson(map(res['heli'])) : null,
     );
   }
 
@@ -219,6 +229,7 @@ class AdminSettings {
   final SystemConfig config;
   final IosAppSetting? iosApp;
   final PayonSettings? payon;
+  final HeliSetting? heli;
 }
 
 /// userModel.list() row: { id, username, full_name, role, is_active, created_at }.

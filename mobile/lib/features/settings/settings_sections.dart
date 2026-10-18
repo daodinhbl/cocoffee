@@ -117,20 +117,41 @@ class _PasswordCardState extends ConsumerState<PasswordCard> {
   }
 }
 
-/// "Cấu hình hệ thống" (read-only).
-class ConfigCard extends StatelessWidget {
+/// "Cấu hình hệ thống": read-only, except the public address (PUT /api/admin/settings/public-url).
+class ConfigCard extends ConsumerWidget {
   const ConfigCard({super.key, required this.config});
   final SystemConfig config;
 
   Widget _onOff(bool v) => v ? const StatusBadge('Bật', tone: Tone.good) : const StatusBadge('Tắt', tone: Tone.neutral);
 
+  Future<void> _editUrl(BuildContext context, WidgetRef ref) async {
+    final saved = await showDialog<String>(context: context, builder: (_) => _PublicUrlDialog(config: config));
+    if (saved == null || !context.mounted) return;
+    await runWithToast(context, () async {
+      await ref.read(apiProvider).put('/admin/settings/public-url', {'url': saved});
+      ref.invalidate(adminSettingsProvider);
+    }, success: saved.isEmpty ? 'Đã dùng lại địa chỉ từ biến môi trường.' : 'Đã lưu tên miền công khai.');
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final c = config;
     const mono = TextStyle(fontFamily: 'monospace', fontSize: 13);
     final rows = <(String, Widget)>[
       ('Tên quán (SHOP_NAME)', Text(c.shopName.isEmpty ? '—' : c.shopName, textAlign: TextAlign.right)),
-      ('Tên miền công khai', Text(c.publicBaseUrl, style: mono, textAlign: TextAlign.right)),
+      (
+        'Tên miền công khai',
+        Row(mainAxisSize: MainAxisSize.min, children: [
+          Flexible(child: Text(c.publicBaseUrl, style: mono, textAlign: TextAlign.right)),
+          IconButton(
+            key: const Key('edit-public-url'),
+            tooltip: 'Sửa tên miền công khai',
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.edit_rounded, size: 18),
+            onPressed: () => _editUrl(context, ref),
+          ),
+        ]),
+      ),
       ('Cho phép bán khi âm kho', _onOff(c.allowNegativeStock)),
       ('Đơn nháp Zalo hết hạn sau', Text('${c.draftTtlMinutes} phút')),
       ('Xác thực chữ ký Zalo', _onOff(c.verifySignature)),
@@ -140,7 +161,7 @@ class ConfigCard extends StatelessWidget {
     ];
     return SectionCard(
       title: 'Cấu hình hệ thống',
-      subtitle: 'Chỉ đọc. Thay đổi trong biến môi trường của ứng dụng (hPanel) rồi khởi động lại.',
+      subtitle: 'Tên miền công khai sửa được ngay (nút bút chì); các mục khác chỉ đọc, đổi trong biến môi trường của ứng dụng (hPanel) rồi khởi động lại.',
       child: Column(children: [
         for (final (label, value) in rows)
           Padding(
@@ -152,6 +173,54 @@ class ConfigCard extends StatelessWidget {
             ]),
           ),
       ]),
+    );
+  }
+}
+
+/// The edit box of the public address. It owns its controller: disposing one from the caller while the dialog is still
+/// animating away would rebuild the field with a dead controller.
+class _PublicUrlDialog extends StatefulWidget {
+  const _PublicUrlDialog({required this.config});
+  final SystemConfig config;
+  @override
+  State<_PublicUrlDialog> createState() => _PublicUrlDialogState();
+}
+
+class _PublicUrlDialogState extends State<_PublicUrlDialog> {
+  late final TextEditingController _ctrl = TextEditingController(text: widget.config.publicBaseUrlSource == 'settings' ? widget.config.publicBaseUrl : '');
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final c = widget.config;
+    return AlertDialog(
+      title: const Text('Sửa tên miền công khai'),
+      content: SingleChildScrollView(
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(
+            'Địa chỉ mà mã QR, webhook Zalo, PayOn và hóa đơn ảnh dùng để quay về quán. Địa chỉ lưu ở đây được ưu tiên hơn biến môi trường'
+            '${c.publicBaseUrlEnv.isEmpty ? '' : ' (${c.publicBaseUrlEnv})'}. Để trống rồi lưu để dùng lại biến môi trường.',
+            style: const TextStyle(fontSize: 13),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _ctrl,
+            autofocus: true,
+            keyboardType: TextInputType.url,
+            autocorrect: false,
+            decoration: InputDecoration(hintText: c.publicBaseUrlEnv.isEmpty ? 'https://ten-mien-cua-ban.com' : c.publicBaseUrlEnv),
+          ),
+        ]),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
+        FilledButton(onPressed: () => Navigator.pop(context, _ctrl.text.trim()), child: const Text('Lưu')),
+      ],
     );
   }
 }

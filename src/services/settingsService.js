@@ -4,6 +4,8 @@ const env = require('../config/env');
 function systemConfig() {
   return {
     publicBaseUrl: env.publicBaseUrl || '',
+    publicBaseUrlSource: env.publicUrlOverride.value ? 'settings' : (env.publicUrlEnv ? 'env' : ''),   // who set it: the saved setting wins over PUBLIC_BASE_URL
+    publicBaseUrlEnv: env.publicUrlEnv || '',
     allowNegativeStock: env.business.allowNegativeStock,
     draftTtlMinutes: env.zalo.draftTtlMinutes,
     verifySignature: env.zalo.verifySignature,

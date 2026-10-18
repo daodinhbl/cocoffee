@@ -396,9 +396,9 @@ test('API endpoints for the app', async (t) => {
 
   await t.test('GET /api/admin/settings, PUT /api/admin/settings/printer', async () => {
     let r = await get('/api/admin/settings');
-    assert.deepEqual(Object.keys(r.body).sort(), ['config', 'ios_app', 'payon', 'printer', 'shop_name']);
+    assert.deepEqual(Object.keys(r.body).sort(), ['config', 'db_conn', 'heli', 'ios_app', 'payon', 'printer', 'shop_name']);
     assert.equal(typeof r.body.shop_name, 'string');
-    assert.deepEqual(Object.keys(r.body.config).sort(), ['allowNegativeStock', 'draftTtlMinutes', 'publicBaseUrl', 'receiptImage', 'sessionHours', 'timezone', 'verifySignature']);
+    assert.deepEqual(Object.keys(r.body.config).sort(), ['allowNegativeStock', 'draftTtlMinutes', 'publicBaseUrl', 'publicBaseUrlEnv', 'publicBaseUrlSource', 'receiptImage', 'sessionHours', 'timezone', 'verifySignature']);
     assert.equal(r.body.config.publicBaseUrl, 'https://cafe.example.test');
     r = await api('PUT', '/api/admin/settings/printer', { token: admin, json: { paperMm: 58, autoPrint: false, footer: 'Hẹn gặp lại' } });
     assert.equal(r.status, 200);

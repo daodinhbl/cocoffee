@@ -108,6 +108,10 @@ async function start() {
   // SKIP_BOOT_TASKS=true: run the UI on your own machine against a live database without any of the write-y boot
   // steps below (schema/menu/photos/backups, Zalo webhook re-registration, PayOn recovery).
   const skipBoot = /^(1|true|yes)$/i.test(process.env.SKIP_BOOT_TASKS || '');
+  await require('./src/services/publicUrl').load();       // address saved in Cài đặt (wins over PUBLIC_BASE_URL); read-only, never throws
+  require('./src/services/publicUrl').startRefresh();
+  await require('./src/services/heli/heliConfig').load();   // ChatGPT key / model saved in Cài đặt (wins over OPENAI_*); read-only, never throws
+  require('./src/services/heli/heliConfig').startRefresh();
   await require('./src/services/demoState').load();      // demo switch kept in the database (scripts/demo-mode.js), read-only; never throws
   require('./src/services/demoState').startRefresh();
   await require('./src/services/shopProfile').apply();   // shop name / address / phone saved in Cài đặt (read-only; also with SKIP_BOOT_TASKS)
@@ -127,6 +131,7 @@ async function start() {
     require('./src/services/taxExportService').startWorker();   // builds the tax books queued from the web / app, one at a time
     require('./src/services/rollupService').startScheduler();   // 02:30 rebuild of the last days' revenue / expense rollups (fallback to the hPanel cron job)
     require('./src/services/backupMailService').startScheduler();   // 02:00 database backup by e-mail (needs SMTP_*); never throws
+    require('./src/services/cloudSyncService').startScheduler();   // local box -> Hostinger copy (CLOUD_SYNC_ENABLED); never throws
     backupService.startScheduler();                     // automatic database backups (Admin > Sao lưu); never throws
     webhookGuard.ensure().catch(() => {});              // Zalo Bot Platform: re-register the webhook when its URL / secret changed; never throws, not awaited
     payonService.startRecovery();                       // PayOn: finishes claims a dead process left half-applied; never throws

@@ -45,6 +45,13 @@ router.put('/zalo/bot-token', zalo.saveBotToken);                               
 
 router.get('/settings', settings.get);
 router.put('/settings/printer', settings.savePrinter);
+router.put('/settings/public-url', settings.savePublicUrl);
+router.put('/settings/heli', settings.saveHeli);
+router.post('/settings/db/test', settings.testDb);
+router.put('/settings/db', settings.saveDb);
+router.delete('/settings/db', settings.resetDb);
+router.post('/settings/db/restart', settings.restartApp);
+router.post('/settings/heli/test', settings.testHeli);
 router.put('/settings/ios-app', settings.saveIosApp);
 router.put('/settings/payon', settings.savePayon);
 router.post('/settings/payon/test', settings.testPayon);

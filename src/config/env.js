@@ -1,3 +1,4 @@
+const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { jwtSecretProblems } = require('./jwtSecretCheck');
@@ -5,10 +6,25 @@ const { jwtSecretProblems } = require('./jwtSecretCheck');
 // Local dev reads .env; on Hostinger the same keys come from the app's environment variables.
 require('dotenv').config({ path: path.resolve(__dirname, '../../.env'), quiet: true });
 
+// A database connection saved from Cài đặt (services/dbConfig.js) lives in this file and wins over DB_* / CLOUD_DB_*: the
+// installer's local MariaDB and the Hostinger sync target are set there, and so can an owner change server, name, user or
+// password without touching the hosting panel. Read once at start; a change needs a restart.
+const dbConfigFile = process.env.DB_CONFIG_FILE || path.resolve(__dirname, '../../data/db-config.json');
+const savedConn = (() => {
+  try { return JSON.parse(fs.readFileSync(dbConfigFile, 'utf8')) || {}; } catch (_) { return {}; }
+})();
+const fromFile = (section, key) => (savedConn[section] && savedConn[section][key] !== undefined && savedConn[section][key] !== '' ? String(savedConn[section][key]) : undefined);
+
 const required = (key) => {
   const value = process.env[key];
   if (value === undefined || value === '') throw new Error(`Missing required environment variable: ${key}`);
   return value;
+};
+const dbValue = (key, envKey, fallback) => fromFile('db', key) ?? (process.env[envKey] === undefined || process.env[envKey] === '' ? fallback : process.env[envKey]);
+const dbRequired = (key, envKey) => {
+  const v = dbValue(key, envKey, undefined);
+  if (v === undefined) throw new Error(`Missing required environment variable: ${envKey}`);
+  return v;
 };
 const optional = (key, fallback = '') => (process.env[key] === undefined || process.env[key] === '' ? fallback : process.env[key]);
 const bool = (key, fallback = false) => {
@@ -41,17 +57,26 @@ const jwtSecret = () => {
   if (optional('NODE_ENV', 'development') === 'production') {
     console.warn('[warn] JWT_SECRET is not set: the signing key is derived from DB_PASSWORD. Set JWT_SECRET (and REQUIRE_JWT_SECRET=1) so a leaked database password cannot forge tokens.');
   }
-  return crypto.createHmac('sha256', required('DB_PASSWORD')).update('cocoffee-fnb:jwt:v1').digest('hex');
+  return crypto.createHmac('sha256', dbRequired('password', 'DB_PASSWORD')).update('cocoffee-fnb:jwt:v1').digest('hex');
 };
 
 let demoEnv = bool('DEMO_MODE', false);
 const demoRuntime = { on: false };
+const publicUrlEnv = optional('PUBLIC_BASE_URL').replace(/\/+$/, '');
+const publicUrlOverride = { value: '' };
+const heliEnv = { apiKey: optional('OPENAI_API_KEY'), model: optional('OPENAI_MODEL', 'gpt-4o-mini') };
+const heliOverride = { apiKey: '', model: '' };
 
 module.exports = {
   demoRuntime,
+  dbConfigFile,
+  savedConn,
   nodeEnv: optional('NODE_ENV', 'development'),
   rootDir: path.resolve(__dirname, '../..'),
-  publicBaseUrl: optional('PUBLIC_BASE_URL').replace(/\/+$/, ''),
+  // PUBLIC_BASE_URL, unless the owner saved another address in Cài đặt (services/publicUrl.js keeps publicUrlOverride.value)
+  get publicBaseUrl() { return publicUrlOverride.value || publicUrlEnv; },
+  publicUrlEnv,
+  publicUrlOverride,
   // iOS app for staff iPhones/iPads: TestFlight public link or App Store page, used while nothing is set in
   // Web Admin > Cài đặt > Ứng dụng iOS (see services/iosApp.js). The shop's TestFlight public link (2026-10-17)
   // is the default while the variable is absent, so a fresh deploy shows the QR without any configuration;
@@ -66,11 +91,11 @@ module.exports = {
 
   db: {
     // Hostinger writes DB_HOST=localhost, which Node may resolve to ::1 (no grant there): force IPv4 loopback.
-    host: optional('DB_HOST', '127.0.0.1') === 'localhost' ? '127.0.0.1' : optional('DB_HOST', '127.0.0.1'),
-    port: int('DB_PORT', 3306),
-    name: required('DB_NAME'),
-    user: required('DB_USER'),
-    password: required('DB_PASSWORD'),
+    host: dbValue('host', 'DB_HOST', '127.0.0.1') === 'localhost' ? '127.0.0.1' : dbValue('host', 'DB_HOST', '127.0.0.1'),
+    port: Number.parseInt(dbValue('port', 'DB_PORT', '3306'), 10) || 3306,
+    name: dbRequired('name', 'DB_NAME'),
+    user: dbRequired('user', 'DB_USER'),
+    password: dbRequired('password', 'DB_PASSWORD'),
     poolLimit: int('DB_POOL_LIMIT', 5),
     timezone: optional('DB_TIMEZONE', '+07:00'),
     // First-boot setup for hosts without SQL import (see src/config/bootstrapDb.js). Both default off.
@@ -134,6 +159,18 @@ module.exports = {
     maxAttachmentMb: int('BACKUP_MAIL_MAX_MB', 20),
   },
 
+  // Local box <-> Hostinger copy (services/cloudSync.js). The Windows installer sets these; off otherwise.
+  cloudSync: {
+    enabled: bool('CLOUD_SYNC_ENABLED', false),
+    host: fromFile('cloud', 'host') ?? optional('CLOUD_DB_HOST'),                  // e.g. srv2089.hstgr.io (this PC's IP must be allowed in hPanel > Remote MySQL)
+    port: Number.parseInt(fromFile('cloud', 'port') ?? process.env.CLOUD_DB_PORT ?? '3306', 10) || 3306,
+    name: fromFile('cloud', 'name') ?? optional('CLOUD_DB_NAME'),
+    user: fromFile('cloud', 'user') ?? optional('CLOUD_DB_USER'),
+    password: fromFile('cloud', 'password') ?? optional('CLOUD_DB_PASSWORD'),
+    minutes: int('CLOUD_SYNC_MINUTES', 5),
+    statusFile: optional('CLOUD_SYNC_STATUS_FILE'),
+  },
+
   // Multi-shop (tenant) mode, docs/da-tenant.md. Off until TENANT_BASE_DOMAIN is set: then <slug>.<base domain> is a shop
   // with its own database, and the main site (defaultSlug) keeps the database in DB_*.
   tenancy: {
@@ -152,9 +189,12 @@ module.exports = {
   },
 
   // Heli voice assistant (/api/heli/*): the OpenAI key lives only on the server, the app never sees it. Off until the key is set.
+  // A key / model saved in Cài đặt (services/heli/heliConfig.js keeps heliOverride) wins over OPENAI_API_KEY / OPENAI_MODEL.
+  heliEnv,
+  heliOverride,
   heli: {
-    apiKey: optional('OPENAI_API_KEY'),
-    model: optional('OPENAI_MODEL', 'gpt-4o-mini'),
+    get apiKey() { return heliOverride.apiKey || heliEnv.apiKey; },
+    get model() { return heliOverride.model || heliEnv.model; },
     sttModel: optional('STT_MODEL', 'gpt-4o-mini-transcribe'),
     ttsModel: optional('TTS_MODEL', 'gpt-4o-mini-tts'),
     ttsVoice: optional('TTS_VOICE', 'nova'),

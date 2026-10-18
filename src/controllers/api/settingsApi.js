@@ -17,7 +17,7 @@ const v = require('../../utils/validate');
  */
 async function get(_req, res) {
   const [printer, ios, px] = await Promise.all([printerSettings.get(), iosApp.view(), payon.settingsPanel()]);
-  res.json({ printer, config: systemConfig(), shop_name: env.business.shopName, ios_app: ios, payon: px });
+  res.json({ printer, config: systemConfig(), shop_name: env.business.shopName, ios_app: ios, payon: px, heli: require('../../services/heli/heliConfig').view(), db_conn: require('../../services/dbConfig').view() });
 }
 
 const PRINTER_FIELDS = ['paperMm', 'autoPrint', 'copies', 'printerName', 'shopAddress', 'shopPhone', 'footer', 'showVat', 'vatRate'];
@@ -41,6 +41,62 @@ async function savePrinter(req, res) {
   body.showVat = formFlag(body.showVat, 'showVat');
   await printerSettings.save(body, req.user.id);
   res.json({ printer: await printerSettings.get() });
+}
+
+/**
+ * Database connection (server, name, user, password): the admin's own password is required in every call (admin_password).
+ *   POST /api/admin/settings/db/test    { section: db|cloud, host, port, name, user, password?, admin_password } -> { ok, version, tables, empty }
+ *   PUT  /api/admin/settings/db         same body -> { ok, restartNeeded } (tested first; saved to the connection file; applies after a restart)
+ *   DELETE /api/admin/settings/db       { section, admin_password } -> { ok } (back to the environment values)
+ *   POST /api/admin/settings/db/restart { admin_password } -> { ok }
+ * The password is write-only (blank = keep the current one) and never returned.
+ */
+async function dbConfirm(req) {
+  await require('../admin/settings').confirmAdmin(req, (req.body || {}).admin_password);
+}
+const dbBody = (b) => ({ host: b.host, port: b.port, name: b.name, user: b.user, password: b.password });
+
+async function testDb(req, res) {
+  await dbConfirm(req);
+  res.json(await require('../../services/dbConfig').test(req.body.section, dbBody(req.body)));
+}
+
+async function saveDb(req, res) {
+  await dbConfirm(req);
+  const r = await require('../../services/dbConfig').save(req.body.section, dbBody(req.body));
+  res.json({ ok: true, restartNeeded: r.restartNeeded, version: r.version, tables: r.tables });
+}
+
+async function resetDb(req, res) {
+  await dbConfirm(req);
+  require('../../services/dbConfig').reset(req.body.section);
+  res.json({ ok: true });
+}
+
+async function restartApp(req, res) {
+  await dbConfirm(req);
+  require('../../services/dbConfig').restart();
+  res.json({ ok: true });
+}
+
+/**
+ * PUT /api/admin/settings/heli { api_key?, model?, clear? } -> { heli } (the key itself is never returned: enabled, source, hint = last 4)
+ * POST /api/admin/settings/heli/test { api_key? } -> { ok, hint } (asks OpenAI; with no api_key it tests the key in force)
+ */
+async function saveHeli(req, res) {
+  const heli = require('../../services/heli/heliConfig');
+  const b = req.body || {};
+  res.json({ heli: await heli.save({ apiKey: b.api_key, model: b.model, clear: b.clear === true }, req.user.id) });
+}
+
+async function testHeli(req, res) {
+  res.json(await require('../../services/heli/heliConfig').test((req.body || {}).api_key));
+}
+
+/** PUT /api/admin/settings/public-url { url } ('' = back to PUBLIC_BASE_URL) -> { config } */
+async function savePublicUrl(req, res) {
+  await require('../../services/publicUrl').save((req.body || {}).url, req.user.id);
+  res.json({ config: systemConfig() });
 }
 
 /** PUT /api/admin/settings/ios-app { url } ('' clears it; only https TestFlight / App Store links) -> { ios_app } */
@@ -98,4 +154,4 @@ async function setActive(req, res) {
   res.json({ ok: true });
 }
 
-module.exports = { get, savePrinter, saveIosApp, savePayon, testPayon, payonIp, listUsers, createUser, resetPassword, setActive };
+module.exports = { get, testDb, saveDb, resetDb, restartApp, saveHeli, testHeli, savePublicUrl, savePrinter, saveIosApp, savePayon, testPayon, payonIp, listUsers, createUser, resetPassword, setActive };

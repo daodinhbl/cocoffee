@@ -6,6 +6,7 @@ import '../../core/session.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common.dart';
 import '../menu/form_sheet.dart';
+import 'heli_card.dart';
 import 'settings_models.dart';
 import 'user_sheets.dart' show noCounter;
 
@@ -25,6 +26,7 @@ class IntegrationsSection extends ConsumerWidget {
         if (s.iosApp != null) IosAppCard(setting: s.iosApp!),
         if (s.iosApp != null && s.payon != null) const SizedBox(height: 16),
         if (s.payon != null) PayonCard(payon: s.payon!),
+        if (s.heli != null) ...[const SizedBox(height: 16), HeliCard(setting: s.heli!)],
       ]),
       loading: () => const SizedBox.shrink(),
       error: (_, _) => const SizedBox.shrink(), // the printer card above already shows the error with "Thử lại"
