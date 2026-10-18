@@ -47,19 +47,17 @@ class _BrandMark extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final server = ref.watch(serverUrlProvider);
     return Center(
       child: Container(
         width: 36,
         height: 36,
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
-          color: const Color(0xFFFBF6EF),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(4),
           border: Border.all(color: const Color(0xFFE9D3B6)),
         ),
-        child: Image.network('$server/brand/mark.png',
-            fit: BoxFit.contain, errorBuilder: (_, _, _) => const Icon(Icons.local_cafe_rounded, color: Palette.navy, size: 20)),
+        child: Image.asset('assets/brand/mark.png', fit: BoxFit.contain),
       ),
     );
   }

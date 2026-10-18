@@ -106,7 +106,6 @@ class _Brand extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final server = ref.watch(serverUrlProvider);
     return SizedBox(
       height: 64,
       child: Row(children: [
@@ -115,9 +114,8 @@ class _Brand extends ConsumerWidget {
           width: 36,
           height: 36,
           padding: const EdgeInsets.all(3),
-          decoration: BoxDecoration(color: const Color(0xFFFBF6EF), borderRadius: BorderRadius.circular(6)),
-          child: Image.network('$server/brand/mark.png', fit: BoxFit.contain,
-              errorBuilder: (_, _, _) => const Icon(Icons.local_cafe_rounded, color: Palette.navy, size: 20)),
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6)),
+          child: Image.asset('assets/brand/mark.png', fit: BoxFit.contain),
         ),
         const SizedBox(width: 12),
         const Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [

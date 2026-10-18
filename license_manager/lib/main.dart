@@ -102,6 +102,7 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
     return Scaffold(
       appBar: AppBar(
+        leading: Padding(padding: const EdgeInsets.all(8), child: DecoratedBox(decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6)), child: Padding(padding: const EdgeInsets.all(3), child: Image.asset('assets/brand/mark.png')))),
         title: const Text('Cấp phép POS Tasotek Server'),
         backgroundColor: const Color(0xFF172554),
         foregroundColor: Colors.white,

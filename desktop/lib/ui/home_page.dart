@@ -67,7 +67,12 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final pages = [_overview(context), SettingsPage(stack: s), SyncPage(stack: s), LicenseScreen(stack: s), _logs(context)];
     return Scaffold(
-      appBar: AppBar(title: Text('POS Tasotek Server · ${s.config.shopName}'), backgroundColor: const Color(0xFF172554), foregroundColor: Colors.white),
+      appBar: AppBar(
+        leading: Padding(padding: const EdgeInsets.all(8), child: DecoratedBox(decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(6)), child: Padding(padding: const EdgeInsets.all(3), child: Image.asset('assets/brand/mark.png')))),
+        title: Text('POS Tasotek Server · ${s.config.shopName}'),
+        backgroundColor: const Color(0xFF172554),
+        foregroundColor: Colors.white,
+      ),
       body: Row(children: [
         NavigationRail(
           selectedIndex: _tab,
