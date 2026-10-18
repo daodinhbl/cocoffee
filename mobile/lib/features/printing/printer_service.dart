@@ -50,6 +50,9 @@ final lanTransportProvider = Provider<PrinterTransport>((_) => LanTransport());
 const _kName = 'printer.bt.name';
 const _kAddress = 'printer.bt.address';
 const _kKind = 'printer.kind';
+const _kDensity = 'printer.opt.density';
+const _kCut = 'printer.opt.cut';
+const _kFeed = 'printer.opt.feed';
 
 /// How a printer is reached.
 const kindBluetooth = 'bluetooth';
@@ -89,6 +92,25 @@ class SavedPrinterNotifier extends Notifier<SavedPrinter?> {
 }
 
 final savedPrinterProvider = NotifierProvider<SavedPrinterNotifier, SavedPrinter?>(SavedPrinterNotifier.new);
+
+/// Print mode of this phone (ink, cut command, feed lines): Settings > Máy in > "Chế độ in".
+class PrintOptionsNotifier extends Notifier<PrintOptions> {
+  @override
+  PrintOptions build() {
+    final p = ref.watch(sessionStoreProvider).prefs;
+    return PrintOptions.from(density: p.getInt(_kDensity), cut: p.getString(_kCut), feedLines: p.getInt(_kFeed));
+  }
+
+  Future<void> set(PrintOptions o) async {
+    final p = ref.read(sessionStoreProvider).prefs;
+    await p.setInt(_kDensity, o.density);
+    await p.setString(_kCut, o.cut);
+    await p.setInt(_kFeed, o.feedLines);
+    state = PrintOptions.from(density: o.density, cut: o.cut, feedLines: o.feedLines);
+  }
+}
+
+final printOptionsProvider = NotifierProvider<PrintOptionsNotifier, PrintOptions>(PrintOptionsNotifier.new);
 
 class PrintException implements Exception {
   PrintException(this.message);
@@ -140,7 +162,8 @@ class PrinterService {
     final width = dotsForPaper(paperMm);
     final image = await paintReceipt(data, width);
     final rgba = await rgbaOf(image);
-    final bytes = escposRaster(rgba, width, image.height);
+    final o = _ref.read(printOptionsProvider);
+    final bytes = escposRaster(rgba, width, image.height, threshold: o.threshold, cut: o.cut != kCutNone, fullCut: o.cut == kCutFull, feedLines: o.feedLines);
     image.dispose();
     await _send(bytes);
   }

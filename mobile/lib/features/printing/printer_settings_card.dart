@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common.dart';
+import 'escpos_raster.dart';
 import 'lan_printer.dart';
 import 'printer_service.dart';
 
@@ -45,8 +46,8 @@ class _PrinterSettingsCardState extends ConsumerState<PrinterSettingsCard> {
     }
   }
 
-  Future<void> _addLan() async {
-    final d = await showDialog<PrinterDevice>(context: context, builder: (_) => const LanPrinterDialog());
+  Future<void> _addLan({SavedPrinter? edit}) async {
+    final d = await showDialog<PrinterDevice>(context: context, builder: (_) => LanPrinterDialog(initial: edit));
     if (d != null) await ref.read(savedPrinterProvider.notifier).choose(d, kind: kindLan);
   }
 
@@ -85,17 +86,59 @@ class _PrinterSettingsCardState extends ConsumerState<PrinterSettingsCard> {
           FilledButton.icon(onPressed: _busy ? null : _pickBluetooth, icon: const Icon(Icons.bluetooth_searching_rounded), label: const Text('Chọn máy in Bluetooth')),
           FilledButton.tonalIcon(key: const Key('add-lan-printer'), onPressed: _busy ? null : _addLan, icon: const Icon(Icons.lan_rounded), label: const Text('Thêm máy in mạng LAN')),
           OutlinedButton.icon(onPressed: _busy || saved == null ? null : _test, icon: const Icon(Icons.receipt_long_rounded), label: const Text('In thử máy in')),
+          if (saved != null && saved.isLan) OutlinedButton.icon(key: const Key('edit-lan-printer'), onPressed: _busy ? null : () => _addLan(edit: saved), icon: const Icon(Icons.edit_rounded), label: const Text('Sửa địa chỉ / cổng')),
           if (saved != null) TextButton(onPressed: _busy ? null : () => ref.read(savedPrinterProvider.notifier).forget(), child: const Text('Bỏ chọn')),
         ]),
+        const SizedBox(height: 16),
+        const _PrintModeSection(),
       ]),
     );
+  }
+}
+
+/// "Chế độ in": ink density, the cut command and the lines fed before it. Saved at once, used by every print on this phone.
+class _PrintModeSection extends ConsumerWidget {
+  const _PrintModeSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final o = ref.watch(printOptionsProvider);
+    final n = ref.read(printOptionsProvider.notifier);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Text('Chế độ in', style: TextStyle(fontWeight: FontWeight.w700)),
+      const SizedBox(height: 8),
+      const Text('Độ đậm'),
+      SegmentedButton<int>(
+        key: const Key('print-density'),
+        segments: const [ButtonSegment(value: 0, label: Text('Nhạt')), ButtonSegment(value: 1, label: Text('Vừa')), ButtonSegment(value: 2, label: Text('Đậm'))],
+        selected: {o.density},
+        onSelectionChanged: (s) => n.set(o.copyWith(density: s.first)),
+      ),
+      const SizedBox(height: 10),
+      const Text('Lệnh cắt giấy'),
+      SegmentedButton<String>(
+        key: const Key('print-cut'),
+        segments: const [ButtonSegment(value: kCutPartial, label: Text('Cắt lửng')), ButtonSegment(value: kCutFull, label: Text('Cắt hẳn')), ButtonSegment(value: kCutNone, label: Text('Không cắt'))],
+        selected: {o.cut},
+        onSelectionChanged: (s) => n.set(o.copyWith(cut: s.first)),
+      ),
+      const SizedBox(height: 10),
+      Row(children: [
+        Expanded(child: Text('Đẩy giấy trước khi cắt: ${o.feedLines} dòng')),
+        IconButton(key: const Key('feed-minus'), onPressed: o.feedLines > 0 ? () => n.set(o.copyWith(feedLines: o.feedLines - 1)) : null, icon: const Icon(Icons.remove_circle_outline)),
+        IconButton(key: const Key('feed-plus'), onPressed: o.feedLines < 8 ? () => n.set(o.copyWith(feedLines: o.feedLines + 1)) : null, icon: const Icon(Icons.add_circle_outline)),
+      ]),
+    ]);
   }
 }
 
 /// Add a network printer: type its IP (and port, default 9100) or let the app look for printers on this Wi-Fi. The connection is
 /// tried before it is accepted.
 class LanPrinterDialog extends ConsumerStatefulWidget {
-  const LanPrinterDialog({super.key, this.connector = realConnector, this.subnetFinder = localSubnet});
+  const LanPrinterDialog({super.key, this.connector = realConnector, this.subnetFinder = localSubnet, this.initial});
+
+  /// The saved printer being edited (address and port prefilled), or null to add a new one.
+  final SavedPrinter? initial;
 
   /// Plug-ins for tests.
   final LanConnector connector;
@@ -106,8 +149,10 @@ class LanPrinterDialog extends ConsumerStatefulWidget {
 }
 
 class _LanPrinterDialogState extends ConsumerState<LanPrinterDialog> {
-  final _addr = TextEditingController();
-  final _name = TextEditingController();
+  late final _addr = TextEditingController(text: _initialAddr?.host ?? '');
+  late final _port = TextEditingController(text: '${_initialAddr?.port ?? 9100}');
+  late final _name = TextEditingController(text: widget.initial?.name ?? '');
+  LanAddress? get _initialAddr => widget.initial == null ? null : LanAddress.parse(widget.initial!.address);
   bool _scanning = false;
   bool _checking = false;
   String? _error;
@@ -116,6 +161,7 @@ class _LanPrinterDialogState extends ConsumerState<LanPrinterDialog> {
   @override
   void dispose() {
     _addr.dispose();
+    _port.dispose();
     _name.dispose();
     super.dispose();
   }
@@ -147,9 +193,12 @@ class _LanPrinterDialogState extends ConsumerState<LanPrinterDialog> {
   }
 
   Future<void> _ok() async {
-    final a = LanAddress.parse(_addr.text);
+    // The port box wins when the address has no port of its own ("192.168.1.50" + 9101); "ip:port" in the address box still works.
+    final typed = _addr.text.trim();
+    final port = _port.text.trim();
+    final a = LanAddress.parse(typed.contains(':') || port.isEmpty ? typed : '$typed:$port');
     if (a == null) {
-      setState(() => _error = 'Địa chỉ không hợp lệ. Ví dụ: 192.168.1.50 hoặc 192.168.1.50:9100');
+      setState(() => _error = 'Địa chỉ hoặc cổng không hợp lệ. Ví dụ: 192.168.1.50 và cổng 9100 (1-65535).');
       return;
     }
     setState(() {
@@ -172,15 +221,17 @@ class _LanPrinterDialogState extends ConsumerState<LanPrinterDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Thêm máy in mạng LAN'),
+      title: Text(widget.initial == null ? 'Thêm máy in mạng LAN' : 'Sửa máy in mạng LAN'),
       content: SingleChildScrollView(
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           TextField(
             controller: _addr,
             keyboardType: TextInputType.url,
             autocorrect: false,
-            decoration: const InputDecoration(labelText: 'Địa chỉ IP (và cổng)', hintText: '192.168.1.50:9100'),
+            decoration: const InputDecoration(labelText: 'Địa chỉ IP', hintText: '192.168.1.50'),
           ),
+          const SizedBox(height: 8),
+          TextField(key: const Key('lan-port'), controller: _port, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Cổng', hintText: '9100')),
           const SizedBox(height: 8),
           TextField(controller: _name, decoration: const InputDecoration(labelText: 'Tên gọi (không bắt buộc)', hintText: 'Máy in quầy')),
           const SizedBox(height: 12),
@@ -194,7 +245,10 @@ class _LanPrinterDialogState extends ConsumerState<LanPrinterDialog> {
             const SizedBox(height: 8),
             const Text('Thấy các máy (cổng 9100):', style: TextStyle(fontWeight: FontWeight.w600)),
             for (final h in _found)
-              ListTile(dense: true, contentPadding: EdgeInsets.zero, leading: const Icon(Icons.print_rounded), title: Text(h), onTap: () => setState(() => _addr.text = h)),
+              ListTile(dense: true, contentPadding: EdgeInsets.zero, leading: const Icon(Icons.print_rounded), title: Text(h), onTap: () => setState(() {
+                _addr.text = h;
+                _port.text = '9100';
+              })),
           ],
           if (_error != null) ...[
             const SizedBox(height: 8),
@@ -204,7 +258,7 @@ class _LanPrinterDialogState extends ConsumerState<LanPrinterDialog> {
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
-        FilledButton(onPressed: _checking || _scanning ? null : _ok, child: Text(_checking ? 'Đang thử…' : 'Thêm')),
+        FilledButton(onPressed: _checking || _scanning ? null : _ok, child: Text(_checking ? 'Đang thử…' : (widget.initial == null ? 'Thêm' : 'Lưu'))),
       ],
     );
   }

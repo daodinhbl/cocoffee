@@ -147,12 +147,43 @@ void main() {
       expect(find.text('Thêm máy in mạng LAN'), findsNothing, reason: 'the dialog closed with the printer');
     });
 
+    testWidgets('the port box sets the port (9101 here); an invalid port is refused', (tester) async {
+      final tried = <String>[];
+      await run(tester, connector: (h, p, t) async {
+        tried.add('$h:$p');
+        return true;
+      });
+      await tester.enterText(find.byType(TextField).first, '192.168.1.50');
+      await tester.enterText(find.byKey(const Key('lan-port')), '70000');
+      await tester.tap(find.text('Thêm'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Địa chỉ hoặc cổng không hợp lệ'), findsOneWidget);
+      expect(tried, isEmpty);
+      await tester.enterText(find.byKey(const Key('lan-port')), '9101');
+      await tester.tap(find.text('Thêm'));
+      await tester.pumpAndSettle();
+      expect(tried, ['192.168.1.50:9101']);
+    });
+
+    testWidgets('editing a saved printer prefills address, port and name', (tester) async {
+      await setSurface(tester, phone);
+      await tester.pumpWidget(await testApp(
+        const LanPrinterDialog(initial: SavedPrinter('Máy in quầy', '192.168.1.50:9101', kind: kindLan)),
+        api: MockApi(),
+      ));
+      await tester.pumpAndSettle();
+      expect(find.text('Sửa máy in mạng LAN'), findsOneWidget);
+      expect(tester.widget<TextField>(find.byType(TextField).at(0)).controller!.text, '192.168.1.50');
+      expect(tester.widget<TextField>(find.byKey(const Key('lan-port'))).controller!.text, '9101');
+      expect(tester.widget<TextField>(find.byType(TextField).at(2)).controller!.text, 'Máy in quầy');
+    });
+
     testWidgets('a bad address and an unreachable one are explained, the dialog stays open', (tester) async {
       await run(tester, connector: (h, p, t) async => false);
       await tester.enterText(find.byType(TextField).first, 'khong hop le');
       await tester.tap(find.text('Thêm'));
       await tester.pumpAndSettle();
-      expect(find.textContaining('Địa chỉ không hợp lệ'), findsOneWidget);
+      expect(find.textContaining('Địa chỉ hoặc cổng không hợp lệ'), findsOneWidget);
       await tester.enterText(find.byType(TextField).first, '192.168.1.99');
       await tester.tap(find.text('Thêm'));
       await tester.pumpAndSettle();

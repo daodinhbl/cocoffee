@@ -52,6 +52,23 @@ Map<String, dynamic> receiptJson() => {
 
 void main() {
   group('escposRaster', () {
+    test('print options: full cut, no cut, feed lines, density threshold', () {
+      final white = Uint8List(8 * 1 * 4)..fillRange(0, 32, 255);
+      expect(escposRaster(white, 8, 1, fullCut: true, feedLines: 0).sublist(escposRaster(white, 8, 1, fullCut: true, feedLines: 0).length - 3), [0x1D, 0x56, 0x00]);
+      final partial = escposRaster(white, 8, 1, feedLines: 2);
+      expect(partial.sublist(partial.length - 6), [0x0A, 0x0A, 0x1D, 0x56, 0x42, 0x00]);
+      final none = escposRaster(white, 8, 1, cut: false, feedLines: 1);
+      expect(none.last, 0x0A);
+      final grey = Uint8List(8 * 1 * 4)..fillRange(0, 32, 180);                  // luminance 180, opaque
+      for (var i = 3; i < 32; i += 4) {
+        grey[i] = 255;
+      }
+      expect(escposRaster(grey, 8, 1, threshold: const PrintOptions(density: 2).threshold, cut: false, feedLines: 0)[10], 0, reason: 'dark ink (120) leaves 180 white');
+      expect(escposRaster(grey, 8, 1, threshold: 200, cut: false, feedLines: 0)[10], 0xFF, reason: 'light ink (200) prints 180');
+      expect(PrintOptions.from(density: 9, cut: 'x', feedLines: 99).feedLines, 8);
+      expect(PrintOptions.from(density: 9, cut: 'x', feedLines: -1).cut, kCutPartial);
+    });
+
     test('header, dimensions and bits: a black pixel becomes a set bit, MSB first', () {
       const w = 16, h = 2;
       final rgba = Uint8List(w * h * 4)..fillRange(0, w * h * 4, 255);
