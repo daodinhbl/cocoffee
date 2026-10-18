@@ -13,12 +13,13 @@ const logger = require('../utils/logger');
  * Tax books as Excel files, built OUT of the request: a request only queues a row in tax_exports and answers at once;
  * a single worker (one job at a time) writes the file with exceljs' streaming writer, so memory stays flat whatever
  * the number of rows, then the app shows the job as done and the file can be downloaded for 7 days.
+ *   s2a           Sổ doanh thu mẫu S2a-HKD (hộ kinh doanh nộp thuế theo tỷ lệ % trên doanh thu): one line per day per tax group
  *   revenue_book  Sổ doanh thu (per day, per tax group)       expense_book  Sổ chi phí (every posted expense)
  *   declaration   Bảng kê tờ khai (estimate of the period)    bundle        all three sheets in one workbook
  * Everything is an ESTIMATE to prepare the declaration; every sheet says so.
  */
-const KINDS = ['revenue_book', 'expense_book', 'declaration', 'bundle'];
-const KIND_LABEL = { revenue_book: 'so-doanh-thu', expense_book: 'so-chi-phi', declaration: 'bang-ke-to-khai', bundle: 'so-thue' };
+const KINDS = ['s2a', 'revenue_book', 'expense_book', 'declaration', 'bundle'];
+const KIND_LABEL = { s2a: 'S2a-HKD-so-doanh-thu', revenue_book: 'so-doanh-thu', expense_book: 'so-chi-phi', declaration: 'bang-ke-to-khai', bundle: 'so-thue' };
 const MAX_DAYS = 366;
 const POLL_MS = 5000;
 const NUM = '#,##0';
@@ -88,6 +89,74 @@ async function revenueSheet(wb, period, shop) {
   total.commit();
   ws.addRow(['Thuế ở sổ này là thuế tính trên toàn bộ doanh thu; phần được miễn theo ngưỡng doanh thu năm xem ở “Bảng kê tờ khai”.']).commit();
   ws.columns.forEach((col, i) => { col.width = i === 0 ? 14 : 18; });
+  await ws.commit();
+}
+
+/**
+ * Mẫu S2a-HKD "Sổ doanh thu bán hàng hóa, dịch vụ": the book a household business keeps when it pays VAT / personal income
+ * tax as a percentage of revenue. One entry per day and tax group (the day's takings are booked from the POS, so the
+ * "chứng từ" is the day's sales summary), grouped by line of business, with the group totals and the signature block.
+ * The layout follows the form; whether it is the form in force must be confirmed by the accountant.
+ */
+async function s2aSheet(wb, period, shop) {
+  const ws = wb.addWorksheet('S2a-HKD');
+  const cats = (await taxModel.categories()).filter((c) => c.code !== 'none');
+  const rows = await taxModel.revenueRows(period.from, period.to);
+  ws.addRow([`HỘ, CÁ NHÂN KINH DOANH: ${shop.name.toUpperCase()}`]).font = { bold: true };
+  ws.addRow([`Chủ hộ: ${shop.ownerName || '—'}`, '', '', '', 'Mẫu số S2a-HKD']);
+  ws.addRow([`Địa chỉ: ${shop.address || '—'}`]);
+  ws.addRow([`Mã số thuế: ${shop.taxCode || '—'}`]);
+  ws.addRow([]);
+  const t = ws.addRow(['SỔ DOANH THU BÁN HÀNG HÓA, DỊCH VỤ']);
+  t.font = { bold: true, size: 14 };
+  ws.addRow([`Địa điểm kinh doanh: ${shop.address || '—'}`]);
+  ws.addRow([`Kỳ kê khai: từ ${dmy(period.from)} đến ${dmy(period.to)}`]);
+  ws.addRow(['Đơn vị tính: đồng']);
+  ws.addRow(['Số liệu tổng hợp từ máy bán hàng (ước tính), cần kế toán đối chiếu với mẫu sổ hiện hành trước khi nộp.']).font = { italic: true, color: { argb: 'FF666666' } };
+  ws.addRow([]);
+  for (let i = 1; i <= 11; i += 1) ws.getRow(i).commit();
+  const head = ws.addRow(['Ngày, tháng ghi sổ', 'Số hiệu', 'Ngày, tháng', 'Diễn giải', 'Số tiền']);
+  head.font = { bold: true };
+  head.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+  head.eachCell((c) => { c.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFEFEA' } }; c.border = { top: { style: 'thin' }, bottom: { style: 'thin' } }; });
+  head.commit();
+  const sub = ws.addRow(['A', 'B', 'C', 'D', '1']);
+  sub.alignment = { horizontal: 'center' };
+  sub.font = { italic: true };
+  sub.commit();
+  let grand = 0;
+  for (const c of cats) {
+    const mine = rows.filter((r) => r.categoryId === c.id && r.net !== 0).sort((a, b) => String(a.day).localeCompare(String(b.day)));
+    if (!mine.length) continue;
+    const g = ws.addRow(['', '', '', `${c.name}`, '']);
+    g.font = { bold: true };
+    g.commit();
+    let sum = 0;
+    for (const r of mine) {
+      const day = String(r.day).slice(0, 10);
+      const row = ws.addRow([dmy(day), `BH-${day.replace(/-/g, '')}`, dmy(day), `Doanh thu bán hàng trong ngày (${r.lines} dòng bán)`, Math.round(r.net)]);
+      row.getCell(5).numFmt = NUM;
+      row.commit();
+      sum += Math.round(r.net);
+    }
+    const tot = ws.addRow(['', '', '', `Tổng số thuộc nhóm “${c.name}”`, sum]);
+    tot.font = { bold: true };
+    tot.getCell(5).numFmt = NUM;
+    tot.eachCell((cell) => { cell.border = { top: { style: 'thin' } }; });
+    tot.commit();
+    grand += sum;
+  }
+  const all = ws.addRow(['', '', '', 'TỔNG CỘNG DOANH THU', grand]);
+  all.font = { bold: true };
+  all.getCell(5).numFmt = NUM;
+  all.eachCell((cell) => { cell.border = { top: { style: 'medium' } }; });
+  all.commit();
+  ws.addRow([]).commit();
+  ws.addRow(['', '', '', '', `Ngày ${dmy(shopDay())}`]).commit();
+  ws.addRow(['', '', '', '', 'NGƯỜI ĐẠI DIỆN HỘ KINH DOANH']).font = { bold: true };
+  ws.addRow(['', '', '', '', '(Ký, họ tên, đóng dấu nếu có)']).font = { italic: true };
+  ws.addRow(['', '', '', '', shop.ownerName || '']).commit();
+  ws.columns.forEach((col, i) => { col.width = [18, 20, 14, 52, 20][i] || 16; });
   await ws.commit();
 }
 
@@ -166,6 +235,7 @@ async function build(job) {
   const tmp = `${file}.part`;
   const wb = new ExcelJS.stream.xlsx.WorkbookWriter({ filename: tmp, useStyles: true, useSharedStrings: false });
   wb.creator = 'CoCoffee POS';
+  if (job.kind === 's2a' || job.kind === 'bundle') await s2aSheet(wb, period, shop);
   if (job.kind === 'revenue_book' || job.kind === 'bundle') await revenueSheet(wb, period, shop);
   if (job.kind === 'expense_book' || job.kind === 'bundle') await expenseSheet(wb, period, shop);
   if (job.kind === 'declaration' || job.kind === 'bundle') await declarationSheet(wb, period, shop);

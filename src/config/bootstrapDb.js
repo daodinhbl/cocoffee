@@ -155,7 +155,7 @@ const UPGRADES = [
    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
   `CREATE TABLE IF NOT EXISTS tax_exports (
      id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
-     kind         ENUM('revenue_book','expense_book','declaration','bundle') NOT NULL,
+     kind         ENUM('s2a','revenue_book','expense_book','declaration','bundle') NOT NULL,
      period_from  DATE         NOT NULL,
      period_to    DATE         NOT NULL,
      status       ENUM('queued','running','done','failed') NOT NULL DEFAULT 'queued',
@@ -489,6 +489,12 @@ async function ensureSchemaUpgrades() {
         [table, column]
       );
       if (!Number(n)) { await pool.query(alter); logger.info(`Schema upgrade: added ${table}.${column}`); }
+    }
+    // tax_exports.kind gained 's2a' (Sổ doanh thu mẫu S2a-HKD): widen the ENUM of an older table once.
+    const [[kindCol]] = await pool.query("SELECT COLUMN_TYPE AS t FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'tax_exports' AND column_name = 'kind'");
+    if (kindCol && !/'s2a'/.test(kindCol.t || kindCol.COLUMN_TYPE || '')) {
+      await pool.query("ALTER TABLE tax_exports MODIFY kind ENUM('s2a','revenue_book','expense_book','declaration','bundle') NOT NULL");
+      logger.info('Schema upgrade: tax_exports.kind accepts s2a');
     }
     for (const sql of BACKFILL) await pool.query(sql);
     return 'ok';

@@ -74,6 +74,11 @@ async function addAll(today) {
   await ensureSchemaUpgrades();
   const today = shopDay();
   const from = addDays(`${monthOf(today, -2).y}-${pad(monthOf(today, -2).m)}-01`, 0);
+  if (remove && dryRun) {
+    const [[{ n }]] = await pool.query("SELECT COUNT(*) AS n FROM expenses WHERE doc_no LIKE 'MAU-%'");
+    console.log(`Dry run: would remove ${n} sample expense(s).`);
+    return;
+  }
   if (remove) {
     const n = await removeAll();
     await taxModel.rebuildExpenses(from, today);

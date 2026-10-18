@@ -183,7 +183,7 @@ function exportView(e) {
   };
 }
 
-/** POST /api/tax/exports { kind: revenue_book|expense_book|declaration|bundle, from, to } -> 202 { export } (reused: true when the same job is already waiting) */
+/** POST /api/tax/exports { kind: s2a|revenue_book|expense_book|declaration|bundle, from, to } -> 202 { export } (reused: true when the same job is already waiting) */
 async function createExport(req, res) {
   const kind = v.oneOf(req.body.kind, 'kind', taxExportService.KINDS);
   const r = await taxExportService.enqueue({ kind, from: req.body.from, to: req.body.to, userId: req.user.id });

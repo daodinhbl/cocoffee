@@ -311,10 +311,11 @@ class TaxExport {
 }
 
 const taxExportKinds = <String, String>{
+  's2a': 'Sổ doanh thu S2a-HKD',
   'revenue_book': 'Sổ doanh thu',
   'expense_book': 'Sổ chi phí',
   'declaration': 'Bảng kê tờ khai',
-  'bundle': 'Gói đủ 3 sổ',
+  'bundle': 'Gói đủ các sổ',
 };
 
 /// The last 20 exports; polls every 3 s while any is still queued or running.

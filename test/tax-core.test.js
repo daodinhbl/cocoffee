@@ -206,8 +206,15 @@ test('export worker: builds the three sheets as a real .xlsx and marks the job d
 
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.readFile(path.join(dir, fileName));
-  assert.deepEqual(wb.worksheets.map((w) => w.name), ['Sổ doanh thu', 'Sổ chi phí', 'Bảng kê tờ khai']);
+  assert.deepEqual(wb.worksheets.map((w) => w.name), ['S2a-HKD', 'Sổ doanh thu', 'Sổ chi phí', 'Bảng kê tờ khai']);
   const text = (ws) => { const out = []; ws.eachRow((r) => out.push(r.values.slice(1).join(' | '))); return out.join('\n'); };
+  const s2a = text(wb.getWorksheet('S2a-HKD'));
+  assert.match(s2a, /Mẫu số S2a-HKD/);
+  assert.match(s2a, /SỔ DOANH THU BÁN HÀNG HÓA, DỊCH VỤ/);
+  assert.match(s2a, /MST|Mã số thuế: 0123456789/);
+  assert.match(s2a, /01\/09\/2026 \| BH-20260901 \| 01\/09\/2026 \| Doanh thu bán hàng trong ngày/);
+  assert.match(s2a, /TỔNG CỘNG DOANH THU \| 2580000/);
+  assert.match(s2a, /NGƯỜI ĐẠI DIỆN HỘ KINH DOANH/);
   const rev = text(wb.getWorksheet('Sổ doanh thu'));
   assert.match(rev, /CÒ COFFEE/);
   assert.match(rev, /MST: 0123456789/);

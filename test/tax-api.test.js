@@ -154,7 +154,7 @@ test('finance API for the app + the tax page', async (t) => {
     assert.match(text, /Thuế ước tính 11\.700\.000đ GTGT 7\.800\.000đ · TNCN 3\.900\.000đ/);
     assert.match(text, /Lũy kế đến hết kỳ: 800\.000\.000đ/);
     assert.match(text, /Dịch vụ ăn uống 400\.000\.000đ/);
-    assert.match(text, /Gói đủ 3 sổ/);
+    assert.match(text, /Gói đủ các sổ/);
     assert.match(text, /Tải về \(20 KB\)/);
     assert.match(html, /name="exempt_threshold"[^>]*value="500000000"/);
     assert.match(html, /<option value="revenue" selected>/);
