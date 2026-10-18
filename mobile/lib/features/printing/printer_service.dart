@@ -7,6 +7,7 @@ import '../../core/api/api_client.dart';
 import '../../core/diagnostics/app_log.dart';
 import '../../core/session.dart';
 import 'escpos_raster.dart';
+import 'lan_printer.dart';
 import 'receipt_image.dart';
 
 /// A paired Bluetooth printer as the phone lists it.
@@ -44,13 +45,22 @@ class BluetoothThermalTransport implements PrinterTransport {
 
 final printerTransportProvider = Provider<PrinterTransport>((_) => BluetoothThermalTransport());
 
+final lanTransportProvider = Provider<PrinterTransport>((_) => LanTransport());
+
 const _kName = 'printer.bt.name';
 const _kAddress = 'printer.bt.address';
+const _kKind = 'printer.kind';
 
-/// The Bluetooth printer the shop chose on this phone (stored locally: each phone pairs its own printer).
+/// How a printer is reached.
+const kindBluetooth = 'bluetooth';
+const kindLan = 'lan';
+
+/// The printer the shop chose on this phone (stored locally: each phone has its own). [address] is the Bluetooth MAC, or
+/// "host:port" of a network (LAN) printer.
 class SavedPrinter {
-  const SavedPrinter(this.name, this.address);
-  final String name, address;
+  const SavedPrinter(this.name, this.address, {this.kind = kindBluetooth});
+  final String name, address, kind;
+  bool get isLan => kind == kindLan;
 }
 
 class SavedPrinterNotifier extends Notifier<SavedPrinter?> {
@@ -58,20 +68,22 @@ class SavedPrinterNotifier extends Notifier<SavedPrinter?> {
   SavedPrinter? build() {
     final p = ref.watch(sessionStoreProvider).prefs;
     final a = p.getString(_kAddress);
-    return a == null ? null : SavedPrinter(p.getString(_kName) ?? a, a);
+    return a == null ? null : SavedPrinter(p.getString(_kName) ?? a, a, kind: p.getString(_kKind) == kindLan ? kindLan : kindBluetooth);
   }
 
-  Future<void> choose(PrinterDevice d) async {
+  Future<void> choose(PrinterDevice d, {String kind = kindBluetooth}) async {
     final p = ref.read(sessionStoreProvider).prefs;
     await p.setString(_kName, d.name);
     await p.setString(_kAddress, d.address);
-    state = SavedPrinter(d.name, d.address);
+    await p.setString(_kKind, kind);
+    state = SavedPrinter(d.name, d.address, kind: kind);
   }
 
   Future<void> forget() async {
     final p = ref.read(sessionStoreProvider).prefs;
     await p.remove(_kName);
     await p.remove(_kAddress);
+    await p.remove(_kKind);
     state = null;
   }
 }
@@ -85,16 +97,23 @@ class PrintException implements Exception {
   String toString() => message;
 }
 
-/// Prints a receipt on the saved Bluetooth printer.
+/// Prints a receipt on the saved printer (Bluetooth or network).
 class PrinterService {
   PrinterService(this._ref);
   final Ref _ref;
 
-  PrinterTransport get _t => _ref.read(printerTransportProvider);
+  PrinterTransport get _t {
+    final saved = _ref.read(savedPrinterProvider);
+    return _ref.read(saved != null && saved.isLan ? lanTransportProvider : printerTransportProvider);
+  }
 
   Future<void> _ensureConnected() async {
     final saved = _ref.read(savedPrinterProvider);
-    if (saved == null) throw PrintException('Chưa chọn máy in. Vào Cài đặt > Máy in Bluetooth để chọn.');
+    if (saved == null) throw PrintException('Chưa chọn máy in. Vào Cài đặt > Máy in để chọn (Bluetooth hoặc mạng LAN).');
+    if (saved.isLan) {
+      if (!await _t.connect(saved.address)) throw PrintException('Không kết nối được máy in ${saved.name} (${saved.address}). Kiểm tra máy in đã bật, cùng mạng Wi-Fi/LAN với điện thoại và đúng địa chỉ IP.');
+      return;
+    }
     if (!await _t.permissionGranted()) throw PrintException('Chưa cấp quyền Bluetooth cho ứng dụng.');
     if (!await _t.bluetoothOn()) throw PrintException('Bluetooth đang tắt. Hãy bật Bluetooth rồi in lại.');
     if (!await _t.connect(saved.address)) throw PrintException('Không kết nối được máy in ${saved.name}. Kiểm tra máy in đã bật và đang ở gần.');

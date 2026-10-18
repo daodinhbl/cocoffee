@@ -85,5 +85,7 @@
 	<string>Mở khóa ứng dụng bằng Face ID.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Kết nối máy in hóa đơn Bluetooth.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Tìm và kết nối máy in hóa đơn trong mạng LAN/Wi-Fi của quán.</string>
 </dict>
 </plist>
