@@ -44,7 +44,7 @@ const jwtSecret = () => {
   return crypto.createHmac('sha256', required('DB_PASSWORD')).update('cocoffee-fnb:jwt:v1').digest('hex');
 };
 
-const demoEnv = bool('DEMO_MODE', false);
+let demoEnv = bool('DEMO_MODE', false);
 const demoRuntime = { on: false };
 
 module.exports = {
@@ -91,6 +91,7 @@ module.exports = {
   // reads it at start and every minute), turns it on.
   demo: {
     get enabled() { return demoEnv || demoRuntime.on; },
+    set enabled(v) { demoEnv = Boolean(v); },                   // tests flip it
     username: optional('DEMO_USERNAME', 'admin'),
     password: optional('DEMO_PASSWORD', 'admin'),
   },
