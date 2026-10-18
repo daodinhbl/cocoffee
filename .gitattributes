@@ -12,3 +12,4 @@ README.md        export-ignore
 
 # CI workflows are not part of the server deploy archive
 .github/         export-ignore
+/desktop export-ignore
