@@ -577,3 +577,17 @@
   try { if (window.location.hash.length > 1) hashTab = document.getElementById(decodeURIComponent(window.location.hash.slice(1))); } catch (e) { hashTab = null; /* malformed %-escape */ }
   if (hashTab && hashTab.getAttribute('role') === 'tab') selectTab(hashTab, false);
 })();
+
+
+// Generic "copy" button: <button data-copy-from="#id" data-copy-note="#note">. Copies the text of #id and says so in #note.
+document.addEventListener('click', function (e) {
+  var btn = e.target.closest && e.target.closest('[data-copy-from]');
+  if (!btn) return;
+  var src = document.querySelector(btn.getAttribute('data-copy-from'));
+  var note = document.querySelector(btn.getAttribute('data-copy-note') || '#__none');
+  if (!src) return;
+  var text = src.textContent.trim();
+  var say = function (ok) { if (note) note.textContent = ok ? 'Đã sao chép.' : 'Không sao chép được: bôi đen rồi nhấn Ctrl+C.'; };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function () { say(true); }, function () { say(false); });
+  else say(false);
+});

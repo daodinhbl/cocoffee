@@ -32,6 +32,10 @@
     .opt span { font-size: .9rem; color: #555; }
     button { width: 100%; margin-top: 1.3rem; padding: .8rem; border: 0; border-radius: 8px; background: var(--navy2); color: #fff; font: 700 1.05rem "Times New Roman", serif; cursor: pointer; }
     button:hover { background: var(--navy); }
+    .showpw { display: flex; align-items: center; gap: .5rem; margin-top: .5rem; font-weight: 400; cursor: pointer; }
+    .mid { background: #F1EEE8; border: 1px solid var(--line); border-radius: 8px; padding: .8rem 1rem; margin-top: 1.4rem; }
+    .mid code { display: block; font: 600 1.02rem Consolas, monospace; word-break: break-all; margin: .3rem 0; }
+    .mid button { width: auto; margin: .2rem 0 0; padding: .45rem .9rem; font-size: .95rem; }
     .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
   </style>
 </head>
@@ -62,6 +66,7 @@
     <p class="hint">Ít nhất 10 ký tự.</p>
     <label class="f" for="password2">Nhập lại mật khẩu</label>
     <input id="password2" name="password2" type="password" minlength="10" maxlength="72" required autocomplete="new-password" <%- field === 'password2' ? 'aria-invalid="true"' : '' %>>
+    <label class="showpw"><input type="checkbox" id="show-pw"> Hiện mật khẩu</label>
 
     <h2>3. Dữ liệu ban đầu</h2>
     <label class="opt"><input type="radio" name="data" value="blank" <%= values.data !== 'sample' ? 'checked' : '' %>><div><b>Trống</b><span>Chưa có món, nguyên liệu hay bàn nào. Bạn tự thêm trong trang quản lý.</span></div></label>
@@ -74,9 +79,17 @@
       <p class="hint">Mã do người quản trị máy chủ đặt, để người lạ không chiếm được trang mới.</p>
     <% } %>
 
+    <% if (machineId) { %>
+      <div class="mid">
+        <b>Mã máy</b> <span class="hint">(gửi cho người cấp giấy phép để nhận mã kích hoạt)</span>
+        <code id="machine-id"><%= machineId %></code>
+        <button type="button" id="copy-machine-id">Sao chép mã máy</button> <span id="copy-note" class="hint"></span>
+      </div>
+    <% } %>
     <button type="submit">Cài đặt</button>
   </form>
 <% } %>
 </main>
+<script src="/install/install.js" defer></script>
 </body>
 </html>

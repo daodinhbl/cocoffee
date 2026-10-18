@@ -25,6 +25,7 @@ async function page(req, res) {
     config: { ...systemConfig(), publicBaseUrl: env.publicBaseUrl || '(chưa đặt)' },
     heli: forced ? null : require('../../services/heli/heliConfig').view(),
     dbConn: forced ? null : require('../../services/dbConfig').view(),
+    machineId: forced ? null : await require('../../services/machineId').read(),
   });
 }
 

@@ -50,6 +50,7 @@ void main() {
     test('the same machine always gives the same id; any change of guid or disk gives another', () {
       final a = machineIdFrom(guid: '6F1C2D3E-1111-2222-3333-444455556666', volumeSerial: '1A2B-3C4D');
       expect(a, matches(RegExp(r'^([0-9A-F]{4}-){7}[0-9A-F]{4}$')));
+      expect(a, '03ED-76A2-9A68-E1C0-A66B-9E17-B152-DE97', reason: 'the same value src/services/machineId.js gives (web pages show the same id)');
       expect(machineIdFrom(guid: '6f1c2d3e-1111-2222-3333-444455556666 ', volumeSerial: '1a2b-3c4d'), a, reason: 'case and spaces do not matter');
       expect(machineIdFrom(guid: '6F1C2D3E-1111-2222-3333-444455556667', volumeSerial: '1A2B-3C4D'), isNot(a));
       expect(machineIdFrom(guid: '6F1C2D3E-1111-2222-3333-444455556666', volumeSerial: '1A2B-3C4E'), isNot(a));
@@ -69,6 +70,8 @@ void main() {
         expect(id, isNotNull);
         expect(id, matches(RegExp(r'^([0-9A-F]{4}-){7}[0-9A-F]{4}$')));
         expect(await readMachineId(), id, reason: 'stable between calls');
+        // ignore: avoid_print
+        print('THIS-PC-ID $id');
       }
     });
   });

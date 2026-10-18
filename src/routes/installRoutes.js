@@ -8,8 +8,10 @@ const logger = require('../utils/logger');
 const router = express.Router();
 router.use(express.urlencoded({ extended: false, limit: '20kb' }));
 
-const page = (res, values = {}, error = null, field = null, status = 200, extra = {}) =>
-  res.status(status).render('install', { values, error, field, needsToken: Boolean(env.db.installToken), noTables: false, ...extra });
+const machineId = require('../services/machineId');
+
+const page = async (res, values = {}, error = null, field = null, status = 200, extra = {}) =>
+  res.status(status).render('install', { values, error, field, needsToken: Boolean(env.db.installToken), noTables: false, machineId: await machineId.read(), ...extra });
 
 router.use(async (_req, res, next) => (await installService.isInstalled() ? res.redirect(302, '/admin/login') : next()));
 

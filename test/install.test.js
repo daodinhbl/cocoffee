@@ -106,3 +106,40 @@ test('the setup token, when configured, is required', () => {
     assert.doesNotThrow(() => installService.validate({ ...body, token: 's3cret-token' }));
   } finally { env.db.installToken = before; }
 });
+
+test('setup page: show-password toggle and the machine id to send to the licence issuer', async (t) => {
+  const machineId = require('../src/services/machineId');
+  mock.method(userModel, 'count', async () => 0);
+  const real = machineId.read;
+  machineId.read = async () => '4D08-30D3-AD2E-8125-DD67-9EE7-5294-FDBA';
+  const app = express();
+  app.set('view engine', 'ejs');
+  app.set('views', path.join(__dirname, '..', 'views'));
+  app.use('/cai-dat', installRoutes);
+  app.use(express.static(path.join(__dirname, '..', 'public')));
+  const server = http.createServer(app).listen(0);
+  await new Promise((r) => server.once('listening', r));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  t.after(() => { server.close(); machineId.read = real; mock.restoreAll(); installService.forget(); });
+  installService.forget();
+  const html = await (await fetch(`${base}/cai-dat`)).text();
+  assert.match(html, /id="show-pw"/);
+  assert.match(html, /Hiện mật khẩu/);
+  assert.match(html, /id="machine-id">4D08-30D3-AD2E-8125-DD67-9EE7-5294-FDBA</);
+  assert.match(html, /gửi cho người cấp giấy phép/);
+  assert.match(html, /src="\/install\/install\.js"/);
+  const js = await (await fetch(`${base}/install/install.js`)).text();
+  assert.match(js, /show-pw/);
+  assert.match(js, /clipboard/);
+  machineId.read = async () => null;                     // Hostinger / Linux: no machine id, no box
+  assert.ok(!(await (await fetch(`${base}/cai-dat`)).text()).includes('id="machine-id"'));
+});
+
+test('machine id: same algorithm as the Windows manager, parsers read any language', () => {
+  const m = require('../src/services/machineId');
+  assert.equal(m.machineIdFrom({ guid: '6F1C2D3E-1111-2222-3333-444455556666', volumeSerial: '1A2B-3C4D' }), '03ED-76A2-9A68-E1C0-A66B-9E17-B152-DE97');
+  assert.equal(m.machineIdFrom({ guid: ' 6f1c2d3e-1111-2222-3333-444455556666 ', volumeSerial: '1a2b-3c4d' }), '03ED-76A2-9A68-E1C0-A66B-9E17-B152-DE97');
+  assert.equal(m.parseMachineGuid('\r\n    MachineGuid    REG_SZ    6f1c2d3e-1111-2222-3333-444455556666\r\n'), '6f1c2d3e-1111-2222-3333-444455556666');
+  assert.equal(m.parseVolumeSerial(' Ổ đĩa C không có nhãn.\r\n Số sê-ri của ổ đĩa là 9F8E-7D6C\r\n'), '9F8E-7D6C');
+  assert.equal(m.parseVolumeSerial('khong co'), null);
+});
