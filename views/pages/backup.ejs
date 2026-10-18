@@ -58,6 +58,55 @@
     </form>
   </section>
 
+  <section class="col-span-12 rounded border border-gray-200 p-5" aria-labelledby="bk-mail">
+    <h2 id="bk-mail" class="text-base font-semibold">Gửi bản sao lưu qua email (về Gmail / Google Drive của bạn)</h2>
+    <p class="mt-1 max-w-3xl text-xs text-gray-500">Mỗi ngày lúc <%= mail.hour %>:00 hệ thống gửi một bản sao lưu đầy đủ (file .sql.gz) tới email bên dưới. Dùng địa chỉ Gmail của bạn rồi lưu thư vào Google Drive bằng nút "Lưu vào Drive" của Gmail, hoặc tạo bộ lọc Gmail tự gắn nhãn và lưu. Hộp thư cần có chỗ trống: file lớn hơn 20 MB không được đính kèm.</p>
+    <% if (mailStatus.error) { %><p class="mt-2 rounded bg-red-50 p-2 text-sm text-red-700">Lần gửi gần nhất bị lỗi: <%= mailStatus.error %></p><% } %>
+    <% if (!mail.configured) { %><p class="mt-2 rounded bg-amber-50 p-2 text-sm text-amber-900">Chưa gửi được: nhập đủ email nhận và tài khoản gửi thư (SMTP) bên dưới. Gmail cần "Mật khẩu ứng dụng" (myaccount.google.com → Bảo mật → Xác minh 2 bước → Mật khẩu ứng dụng).</p><% } %>
+    <form method="post" action="/admin/backup/mail" class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <%- include('../partials/csrf') %>
+      <input type="hidden" name="_back" value="/admin/backup">
+      <label class="flex min-h-10 items-center gap-2 text-sm sm:col-span-2">
+        <input type="hidden" name="enabled" value="0">
+        <input type="checkbox" name="enabled" value="1" <%= mail.enabled ? 'checked' : '' %> class="h-4 w-4 rounded border-gray-300 accent-blue-700">
+        Bật gửi sao lưu hằng ngày qua email
+      </label>
+      <div class="sm:col-span-2">
+        <label for="bm-to" class="<%= label %>">Email nhận bản sao lưu</label>
+        <input id="bm-to" name="to" type="email" required maxlength="120" value="<%= mail.to %>" class="<%= input %>" autocomplete="off">
+      </div>
+      <div>
+        <label for="bm-host" class="<%= label %>">Máy chủ gửi thư (SMTP)</label>
+        <input id="bm-host" name="host" type="text" maxlength="120" placeholder="smtp.gmail.com" value="<%= mail.host || '' %>" class="<%= input %>" autocomplete="off">
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label for="bm-port" class="<%= label %>">Cổng</label>
+          <input id="bm-port" name="port" type="number" min="1" max="65535" value="<%= mail.port %>" class="<%= input %> font-mono">
+        </div>
+        <div>
+          <label for="bm-secure" class="<%= label %>">Kết nối</label>
+          <select id="bm-secure" name="secure" class="<%= input %>">
+            <option value="1" <%= mail.secure ? 'selected' : '' %>>SSL (465)</option>
+            <option value="0" <%= mail.secure ? '' : 'selected' %>>STARTTLS (587)</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label for="bm-user" class="<%= label %>">Tài khoản gửi thư</label>
+        <input id="bm-user" name="user" type="text" maxlength="120" value="<%= mail.user || '' %>" class="<%= input %>" autocomplete="off">
+      </div>
+      <div>
+        <label for="bm-pass" class="<%= label %>">Mật khẩu ứng dụng <%= mail.passSet ? '(đã lưu, để trống nếu giữ nguyên)' : '' %></label>
+        <input id="bm-pass" name="pass" type="password" maxlength="200" class="<%= input %>" autocomplete="new-password" placeholder="<%= mail.passSet ? '••••••••••••' : '' %>">
+      </div>
+      <div class="flex flex-wrap gap-3 sm:col-span-2">
+        <button type="submit" class="<%= btnPrimary %>">Lưu</button>
+        <button type="submit" formaction="/admin/backup/mail/test" formnovalidate class="<%= btnSecondary %>">Gửi thử một bản ngay</button>
+      </div>
+    </form>
+  </section>
+
   <section class="col-span-12 rounded border border-gray-200 max-lg:border-0" aria-labelledby="bk-list">
     <div class="border-b border-gray-200 px-5 py-4 max-lg:border-b-0 max-lg:px-0"><h2 id="bk-list" class="text-base font-semibold">Bản sao lưu trên máy chủ (<%= files.length %>)</h2></div>
     <% if (!files.length) { %>

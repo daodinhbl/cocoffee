@@ -2,18 +2,21 @@ const bcrypt = require('bcryptjs');
 const env = require('../../config/env');
 const userModel = require('../../models/userModel');
 const backupService = require('../../services/backupService');
+const backupMail = require('../../services/backupMailService');
 const { AppError } = require('../../utils/httpError');
 const logger = require('../../utils/logger');
 const { render } = require('./common');
 
 async function page(_req, res) {
-  const [files, config] = await Promise.all([backupService.list(), backupService.getSettings()]);
+  const [files, config, mail] = await Promise.all([backupService.list(), backupService.getSettings(), backupMail.view()]);
   await render(res, 'backup', {
     title: 'Sao lưu & khôi phục', activeMenu: 'backup',
     breadcrumbs: [{ label: 'Hệ thống', href: '#' }, { label: 'Sao lưu & khôi phục' }],
   }, {
     files: files.map((f) => ({ ...f, when: f.createdAt.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false }), mb: (f.size / 1048576).toFixed(2) })),
     config,
+    mail,
+    mailStatus: backupMail.status,
     autoWhen: backupService.lastAuto.at ? backupService.lastAuto.at.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false }) : '',
     kinds: backupService.KINDS,
     intervals: backupService.INTERVALS,
@@ -57,6 +60,26 @@ async function saveSettings(req) {
   return { message: 'Đã lưu cấu hình sao lưu tự động.', to: '/admin/backup' };
 }
 
+async function saveMail(req) {
+  await backupMail.save(req.body, req.user.id);
+  return { message: 'Đã lưu cấu hình gửi bản sao lưu qua email.', to: '/admin/backup' };
+}
+
+/** Sends one backup now, to see that the e-mail account works (and that the file reaches the inbox). */
+async function testMail(req) {
+  if (req.body && req.body.to) await backupMail.save(req.body, req.user.id);       // the form's values are tried as typed
+  await backupMail.loadOverrides();
+  if (!backupMail.configured()) throw new AppError(400, 'VALIDATION', 'Chưa nhập đủ email nhận và tài khoản gửi thư (SMTP).');
+  try {
+    const r = await backupMail.sendNow();
+    return { message: `Đã gửi bản sao lưu (${(r.size / 1024).toFixed(0)} KB${r.attached ? '' : ', quá lớn nên không đính kèm'}). Kiểm tra hộp thư.`, to: '/admin/backup' };
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    logger.error('Backup mail test failed', err);
+    throw new AppError(502, 'MAIL_FAILED', `Không gửi được thư: ${String(err.message || err).slice(0, 160)}`);
+  }
+}
+
 async function remove(req) {
   await backupService.remove(req.params.name);
   return { message: 'Đã xóa bản sao lưu.', to: '/admin/backup' };
@@ -83,4 +106,4 @@ async function upload(req, res) {
   }
 }
 
-module.exports = { page, create, downloadNow, downloadFile, saveSettings, remove, restore, upload };
+module.exports = { saveMail, testMail, page, create, downloadNow, downloadFile, saveSettings, remove, restore, upload };

@@ -197,6 +197,8 @@ router.post('/backup/create', act(backup.create));
 router.get('/backup/download', backup.downloadNow);
 router.get('/backup/files/:name', backup.downloadFile);
 router.post('/backup/settings', act(backup.saveSettings));
+router.post('/backup/mail', act(backup.saveMail));
+router.post('/backup/mail/test', act(backup.testMail));
 router.post('/backup/files/:name/delete', act(backup.remove));
 router.post('/backup/files/:name/restore', act(backup.restore));
 
