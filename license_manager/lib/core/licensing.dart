@@ -98,6 +98,20 @@ class VendorKey {
     return _fromSeed(der.sublist(16), file);
   }
 
+  /// Writes a private key pasted from a backup (PEM text). Checks it first; refuses to overwrite an existing file.
+  static Future<VendorKey> importPem(String file, String pem) async {
+    if (File(file).existsSync()) throw LicenseError('Đã có khóa riêng ở $file, không ghi đè.');
+    Directory(p.dirname(file)).createSync(recursive: true);
+    final tmp = File('$file.import')..writeAsStringSync('${pem.trim()}\n');
+    try {
+      final k = await load(tmp.path);
+      tmp.renameSync(file);
+      return VendorKey._(k.pair, k.publicHex, file);
+    } finally {
+      if (tmp.existsSync()) tmp.deleteSync();
+    }
+  }
+
   /// Makes a new key and writes it. Refuses to overwrite an existing file: losing the private key means no new codes.
   static Future<VendorKey> create(String file, {Random? random}) async {
     if (File(file).existsSync()) throw LicenseError('Đã có khóa riêng ở $file, không ghi đè.');

@@ -114,4 +114,14 @@ void main() {
     expect(csv, contains('Đã thu hồi'));
     expect(File('${book.file}.tmp').existsSync(), isFalse);
   });
+
+  test('a backed-up private key can be imported once and gives the same public key', () async {
+    final a = await VendorKey.create(p.join(tmp.path, 'a', 'license-private.pem'));
+    final pem = File(a.file).readAsStringSync();
+    final b = await VendorKey.importPem(p.join(tmp.path, 'b', 'license-private.pem'), pem);
+    expect(b.publicHex, a.publicHex);
+    await expectLater(VendorKey.importPem(b.file, pem), throwsA(isA<LicenseError>()));        // never overwrites
+    await expectLater(VendorKey.importPem(p.join(tmp.path, 'c', 'license-private.pem'), 'khong phai khoa'), throwsA(isA<LicenseError>()));
+    expect(File(p.join(tmp.path, 'c', 'license-private.pem')).existsSync(), isFalse);
+  });
 }

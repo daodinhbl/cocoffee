@@ -3,10 +3,15 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import 'core/licensing.dart';
 
 const _defaultDir = r'D:\FNB-secrets';
+
+/// Phone/tablet build: keys and the ledger live in the app's own (sandboxed) documents folder; no folder picking.
+bool get isMobile => Platform.isIOS || Platform.isAndroid;
 
 void main() => runApp(const LicenseManagerApp());
 
@@ -34,7 +39,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String _dir = Platform.environment['TASOTEK_LICENSE_DIR'] ?? _defaultDir;
+  String _dir = Platform.environment['TASOTEK_LICENSE_DIR'] ?? (isMobile ? '' : _defaultDir);
+  bool _ready = !isMobile;
   VendorKey? _key;
   String? _keyError;
   int _tab = 0;
@@ -43,7 +49,19 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _loadKey();
+    if (isMobile) {
+      getApplicationDocumentsDirectory().then((d) {
+        if (!mounted) return;
+        setState(() {
+          _dir = p.join(d.path, 'tasotek-license');
+          _book = LicenseBook(p.join(_dir, 'license-db.json'));
+          _ready = true;
+        });
+        _loadKey();
+      });
+    } else {
+      _loadKey();
+    }
   }
 
   Future<void> _loadKey() async {
@@ -75,6 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_ready) return const Scaffold(body: Center(child: CircularProgressIndicator()));
     final pages = [
       IssuePage(key: ValueKey('issue$_dir'), keyPair: _key, book: _book, onIssued: () => setState(() {})),
       ListPage(key: ValueKey('list$_dir${_book.read().length}'), keyPair: _key, book: _book, changed: () => setState(() {})),
@@ -88,7 +107,19 @@ class _HomeScreenState extends State<HomeScreen> {
         foregroundColor: Colors.white,
         actions: [Padding(padding: const EdgeInsets.only(right: 16), child: Center(child: Text(_key == null ? 'Chưa có khóa' : 'Khóa: ${_key!.publicHex.substring(0, 12)}…', style: const TextStyle(fontSize: 13))))],
       ),
-      body: Row(children: [
+      bottomNavigationBar: isMobile
+          ? NavigationBar(
+              selectedIndex: _tab,
+              onDestinationSelected: (i) => setState(() => _tab = i),
+              destinations: const [
+                NavigationDestination(icon: Icon(Icons.add_moderator_rounded), label: 'Cấp mã'),
+                NavigationDestination(icon: Icon(Icons.list_alt_rounded), label: 'Đã cấp'),
+                NavigationDestination(icon: Icon(Icons.fact_check_rounded), label: 'Kiểm tra'),
+                NavigationDestination(icon: Icon(Icons.key_rounded), label: 'Khóa'),
+              ],
+            )
+          : null,
+      body: isMobile ? SafeArea(child: pages[_tab]) : Row(children: [
         NavigationRail(
           selectedIndex: _tab,
           onDestinationSelected: (i) => setState(() => _tab = i),
@@ -296,9 +327,13 @@ class _ListPageState extends State<ListPage> {
           SizedBox(width: 260, child: TextField(decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'Tìm khách / mã máy', isDense: true, border: OutlineInputBorder()), onChanged: (v) => setState(() => _q = v.trim().toLowerCase()))),
           const SizedBox(width: 8),
           OutlinedButton.icon(
-            onPressed: () {
+            onPressed: () async {
               final f = File(p.join(p.dirname(widget.book.file), 'danh-sach-cap-phep.csv'))..writeAsStringSync(widget.book.csv());
-              setState(() => _msg = 'Đã xuất ${f.path}');
+              if (isMobile) {
+                await SharePlus.instance.share(ShareParams(files: [XFile(f.path)], subject: 'Danh sách cấp phép'));
+              } else {
+                setState(() => _msg = 'Đã xuất ${f.path}');
+              }
             },
             icon: const Icon(Icons.table_view_rounded, size: 18),
             label: const Text('Xuất CSV'),
@@ -428,6 +463,18 @@ class _KeyPageState extends State<KeyPage> {
     }
   }
 
+  /// Mobile: paste the PEM saved from the Windows tool (or a backup of this app's key).
+  Future<void> _import() async {
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    try {
+      await VendorKey.importPem(p.join(_dir.text.trim(), 'license-private.pem'), data?.text ?? '');
+      widget.onCreated();
+      setState(() => _msg = 'Đã nhập khóa riêng từ bộ nhớ tạm.');
+    } on LicenseError catch (e) {
+      setState(() => _msg = 'Sao chép nội dung file license-private.pem rồi bấm lại. ${e.message}');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).textTheme;
@@ -437,7 +484,7 @@ class _KeyPageState extends State<KeyPage> {
       const SizedBox(height: 4),
       const Text('Khóa riêng (Ed25519) nằm trong thư mục bên dưới, chỉ trên máy này. Sổ mã đã cấp (license-db.json) cũng lưu ở đây.'),
       const SizedBox(height: 12),
-      Row(children: [
+      if (!isMobile) Row(children: [
         Expanded(child: TextField(controller: _dir, decoration: const InputDecoration(labelText: 'Thư mục khóa và sổ', border: OutlineInputBorder()))),
         const SizedBox(width: 8),
         FilledButton(onPressed: () => widget.onDir(_dir.text.trim()), child: const Text('Dùng thư mục này')),
@@ -454,6 +501,14 @@ class _KeyPageState extends State<KeyPage> {
               SelectableText(k.publicHex, style: const TextStyle(fontFamily: 'Consolas', fontSize: 13)),
               const SizedBox(height: 8),
               OutlinedButton.icon(onPressed: () => copy(context, k.publicHex, 'khóa công khai'), icon: const Icon(Icons.copy_rounded, size: 18), label: const Text('Sao chép khóa công khai')),
+              if (isMobile) ...[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: () => SharePlus.instance.share(ShareParams(files: [XFile(k.file)], subject: 'Sao lưu khóa riêng POS Tasotek')),
+                  icon: const Icon(Icons.ios_share_rounded, size: 18),
+                  label: const Text('Sao lưu khóa riêng (cất nơi an toàn)'),
+                ),
+              ],
             ]),
           ),
         ),
@@ -466,6 +521,10 @@ class _KeyPageState extends State<KeyPage> {
               Text(widget.error ?? 'Chưa có khóa riêng.'),
               const SizedBox(height: 8),
               FilledButton.icon(onPressed: _create, icon: const Icon(Icons.vpn_key_rounded), label: const Text('Tạo khóa mới tại thư mục này')),
+              if (isMobile) ...[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(onPressed: _import, icon: const Icon(Icons.content_paste_rounded), label: const Text('Dán khóa riêng đã sao lưu (PEM)')),
+              ],
               const SizedBox(height: 4),
               const Text('Chú ý: nếu tạo khóa mới thì chương trình của khách (đã nhúng khóa công khai cũ) sẽ không nhận mã mới; phải phát hành lại bản cài với khóa công khai mới.', style: TextStyle(fontSize: 12)),
             ]),
