@@ -248,6 +248,53 @@ class LicenseBook {
     _write(all);
   }
 
+  /// The ledger as JSON text, the same layout as license-db.json (what "Sao chép sổ" puts on the clipboard).
+  String exportJson() => const JsonEncoder.withIndent('  ').convert({'licenses': [for (final l in read()) l.toJson()]});
+
+  static int _rank(String s) => switch (s) { 'revoked' => 3, 'replaced' => 2, _ => 1 };
+
+  /// Merges a ledger from another device (Windows <-> iPhone) into this one. Rows are matched by id; a row only moves "forward"
+  /// (active -> replaced -> revoked), so a revoke made on either device wins. Rows whose code was not signed by [publicHex] are
+  /// refused (junk or somebody else's ledger). Returns how many rows were added / updated / refused.
+  Future<({int added, int updated, int refused})> mergeJson(String text, String publicHex) async {
+    Object? j;
+    try {
+      j = jsonDecode(text);
+    } catch (_) {
+      throw LicenseError('Nội dung dán vào không phải sổ cấp phép (JSON).');
+    }
+    final rows = j is Map ? j['licenses'] : null;
+    if (rows is! List) throw LicenseError('Nội dung dán vào không phải sổ cấp phép.');
+    final all = read();
+    final byId = {for (final l in all) l.id: l};
+    var added = 0, updated = 0, refused = 0;
+    for (final raw in rows) {
+      IssuedLicense rec;
+      try {
+        rec = IssuedLicense.fromJson(Map<String, dynamic>.from(raw as Map));
+        final d = await decodeCode(rec.code, publicHex);
+        if (!d.signatureValid || d.payload.machine != rec.payload.machine) throw LicenseError('bad');
+      } catch (_) {
+        refused++;
+        continue;
+      }
+      final mine = byId[rec.id];
+      if (mine == null) {
+        all.add(rec);
+        byId[rec.id] = rec;
+        added++;
+      } else if (_rank(rec.status) > _rank(mine.status)) {
+        mine.status = rec.status;
+        updated++;
+      }
+    }
+    if (added + updated > 0) {
+      all.sort((a, b) => a.payload.issued.compareTo(b.payload.issued));
+      _write(all);
+    }
+    return (added: added, updated: updated, refused: refused);
+  }
+
   /// A spreadsheet-friendly list (UTF-8 with BOM so Excel shows Vietnamese correctly).
   String csv() {
     String q(String s) => '"${s.replaceAll('"', '""')}"';

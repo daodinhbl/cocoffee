@@ -124,4 +124,31 @@ void main() {
     await expectLater(VendorKey.importPem(p.join(tmp.path, 'c', 'license-private.pem'), 'khong phai khoa'), throwsA(isA<LicenseError>()));
     expect(File(p.join(tmp.path, 'c', 'license-private.pem')).existsSync(), isFalse);
   });
+
+  test('ledger merge between devices: union by id, revoke wins, unsigned rows refused', () async {
+    final key = await VendorKey.create(p.join(tmp.path, 'k', 'license-private.pem'));
+    final win = LicenseBook(p.join(tmp.path, 'win', 'db.json'), now: () => DateTime.utc(2026, 10, 18));
+    final phone = LicenseBook(p.join(tmp.path, 'phone', 'db.json'), now: () => DateTime.utc(2026, 10, 18));
+    final a = await win.issue(key, machine: kMachine, customer: 'Quán A', days: 30, features: ['pos']);
+    final b = await phone.issue(key, machine: kMachine, customer: 'Quán B', days: 30, features: ['pos']);
+    var r = await phone.mergeJson(win.exportJson(), key.publicHex);
+    expect((r.added, r.updated, r.refused), (1, 0, 0));
+    expect(phone.read().map((l) => l.payload.customer), unorderedEquals(['Quán A', 'Quán B']));
+    r = await phone.mergeJson(win.exportJson(), key.publicHex);                                     // same again: nothing changes
+    expect((r.added, r.updated), (0, 0));
+    phone.revoke(a.id);                                                                             // revoked on the phone ...
+    r = await win.mergeJson(phone.exportJson(), key.publicHex);                                     // ... reaches Windows
+    expect((r.added, r.updated), (1, 1));
+    expect(win.read().firstWhere((l) => l.id == a.id).status, 'revoked');
+    r = await phone.mergeJson(win.exportJson(), key.publicHex);                                     // and an old "active" copy never un-revokes
+    expect(phone.read().firstWhere((l) => l.id == a.id).status, 'revoked');
+    expect(r.updated, 0);
+    final other = await VendorKey.create(p.join(tmp.path, 'k2', 'license-private.pem'));
+    final foreign = LicenseBook(p.join(tmp.path, 'f', 'db.json'));
+    await foreign.issue(other, machine: kMachine, customer: 'Lạ', days: 30, features: ['pos']);
+    r = await win.mergeJson(foreign.exportJson(), key.publicHex);
+    expect((r.added, r.refused), (0, 1));
+    await expectLater(win.mergeJson('not json', key.publicHex), throwsA(isA<LicenseError>()));
+    expect(b.id, isNotEmpty);
+  });
 }

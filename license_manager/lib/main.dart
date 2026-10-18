@@ -326,6 +326,34 @@ class _ListPageState extends State<ListPage> {
           const Spacer(),
           SizedBox(width: 260, child: TextField(decoration: const InputDecoration(prefixIcon: Icon(Icons.search_rounded), hintText: 'Tìm khách / mã máy', isDense: true, border: OutlineInputBorder()), onChanged: (v) => setState(() => _q = v.trim().toLowerCase()))),
           const SizedBox(width: 8),
+          PopupMenuButton<String>(
+            tooltip: 'Đồng bộ sổ giữa các thiết bị',
+            icon: const Icon(Icons.sync_rounded),
+            onSelected: (v) async {
+              if (v == 'copy') {
+                await Clipboard.setData(ClipboardData(text: widget.book.exportJson()));
+                setState(() => _msg = 'Đã sao chép sổ. Mở app ở thiết bị kia, chọn "Dán và gộp sổ".');
+                return;
+              }
+              final key = widget.keyPair;
+              final data = await Clipboard.getData(Clipboard.kTextPlain);
+              if (key == null) {
+                setState(() => _msg = 'Cần có khóa riêng để kiểm tra mã trước khi gộp.');
+                return;
+              }
+              try {
+                final r = await widget.book.mergeJson(data?.text ?? '', key.publicHex);
+                widget.changed();
+                setState(() => _msg = 'Đã gộp sổ: thêm ${r.added}, cập nhật ${r.updated}, bỏ qua ${r.refused} dòng không hợp lệ.');
+              } on LicenseError catch (e) {
+                setState(() => _msg = e.message);
+              }
+            },
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'copy', child: Text('Sao chép sổ (gửi sang thiết bị khác)')),
+              PopupMenuItem(value: 'paste', child: Text('Dán và gộp sổ từ thiết bị khác')),
+            ],
+          ),
           OutlinedButton.icon(
             onPressed: () async {
               final f = File(p.join(p.dirname(widget.book.file), 'danh-sach-cap-phep.csv'))..writeAsStringSync(widget.book.csv());
