@@ -14,6 +14,7 @@ import '../menu/form_sheet.dart' show showFormSheet;
 import 'order_widgets.dart';
 import 'orders_models.dart';
 import 'orders_providers.dart';
+import '../printing/printer_service.dart';
 import 'pay_sheet.dart';
 import 'record_debt_sheet.dart';
 
@@ -267,6 +268,20 @@ class _Header extends ConsumerWidget {
               onPressed: () => openReceipt(context, ref, o.id),
               icon: const Icon(Icons.receipt_outlined, size: 19),
               label: const Text('In hóa đơn'),
+            ),
+          if (o.printable)
+            OutlinedButton.icon(
+              key: const Key('print-bluetooth'),
+              onPressed: () async {
+                try {
+                  await ref.read(printerServiceProvider).printOrder(o.id);
+                  if (context.mounted) showToast(context, 'Đã gửi hóa đơn ${o.orderCode} tới máy in.');
+                } catch (e) {
+                  if (context.mounted) showToast(context, printErrorText(e), error: true);
+                }
+              },
+              icon: const Icon(Icons.bluetooth_rounded, size: 19),
+              label: const Text('In qua Bluetooth'),
             ),
         ]),
       ],

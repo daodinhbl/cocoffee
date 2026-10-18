@@ -5,6 +5,7 @@ import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../api/api_client.dart';
+import '../diagnostics/app_log.dart';
 import '../session.dart';
 
 /// Vietnamese name of a queued write.
@@ -19,6 +20,7 @@ String kindLabel(String kind) => switch (kind) {
       'inventory.receive' => 'Nhập kho',
       'inventory.adjust' => 'Kiểm kê kho',
       'order.cancel' => 'Hủy đơn',
+      'expense.create' => 'Ghi chi phí',
       _ => kind,
     };
 
@@ -388,6 +390,7 @@ class OutboxNotifier extends Notifier<OutboxState> {
           if (x.isUnauthorized || x.code == 'MUST_CHANGE_PASSWORD') break; // session over: replayed after the next sign-in
           if (x.code == 'IDEMPOTENCY_IN_PROGRESS' || x.code == 'RATE_LIMITED') break; // try again later
           if (!ref.mounted) return;
+          AppLog.instance.record('warn', 'Gửi lại ${item.title} ${item.code} bị từ chối: ${x.code} ${x.message}');
           state = state.copyWith(items: [
             for (final i in state.items)
               if (i.id == item.id) i.copyWith(attempts: i.attempts + 1, error: x.message, errorCode: x.code) else i,

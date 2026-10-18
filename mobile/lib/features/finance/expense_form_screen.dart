@@ -6,7 +6,6 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../core/api/api_client.dart';
 import '../../core/format.dart';
-import '../../core/offline/outbox.dart' show newLocalId;
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common.dart';
 import 'finance_data.dart';
@@ -34,8 +33,6 @@ class _ExpenseFormState extends ConsumerState<ExpenseFormScreen> {
   int? _categoryId;
   bool _vat = false, _busy = false, _removePhoto = false;
   Uint8List? _photo;
-  // One key per form: a second tap on Lưu after a lost answer is the same request, never a second expense.
-  final String _key = newLocalId();
 
   Expense? get _e => widget.expense;
   bool get _purchase => _e?.fromPurchase ?? false;
@@ -93,13 +90,17 @@ class _ExpenseFormState extends ConsumerState<ExpenseFormScreen> {
     );
     setState(() => _busy = true);
     final actions = ref.read(financeActionsProvider);
+    var queued = false;
     final ok = await runWithToast(context, () async {
       if (_e == null) {
-        await actions.create(input, _key);
+        queued = (await actions.create(input)).queued;
       } else {
         await actions.update(_e!.id, input);
       }
-    }, success: _e == null ? 'Đã ghi chi phí.' : 'Đã cập nhật chi phí.');
+    }, success: null);
+    if (ok && mounted) {
+      showToast(context, _e != null ? 'Đã cập nhật chi phí.' : queued ? 'Chưa có mạng: đã lưu trong hàng chờ, sẽ gửi khi có mạng lại.' : 'Đã ghi chi phí.');
+    }
     if (!mounted) return;
     setState(() => _busy = false);
     if (ok) Navigator.of(context).pop(true);

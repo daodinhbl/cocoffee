@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/format.dart';
+import '../../core/offline/outbox.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common.dart';
 import 'expense_form_screen.dart';
@@ -66,6 +67,12 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
     final f = ref.watch(expenseFilterProvider);
     final page = ref.watch(expenseListProvider);
     final cats = ref.watch(expenseCategoriesProvider).value ?? const [];
+    final queued = [for (final i in ref.watch(outboxProvider).items) if (i.kind == 'expense.create') i];
+    // A queued expense that reached the server leaves the outbox: reload the book so it shows up as a real line.
+    ref.listen(outboxProvider, (prev, next) {
+      int n(OutboxState? s) => s == null ? 0 : s.items.where((i) => i.kind == 'expense.create').length;
+      if (n(next) < n(prev)) ref.invalidate(expenseListProvider);
+    });
     return Scaffold(
       appBar: AppBar(title: const Text('Sổ chi phí')),
       floatingActionButton: FloatingActionButton.extended(onPressed: _add, icon: const Icon(Icons.add_rounded), label: const Text('Thêm chi phí')),
@@ -110,6 +117,31 @@ class _ExpensesScreenState extends ConsumerState<ExpensesScreen> {
               FilterChip(label: const Text('Từ phiếu nhập'), selected: f.source == 'purchase', onSelected: (s) => _set(s ? f.copyWith(source: 'purchase') : f.copyWith(clearSource: true))),
               FilterChip(label: const Text('Cả khoản đã hủy'), selected: f.showVoid, onSelected: (s) => _set(f.copyWith(showVoid: s))),
             ]),
+            if (queued.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Card(
+                color: context.co.warnTint,
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 4),
+                    child: Text('Chờ gửi lên máy chủ (${queued.length})', style: TextStyle(fontWeight: FontWeight.w700, color: context.co.warn)),
+                  ),
+                  for (final q in queued)
+                    ListTile(
+                      dense: true,
+                      leading: Icon(q.failed ? Icons.error_outline_rounded : Icons.schedule_rounded, color: q.failed ? context.co.bad : context.co.warn),
+                      title: Text(money(q.total)),
+                      subtitle: Text(q.failed
+                          ? (q.error ?? 'Máy chủ từ chối khoản chi này')
+                          : [_viDay('${q.local['date'] ?? ''}'), if ('${q.local['payee'] ?? ''}'.isNotEmpty) '${q.local['payee']}', if ('${q.local['note'] ?? ''}'.isNotEmpty) '${q.local['note']}'].join(' · ')),
+                      trailing: q.failed
+                          ? TextButton(onPressed: () => ref.read(outboxProvider.notifier).remove(q.id), child: const Text('Bỏ'))
+                          : null,
+                    ),
+                  const SizedBox(height: 6),
+                ]),
+              ),
+            ],
             const SizedBox(height: 12),
             AsyncBody(
               value: page,

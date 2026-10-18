@@ -81,5 +81,9 @@
 	<string>Chụp ảnh chứng từ cho khoản chi.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Chọn ảnh chứng từ cho khoản chi.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Mở khóa ứng dụng bằng Face ID.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Kết nối máy in hóa đơn Bluetooth.</string>
 </dict>
 </plist>

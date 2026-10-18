@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/offline/offline_writer.dart';
 import '../../core/session.dart';
 
 num _n(Object? v) => v is num ? v : num.tryParse('${v ?? ''}') ?? 0;
@@ -187,10 +188,19 @@ class FinanceActions {
     _ref.invalidate(financeDashboardProvider);
   }
 
-  Future<Expense> create(ExpenseInput i, String idempotencyKey) async {
-    final res = await _api.post('/expenses', i.toJson(), {'Idempotency-Key': idempotencyKey});
+  /// Books a new expense. Without a connection it is queued (the outbox replays it, with an Idempotency-Key, when the
+  /// phone is online again) and the result is `queued: true`; a business refusal (locked period, bad amount) still
+  /// reaches the caller as an error. [idempotencyKey] is no longer needed: the outbox item's own id plays that role.
+  Future<WriteOutcome> create(ExpenseInput i) async {
+    final out = await _ref.read(offlineWriterProvider).submit(
+      kind: 'expense.create',
+      path: '/expenses',
+      body: i.toJson(),
+      local: {'code': 'Chi phí', 'total': i.amount, 'date': i.date, 'category_id': i.categoryId, 'payee': i.payee, 'note': i.note, 'has_photo': i.imageData != null},
+      effect: (_) async => {'queued': true}, // the offline copy holds no expense book: nothing to change, the list shows the queued line itself
+    );
     _refresh();
-    return Expense.fromJson(_m(res['expense']));
+    return out;
   }
 
   Future<Expense> update(int id, ExpenseInput i) async {

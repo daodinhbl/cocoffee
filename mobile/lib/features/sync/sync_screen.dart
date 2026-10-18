@@ -173,6 +173,7 @@ class _ItemTile extends StatelessWidget {
       'customer.collect' || 'customer.adjust' => Icons.account_balance_wallet_outlined,
       'inventory.receive' || 'inventory.adjust' => Icons.inventory_2_outlined,
       'order.cancel' => Icons.cancel_outlined,
+      'expense.create' => Icons.account_balance_wallet_rounded,
       _ => Icons.point_of_sale_rounded,
     };
     return ListTile(

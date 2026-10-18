@@ -66,6 +66,9 @@ class SessionStore {
   SessionStore(this._prefs, [FlutterSecureStorage? secure]) : _secure = secure ?? const FlutterSecureStorage();
 
   final SharedPreferences _prefs;
+
+  /// Local settings of this phone (the chosen Bluetooth printer...).
+  SharedPreferences get prefs => _prefs;
   final FlutterSecureStorage _secure;
   String? _token;
 

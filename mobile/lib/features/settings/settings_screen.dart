@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/session.dart';
+import '../printing/printer_settings_card.dart';
+import 'app_lock_card.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common.dart';
 import '../menu/form_sheet.dart';
@@ -49,6 +51,10 @@ class SettingsScreen extends ConsumerWidget {
                 const PasswordCard(),
                 if (admin) ...[const SizedBox(height: 16), const _ConfigSection()],
               ],
+              const SizedBox(height: 16),
+              const AppLockCard(),
+              const SizedBox(height: 16),
+              const PrinterSettingsCard(),
               if (admin) ...[
                 const SizedBox(height: 16),
                 const _PrinterSection(),

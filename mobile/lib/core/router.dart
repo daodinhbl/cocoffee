@@ -9,6 +9,7 @@ import '../features/bom/bom_screen.dart';
 import '../features/customers/customer_detail_screen.dart';
 import '../features/customers/customers_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
+import '../features/diagnostics/diagnostics_screen.dart';
 import '../features/finance/expenses_screen.dart';
 import '../features/finance/finance_screen.dart';
 import '../features/heli/heli_screen.dart';
@@ -38,7 +39,7 @@ final _orderDetail = RegExp(r'^/orders/\d+$');
 
 /// What a cashier may open. The Web Admin gives a cashier only the POS screen (authPages.js, adminAuth.js); the app
 /// adds the order page (GET /api/orders/:id is open to any staff), Cài đặt (own password, app info) and the offline sync screen.
-bool cashierAllowed(String path) => path == '/pos' || path == '/settings' || path == '/sync' || path == '/heli' || _orderDetail.hasMatch(path);
+bool cashierAllowed(String path) => path == '/pos' || path == '/settings' || path == '/sync' || path == '/diagnostics' || path == '/heli' || _orderDetail.hasMatch(path);
 
 /// The router's guard as a pure function of the signed-in [user] and the requested [path] (no query string).
 /// Returns where to go instead, or null to stay.
@@ -123,6 +124,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(parentNavigatorKey: _rootKey, path: '/customers', builder: (_, _) => const CustomersScreen()),
       GoRoute(parentNavigatorKey: _rootKey, path: '/customers/:id', builder: (_, s) => CustomerDetailScreen(id: _id(s))),
       GoRoute(parentNavigatorKey: _rootKey, path: '/settings', builder: (_, _) => const SettingsScreen()),
+      GoRoute(parentNavigatorKey: _rootKey, path: '/diagnostics', builder: (_, _) => const DiagnosticsScreen()),
       GoRoute(parentNavigatorKey: _rootKey, path: '/sync', builder: (_, _) => const SyncScreen()),
       GoRoute(parentNavigatorKey: _rootKey, path: '/heli', builder: (_, _) => const HeliScreen()),
     ],

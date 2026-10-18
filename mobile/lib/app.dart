@@ -9,6 +9,7 @@ import 'core/offline/offline_coordinator.dart';
 import 'core/offline/outbox.dart';
 import 'core/offline/snapshot_sync.dart';
 import 'core/router.dart';
+import 'core/security/app_lock.dart';
 import 'core/session.dart';
 import 'core/theme/app_theme.dart';
 
@@ -26,7 +27,8 @@ class _CoCoffeeAppState extends ConsumerState<CoCoffeeApp> {
   void initState() {
     super.initState();
     // Back in the foreground: find out whether the server is reachable and replay what waited meanwhile.
-    _lifecycle = AppLifecycleListener(onResume: () {
+    _lifecycle = AppLifecycleListener(onHide: () => ref.read(appLockProvider.notifier).leftApp(), onResume: () {
+      ref.read(appLockProvider.notifier).returned();
       ref.read(netProvider.notifier).probe();
       ref.read(outboxProvider.notifier).sync();
       ref.read(snapshotSyncProvider.notifier).sync();
@@ -60,6 +62,10 @@ class _CoCoffeeAppState extends ConsumerState<CoCoffeeApp> {
       supportedLocales: const [Locale('vi'), Locale('en')],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       routerConfig: ref.watch(routerProvider),
+      builder: (context, child) => Stack(children: [
+        child ?? const SizedBox.shrink(),
+        if (ref.watch(appLockProvider).locked && ref.watch(authProvider) is SignedIn) const Positioned.fill(child: LockScreen()),
+      ]),
     );
   }
 }

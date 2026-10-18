@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app.dart';
+import 'core/diagnostics/app_log.dart';
 import 'core/session.dart';
 
 Future<void> main() async {
@@ -19,6 +20,7 @@ Future<void> main() async {
   } catch (_) {
     dir = null; // no plugin (tests, unsupported platform): memory only
   }
+  await AppLog.instance.install(dir);
   runApp(ProviderScope(
     overrides: [sessionStoreProvider.overrideWithValue(store), appDirProvider.overrideWithValue(dir)],
     child: const CoCoffeeApp(),

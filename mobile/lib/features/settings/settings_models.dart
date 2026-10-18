@@ -3,10 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/session.dart';
 
 /// Shown under "Ứng dụng"; keep in step with `version:` in pubspec.yaml.
-const kAppVersion = '1.8.1 (10)';
+const kAppVersion = '1.9.0 (11)';
 
 /// versionCode (the number after `+` in pubspec.yaml): the OTA update compares it with the server's manifest.
-const kAppBuild = 10;
+const kAppBuild = 11;
 
 int _int(Object? v, int fallback) => v is num ? v.toInt() : int.tryParse('${v ?? ''}') ?? fallback;
 bool _bool(Object? v) => v == true || v == 1 || v == '1' || v == 'true';

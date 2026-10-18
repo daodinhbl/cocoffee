@@ -43,6 +43,7 @@ const navGroups = <NavGroup>[
   NavGroup('Hệ thống', [
     NavItem(key: 'heli', label: 'Trợ lý Heli', icon: Icons.mic_rounded, route: '/heli'),
     NavItem(key: 'settings', label: 'Cài đặt', icon: Icons.tune_rounded, route: '/settings'),
+    NavItem(key: 'diagnostics', label: 'Chẩn đoán', icon: Icons.health_and_safety_rounded, route: '/diagnostics'),
     NavItem(key: 'sync', label: 'Đồng bộ ngoại tuyến', icon: Icons.cloud_sync_rounded, route: '/sync'),
   ]),
 ];
