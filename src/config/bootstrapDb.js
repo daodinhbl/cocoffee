@@ -521,6 +521,12 @@ async function ensureSchemaUpgrades() {
       await pool.query("ALTER TABLE tax_exports MODIFY kind ENUM('s2a','revenue_book','expense_book','declaration','bundle') NOT NULL");
       logger.info('Schema upgrade: tax_exports.kind accepts s2a');
     }
+    // ... and 's2c' (Sổ chi tiết vật liệu, dụng cụ, sản phẩm, hàng hóa).
+    const [[kindCol2]] = await pool.query("SELECT COLUMN_TYPE AS t FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'tax_exports' AND column_name = 'kind'");
+    if (kindCol2 && !/'s2c'/.test(kindCol2.t || kindCol2.COLUMN_TYPE || '')) {
+      await pool.query("ALTER TABLE tax_exports MODIFY kind ENUM('s2a','s2c','revenue_book','expense_book','declaration','bundle') NOT NULL");
+      logger.info('Schema upgrade: tax_exports.kind accepts s2c');
+    }
     for (const sql of BACKFILL) await pool.query(sql);
     return 'ok';
   } catch (err) {

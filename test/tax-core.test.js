@@ -179,6 +179,7 @@ test('export worker: builds the three sheets as a real .xlsx and marks the job d
   mock.method(taxModel, 'claimNextExport', async () => job);
   mock.method(taxModel, 'finishExport', async (id, out) => { finished.push([id, out]); });
   mock.method(taxModel, 'failExport', async (id, msg) => { finished.push(['fail', msg]); });
+  mock.method(taxModel, 'inventoryBook', async () => [{ id: 1, sku: 'CF', name: 'Cà phê', unit: 'g', avg_cost: 300, opening: 0, qty_in: 100, qty_out: 40, val_in: 30000, val_out: 12000, last_cost: 300 }]);
   mock.method(taxModel, 'categories', async () => [{ id: 1, code: 'fnb_service', name: 'Dịch vụ ăn uống' }, { id: 2, code: 'goods_distribution', name: 'Hàng hóa' }, { id: 3, code: 'none', name: 'Không thuế' }]);
   mock.method(taxModel, 'revenueRows', async () => [
     { day: '2026-09-01', categoryId: 1, lines: 40, gross: 1500000, discount: 20000, net: 1480000, vat: 44400, pit: 22200 },
@@ -206,7 +207,7 @@ test('export worker: builds the three sheets as a real .xlsx and marks the job d
 
   const wb = new ExcelJS.Workbook();
   await wb.xlsx.readFile(path.join(dir, fileName));
-  assert.deepEqual(wb.worksheets.map((w) => w.name), ['S2a-HKD', 'Sổ doanh thu', 'Sổ chi phí', 'Bảng kê tờ khai']);
+  assert.deepEqual(wb.worksheets.map((w) => w.name), ['S2a-HKD', 'S2c-HKD', 'Sổ doanh thu', 'Sổ chi phí', 'Bảng kê tờ khai']);
   const text = (ws) => { const out = []; ws.eachRow((r) => out.push(r.values.slice(1).join(' | '))); return out.join('\n'); };
   const s2a = text(wb.getWorksheet('S2a-HKD'));
   assert.match(s2a, /Mẫu số S2a-HKD/);

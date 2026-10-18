@@ -440,7 +440,7 @@ CREATE TABLE tax_periods (
 
 CREATE TABLE tax_exports (
   id           INT UNSIGNED NOT NULL AUTO_INCREMENT,
-  kind         ENUM('s2a','revenue_book','expense_book','declaration','bundle') NOT NULL,
+  kind         ENUM('s2a','s2c','revenue_book','expense_book','declaration','bundle') NOT NULL,
   period_from  DATE         NOT NULL,
   period_to    DATE         NOT NULL,
   status       ENUM('queued','running','done','failed') NOT NULL DEFAULT 'queued',

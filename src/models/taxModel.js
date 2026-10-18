@@ -257,7 +257,30 @@ async function clearExportFile(id, conn) {
   await db(conn).query("UPDATE tax_exports SET file_name = NULL, file_bytes = NULL, status = 'failed', error = 'Đã hết hạn lưu (7 ngày)' WHERE id = ?", [id]);
 }
 
+/**
+ * Stock book for [from, to] (shop days, inclusive): per active-or-moved item the opening balance (last balance before `from`),
+ * what came in and went out in the period (quantity and value at the movement's unit cost), the closing balance and its value
+ * at the last known unit cost. Items with no movement ever and no stock are left out.
+ */
+async function inventoryBook(from, to, conn) {
+  const [rows] = await db(conn).query(
+    `SELECT i.id, i.sku, i.name, i.unit, i.avg_cost,
+            COALESCE((SELECT m.balance_after FROM inventory_movements m WHERE m.inventory_item_id = i.id AND m.created_at < ? ORDER BY m.created_at DESC, m.id DESC LIMIT 1), 0) AS opening,
+            COALESCE(p.qty_in, 0) AS qty_in, COALESCE(p.qty_out, 0) AS qty_out, COALESCE(p.val_in, 0) AS val_in, COALESCE(p.val_out, 0) AS val_out,
+            COALESCE((SELECT m.unit_cost FROM inventory_movements m WHERE m.inventory_item_id = i.id AND m.created_at < DATE_ADD(?, INTERVAL 1 DAY) ORDER BY m.created_at DESC, m.id DESC LIMIT 1), i.avg_cost) AS last_cost
+       FROM inventory_items i
+       LEFT JOIN (SELECT inventory_item_id, SUM(GREATEST(quantity_change, 0)) AS qty_in, SUM(GREATEST(-quantity_change, 0)) AS qty_out,
+                         SUM(GREATEST(quantity_change, 0) * unit_cost) AS val_in, SUM(GREATEST(-quantity_change, 0) * unit_cost) AS val_out
+                    FROM inventory_movements WHERE created_at >= ? AND created_at < DATE_ADD(?, INTERVAL 1 DAY) GROUP BY inventory_item_id) p ON p.inventory_item_id = i.id
+      WHERE i.is_active = 1 OR p.inventory_item_id IS NOT NULL
+      ORDER BY i.name, i.id`,
+    [from, to, from, to]
+  );
+  return rows;
+}
+
 module.exports = {
+  inventoryBook,
   categories, rates, ratesOn, addRate, orderLines, setLineTax, bumpRevenue, bumpExpense, rebuildRevenue, rebuildExpenses, sourceTotals, unsnapshotted,
   revenueRows, revenueByCategory, revenueTotal, expenseByTreatment, monthly,
   periods, getPeriod, lockedCovering, lockPeriod, setFiled, unlockPeriod,

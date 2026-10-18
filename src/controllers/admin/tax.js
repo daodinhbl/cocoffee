@@ -7,7 +7,7 @@ const { parseDay, shopDay } = require('../../utils/shopTime');
 const { render, optional } = require('./common');
 
 const KIND_TEXT = { month: 'Tháng', quarter: 'Quý', year: 'Năm' };
-const EXPORT_TEXT = { s2a: 'Sổ doanh thu S2a-HKD', revenue_book: 'Sổ doanh thu', expense_book: 'Sổ chi phí', declaration: 'Bảng kê tờ khai', bundle: 'Gói đủ các sổ' };
+const EXPORT_TEXT = { s2a: 'Sổ doanh thu S2a-HKD', s2c: 'Sổ tồn kho S2c-HKD', revenue_book: 'Sổ doanh thu', expense_book: 'Sổ chi phí', declaration: 'Bảng kê tờ khai', bundle: 'Gói đủ các sổ' };
 
 function params(req) {
   const kind = taxService.KINDS.includes(req.query.kind) ? req.query.kind : (taxService.KINDS.includes(req.body && req.body.kind) ? req.body.kind : 'month');

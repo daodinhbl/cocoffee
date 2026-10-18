@@ -14,12 +14,13 @@ const logger = require('../utils/logger');
  * a single worker (one job at a time) writes the file with exceljs' streaming writer, so memory stays flat whatever
  * the number of rows, then the app shows the job as done and the file can be downloaded for 7 days.
  *   s2a           Sổ doanh thu mẫu S2a-HKD (hộ kinh doanh nộp thuế theo tỷ lệ % trên doanh thu): one line per day per tax group
+ *   s2c           Sổ chi tiết vật liệu, dụng cụ, sản phẩm, hàng hóa mẫu S2c-HKD: per item opening / in / out / closing
  *   revenue_book  Sổ doanh thu (per day, per tax group)       expense_book  Sổ chi phí (every posted expense)
  *   declaration   Bảng kê tờ khai (estimate of the period)    bundle        all three sheets in one workbook
  * Everything is an ESTIMATE to prepare the declaration; every sheet says so.
  */
-const KINDS = ['s2a', 'revenue_book', 'expense_book', 'declaration', 'bundle'];
-const KIND_LABEL = { s2a: 'S2a-HKD-so-doanh-thu', revenue_book: 'so-doanh-thu', expense_book: 'so-chi-phi', declaration: 'bang-ke-to-khai', bundle: 'so-thue' };
+const KINDS = ['s2a', 's2c', 'revenue_book', 'expense_book', 'declaration', 'bundle'];
+const KIND_LABEL = { s2a: 'S2a-HKD-so-doanh-thu', s2c: 'S2c-HKD-so-ton-kho', revenue_book: 'so-doanh-thu', expense_book: 'so-chi-phi', declaration: 'bang-ke-to-khai', bundle: 'so-thue' };
 const MAX_DAYS = 366;
 const POLL_MS = 5000;
 const NUM = '#,##0';
@@ -160,6 +161,37 @@ async function s2aSheet(wb, period, shop) {
   await ws.commit();
 }
 
+/** Mẫu S2c-HKD: stock book of the period, one line per item (quantities in the item's own unit, values in VND). */
+async function inventorySheet(wb, period, shop) {
+  const ws = wb.addWorksheet('S2c-HKD');
+  header(ws, 'SỔ CHI TIẾT VẬT LIỆU, DỤNG CỤ, SẢN PHẨM, HÀNG HÓA', {}, shop, period);
+  ws.addRow(['Mẫu số S2c-HKD. Giá trị nhập/xuất theo đơn giá của từng lần nhập xuất kho; tồn cuối kỳ theo đơn giá gần nhất.']).font = { italic: true };
+  ws.addRow([]);
+  headRow(ws, ['STT', 'Mã', 'Tên vật liệu / hàng hóa', 'ĐVT', 'Tồn đầu kỳ (SL)', 'Nhập trong kỳ (SL)', 'Nhập (giá trị)', 'Xuất trong kỳ (SL)', 'Xuất (giá trị)', 'Tồn cuối kỳ (SL)', 'Tồn cuối kỳ (giá trị)']);
+  const rows = await taxModel.inventoryBook(period.from, period.to);
+  let n = 0;
+  const tot = { vin: 0, vout: 0, vend: 0 };
+  for (const r of rows) {
+    const opening = Number(r.opening), qin = Number(r.qty_in), qout = Number(r.qty_out);
+    const closing = Math.round((opening + qin - qout) * 1000) / 1000;
+    const vend = Math.round(closing * Number(r.last_cost));
+    if (!opening && !qin && !qout && !closing) continue;
+    n += 1;
+    tot.vin += Number(r.val_in); tot.vout += Number(r.val_out); tot.vend += vend;
+    const row = ws.addRow([n, r.sku, r.name, r.unit, opening, qin, Math.round(Number(r.val_in)), qout, Math.round(Number(r.val_out)), closing, vend]);
+    [5, 6, 8, 10].forEach((c) => { row.getCell(c).numFmt = '#,##0.###'; });
+    [7, 9, 11].forEach((c) => { row.getCell(c).numFmt = NUM; });
+    row.commit();
+  }
+  ws.addRow([]).commit();
+  const t = ws.addRow(['', '', 'Cộng', '', '', '', Math.round(tot.vin), '', Math.round(tot.vout), '', tot.vend]);
+  t.font = { bold: true };
+  [7, 9, 11].forEach((c) => { t.getCell(c).numFmt = NUM; });
+  t.commit();
+  ws.columns.forEach((col, i) => { col.width = [6, 14, 34, 8, 16, 16, 16, 16, 16, 16, 18][i] || 16; });
+  await ws.commit();
+}
+
 async function expenseSheet(wb, period, shop) {
   const ws = wb.addWorksheet('Sổ chi phí');
   header(ws, 'SỔ CHI PHÍ SẢN XUẤT, KINH DOANH', {}, shop, period);
@@ -236,6 +268,7 @@ async function build(job) {
   const wb = new ExcelJS.stream.xlsx.WorkbookWriter({ filename: tmp, useStyles: true, useSharedStrings: false });
   wb.creator = 'CoCoffee POS';
   if (job.kind === 's2a' || job.kind === 'bundle') await s2aSheet(wb, period, shop);
+  if (job.kind === 's2c' || job.kind === 'bundle') await inventorySheet(wb, period, shop);
   if (job.kind === 'revenue_book' || job.kind === 'bundle') await revenueSheet(wb, period, shop);
   if (job.kind === 'expense_book' || job.kind === 'bundle') await expenseSheet(wb, period, shop);
   if (job.kind === 'declaration' || job.kind === 'bundle') await declarationSheet(wb, period, shop);
