@@ -27,7 +27,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 WizardStyle=modern
 UninstallDisplayName=POS Tasotek Server
-SetupIconFile=..\windowsunneresourcespp_icon.ico
+SetupIconFile=..windowsunneresourcespp_icon.ico
 UninstallDisplayIcon={app}\manager\pos_tasotek_server.exe
 CloseApplications=yes
 RestartApplications=no
