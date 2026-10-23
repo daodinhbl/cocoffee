@@ -68,8 +68,10 @@ nghiệm khép kín* sớm (cùng file `.aab`) và mời đủ 12 người (nhâ
 
 ## 4. Biểu mẫu An toàn dữ liệu (gợi ý, bạn rà lại)
 
-Dữ liệu trong app là dữ liệu kinh doanh của quán, lưu trên máy chủ của quán; app không gửi gì cho bên thứ ba
-(tin Zalo do máy chủ gửi, không phải app).
+Dữ liệu trong app là dữ liệu kinh doanh của quán, lưu trên máy chủ của quán. Tin Zalo do máy chủ gửi, không phải
+app. Câu hỏi cho trợ lý Heli được máy chủ gửi sang OpenAI; OpenAI là **nhà cung cấp dịch vụ** xử lý thay quán, nên theo
+định nghĩa của Play đó không tính là "chia sẻ" (vẫn phải khai là "thu thập" và ghi rõ trong chính sách quyền riêng tư,
+mục 4 của `/privacy`).
 
 - Ứng dụng có thu thập hoặc chia sẻ dữ liệu người dùng? **Có** (thu thập), **không** chia sẻ.
 - Dữ liệu được mã hóa khi truyền? **Có** (HTTPS).
@@ -79,7 +81,15 @@ Dữ liệu trong app là dữ liệu kinh doanh của quán, lưu trên máy ch
   - *Thông tin cá nhân → Số điện thoại*: thu thập, không bắt buộc, *Chức năng ứng dụng* (số của khách hàng).
   - *Thông tin cá nhân → Mã nhận dạng người dùng*: thu thập, bắt buộc, *Chức năng ứng dụng, Quản lý tài khoản* (tên đăng nhập; Zalo ID của khách).
   - *Thông tin tài chính*: **không** (app không thu thẻ hay tài khoản ngân hàng của người dùng).
-  - *Vị trí, Ảnh, Tệp, Danh bạ, Mã thiết bị, Thông tin về ứng dụng*: không.
+  - *Ảnh và video → Ảnh*: thu thập, **không bắt buộc**, mục đích *Chức năng ứng dụng* (ảnh hóa đơn/biên lai người dùng
+    tự chụp hoặc chọn trong phiếu chi, gửi lên máy chủ của quán). Không chia sẻ.
+  - *Tin nhắn → Tin nhắn khác trong ứng dụng* (hoặc *Hoạt động trong ứng dụng → Nội dung khác do người dùng tạo*):
+    thu thập, **không bắt buộc**, mục đích *Chức năng ứng dụng* (câu hỏi gõ hoặc nói cho Heli, dạng chữ; máy chủ chuyển
+    cho OpenAI với vai trò nhà cung cấp dịch vụ, chỉ giữ tạm trong bộ nhớ). Được xử lý tạm thời: **Có**.
+  - *Âm thanh*: không. Giọng nói được dịch vụ nhận dạng giọng nói của Android đổi thành chữ ngay trên điện thoại; app
+    và máy chủ chỉ nhận chữ, không ghi âm.
+  - *Vị trí, Tệp, Danh bạ, Mã thiết bị, Thông tin về ứng dụng, Sinh trắc học*: không (Bluetooth chỉ để nối máy in đã
+    ghép đôi, có cờ `neverForLocation`; vân tay/khuôn mặt do Android xử lý, app chỉ nhận đúng/sai).
 
 ## 5. Nội dung trang cửa hàng
 

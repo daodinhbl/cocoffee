@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Xóa tài khoản và dữ liệu · POS Tasotek</title>
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <style>
+    :root { --navy: #172554; --navy2: #1E3A8A; --milk: #FAF8F5; --line: #E8E3DA; --bad: #B91C1C; --good: #047857; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--milk); color: #1f1f1f; font: 16px/1.6 "Times New Roman", Times, serif; }
+    header { background: var(--navy); color: #fff; padding: 1.4rem 1rem; text-align: center; }
+    header h1 { margin: 0; font-size: 1.5rem; }
+    header p { margin: .25rem 0 0; color: #CBD5E1; }
+    main { max-width: 38rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
+    section, form { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 1.1rem 1.25rem; margin-bottom: 1rem; }
+    h2 { color: var(--navy2); font-size: 1.1rem; margin: 0 0 .5rem; }
+    ol, ul { padding-left: 1.3rem; margin: .3rem 0; }
+    label { display: block; font-weight: 600; margin: .8rem 0 .25rem; }
+    input[type=text], input[type=password] { width: 100%; padding: .6rem .7rem; border: 1px solid #D6CFC3; border-radius: 6px; font: inherit; background: #fff; }
+    input:focus-visible { outline: 2px solid var(--navy2); outline-offset: 1px; }
+    .sub { display: flex; align-items: center; gap: .4rem; }
+    .sub input { flex: 1 1 auto; min-width: 0; }
+    .sub span { color: #6b6b6b; white-space: nowrap; }
+    .check { display: flex; gap: .5rem; align-items: flex-start; font-weight: 400; }
+    .check input { margin-top: .35rem; }
+    .err { background: #FEE2E2; color: var(--bad); border-radius: 6px; padding: .6rem .8rem; margin-bottom: .6rem; }
+    .done { background: #ECFDF5; color: var(--good); border-radius: 8px; padding: 1rem; }
+    button { width: 100%; margin-top: 1.2rem; padding: .8rem; border: 0; border-radius: 8px; background: var(--bad); color: #fff; font: 700 1.05rem "Times New Roman", serif; cursor: pointer; }
+    .hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+    .muted { color: #6b6b6b; font-size: .95rem; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Xóa tài khoản và dữ liệu</h1>
+  <p>Ứng dụng POS Tasotek / Tasotek FnB</p>
+</header>
+<main>
+<% if (done) { %>
+  <p class="done" role="status">Đã nhận yêu cầu xóa quán <b><%= done.slug %></b>. Quán ngừng hoạt động ngay từ bây giờ; toàn bộ dữ liệu sẽ bị xóa vĩnh viễn sau <%= graceDays %> ngày<% if (done.deleteAfter) { %> (sau ngày <%= done.deleteAfter.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) %>)<% } %>. Nếu đổi ý trong thời gian này, hãy liên hệ <a href="mailto:<%= contact.email %>"><%= contact.email %></a>.</p>
+<% } %>
+  <section>
+    <h2>Cách 1: xóa ngay trong ứng dụng</h2>
+    <ol>
+      <li>Mở ứng dụng, đăng nhập bằng tài khoản <b>quản trị</b> của quán.</li>
+      <li>Vào <b>Thêm › Cài đặt › Xóa tài khoản và dữ liệu</b>.</li>
+      <li>Nhập mật khẩu, gõ tên miền phụ của quán để xác nhận rồi bấm <b>Xóa quán</b>.</li>
+    </ol>
+    <p class="muted">Dùng ứng dụng ở chế độ <b>“Dùng trên máy này”</b> (không có tài khoản trên máy chủ): vào <b>Cài đặt › Xóa toàn bộ dữ liệu trên máy</b>, hoặc gỡ ứng dụng. Dữ liệu chỉ nằm trên điện thoại của bạn.</p>
+  </section>
+
+  <section>
+    <h2>Những gì bị xóa</h2>
+    <ul>
+      <li>Toàn bộ dữ liệu của quán trên máy chủ: thực đơn, kho, đơn hàng, khách hàng và công nợ, chi phí, báo cáo, cài đặt, ảnh đã tải lên.</li>
+      <li>Mọi tài khoản đăng nhập của quán (chủ quán và nhân viên).</li>
+      <li>Thông tin đăng ký của chủ quán: họ tên, email, số điện thoại, tên miền phụ.</li>
+    </ul>
+    <p>Quán ngừng hoạt động ngay khi gửi yêu cầu. Dữ liệu được giữ thêm <b><%= graceDays %> ngày</b> để bạn có thể đổi ý (liên hệ chúng tôi), sau đó bị xóa vĩnh viễn và không thể khôi phục. Không có dữ liệu nào được giữ lại sau thời hạn này.</p>
+  </section>
+
+<% if (signupShops && !done) { %>
+  <form method="post" action="/xoa-tai-khoan" autocomplete="off" novalidate>
+    <h2>Cách 2: gửi yêu cầu xóa tại đây</h2>
+    <p class="muted">Dành cho quán đã tạo bằng ứng dụng hoặc trang đăng ký. Cần tên đăng nhập và mật khẩu quản trị của quán.</p>
+    <% if (error) { %><div class="err" role="alert"><%= error %></div><% } %>
+    <label for="slug">Tên miền phụ của quán</label>
+    <div class="sub">
+      <input type="text" id="slug" name="slug" maxlength="30" required autocapitalize="none" spellcheck="false" value="<%= values.slug || '' %>">
+      <span>.<%= baseDomain %></span>
+    </div>
+    <label for="username">Tên đăng nhập (quản trị)</label>
+    <input type="text" id="username" name="username" maxlength="50" required autocapitalize="none" spellcheck="false" value="<%= values.username || '' %>">
+    <label for="password">Mật khẩu</label>
+    <input type="password" id="password" name="password" maxlength="200" required autocomplete="current-password">
+    <label class="check"><input type="checkbox" name="agree" value="1" required> Tôi hiểu rằng quán ngừng hoạt động ngay và toàn bộ dữ liệu sẽ bị xóa vĩnh viễn sau <%= graceDays %> ngày.</label>
+    <div class="hp" aria-hidden="true"><label for="website">Để trống</label><input type="text" id="website" name="website" tabindex="-1" autocomplete="off"></div>
+    <button type="submit">Xóa quán và toàn bộ dữ liệu</button>
+  </form>
+<% } else if (error) { %>
+  <div class="err" role="alert"><%= error %></div>
+<% } %>
+
+  <section>
+    <h2>Cần hỗ trợ?</h2>
+    <p>Quán do bạn tự cài máy chủ (bản Windows, máy chủ riêng) thì dữ liệu nằm trên máy chủ của bạn; hãy xóa tại đó hoặc liên hệ chúng tôi.</p>
+    <p>Email: <a href="mailto:<%= contact.email %>"><%= contact.email %></a><% if (contact.phone) { %> · Điện thoại: <%= contact.phone %><% } %></p>
+    <p class="muted"><a href="/privacy">Chính sách quyền riêng tư</a></p>
+  </section>
+</main>
+</body>
+</html>

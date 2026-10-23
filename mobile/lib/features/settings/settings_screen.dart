@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/app_mode.dart';
 import '../../core/session.dart';
 import '../printing/printer_settings_card.dart';
+import 'account_deletion_card.dart';
 import 'app_lock_card.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common.dart';
@@ -28,7 +30,9 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
-    final admin = user?.isAdmin ?? false;
+    final local = ref.watch(appModeProvider) == AppMode.local;
+    // In local mode the server's settings (config, receipt printer, integrations, staff accounts) do not exist.
+    final admin = (user?.isAdmin ?? false) && !local;
 
     final list = LayoutBuilder(builder: (context, c) {
       final wide = c.maxWidth >= kTableBreakpoint;
@@ -65,6 +69,8 @@ class SettingsScreen extends ConsumerWidget {
               ],
               const SizedBox(height: 16),
               const AppInfoCard(),
+              const SizedBox(height: 16),
+              const AccountDeletionCard(),
               const SizedBox(height: 20),
               Align(
                 alignment: wide ? Alignment.centerLeft : Alignment.center,

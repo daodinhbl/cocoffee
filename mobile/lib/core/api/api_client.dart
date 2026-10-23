@@ -99,6 +99,10 @@ String vietnameseFor(String code, String? serverMessage, Object? details) {
       return 'Máy chủ phản hồi chậm, vui lòng thử lại.';
     case 'INTERNAL':
       return 'Máy chủ gặp lỗi. Vui lòng thử lại sau.';
+    case 'LOCAL_UNSUPPORTED':
+      return 'Chức năng này chưa có khi dùng trên máy này (không có máy chủ).';
+    case 'ACCOUNT_NOT_DELETABLE':
+      return 'Quán này không được tạo trong ứng dụng nên không xóa được tại đây. Vui lòng liên hệ quản trị máy chủ.';
     default:
       return serverMessage?.isNotEmpty == true ? serverMessage! : 'Có lỗi xảy ra ($code).';
   }

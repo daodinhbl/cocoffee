@@ -23,6 +23,7 @@ async function tenantResolver(req, res, next) {
   }
   if (!t) return res.status(404).type('html').send(PAGE('Không tìm thấy quán', 'Địa chỉ này chưa được đăng ký. Kiểm tra lại tên miền phụ hoặc đăng ký quán mới.'));
   if (t === 'pending') return res.status(503).type('html').send(PAGE('Quán đang được chuẩn bị', 'Tài khoản đã đăng ký và đang chờ cấp cơ sở dữ liệu. Chúng tôi sẽ liên hệ khi sẵn sàng.'));
+  if (t === 'deleting') return res.status(410).type('html').send(PAGE('Quán đã yêu cầu xóa', 'Chủ quán đã yêu cầu xóa tài khoản và toàn bộ dữ liệu của quán này. Dữ liệu sẽ bị xóa vĩnh viễn khi hết thời hạn chờ.'));
   if (t === 'suspended') return res.status(403).type('html').send(PAGE('Quán tạm ngưng', 'Quán này đang tạm ngưng hoạt động. Vui lòng liên hệ quản trị hệ thống.'));
   req.tenant = t;
   return tenantContext.run(t, () => next());

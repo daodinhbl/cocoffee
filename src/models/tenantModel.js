@@ -35,6 +35,7 @@ const MASTER_DDL = [
      error               VARCHAR(255) NULL,
      created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
      activated_at        TIMESTAMP NULL,
+     delete_after        TIMESTAMP NULL,
      PRIMARY KEY (id),
      UNIQUE KEY uq_tenants_slug (slug)
    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
@@ -42,6 +43,11 @@ const MASTER_DDL = [
 
 async function ensureMasterSchema() {
   for (const sql of MASTER_DDL) await defaultPool.query(sql);
+  // Registries created before account deletion existed (MySQL has no ADD COLUMN IF NOT EXISTS).
+  const [cols] = await defaultPool.query(
+    "SELECT 1 FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'tenants' AND column_name = 'delete_after'"
+  );
+  if (!cols.length) await defaultPool.query('ALTER TABLE tenants ADD COLUMN delete_after TIMESTAMP NULL');
 }
 
 const BY_SLUG = `SELECT t.*, d.db_host, d.db_port, d.db_name, d.db_user, d.db_password_enc
@@ -123,6 +129,24 @@ async function setStatus(id, status) {
   await defaultPool.query('UPDATE tenants SET status = ? WHERE id = ?', [status, id]);
 }
 
+/** The owner asked to delete the shop: it stops serving at once (suspended) and is purged after `days`. */
+async function requestDeletion(id, days) {
+  await defaultPool.query(
+    "UPDATE tenants SET status = 'suspended', delete_after = DATE_ADD(NOW(), INTERVAL ? DAY) WHERE id = ?",
+    [Number(days), id]
+  );
+}
+
+async function listDueForPurge() {
+  const [rows] = await defaultPool.query('SELECT id FROM tenants WHERE delete_after IS NOT NULL AND delete_after <= NOW() ORDER BY id');
+  return rows;
+}
+
+/** Forgets the shop entirely (its database must already be emptied and released). */
+async function remove(id) {
+  await defaultPool.query('DELETE FROM tenants WHERE id = ?', [id]);
+}
+
 async function slugTaken(slug) {
   const [rows] = await defaultPool.query('SELECT 1 FROM tenants WHERE slug = ? LIMIT 1', [slug]);
   return rows.length > 0;
@@ -130,5 +154,5 @@ async function slugTaken(slug) {
 
 module.exports = {
   db, ensureMasterSchema, findBySlug, findById, list, listPending, insert, insertDb, listDbs, findDbRow, claimFreeDb, releaseDb,
-  markActive, markError, setStatus, slugTaken,
+  markActive, markError, setStatus, slugTaken, requestDeletion, listDueForPurge, remove,
 };

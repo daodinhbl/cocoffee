@@ -12,6 +12,7 @@ import '../../core/offline/outbox.dart';
 import '../../core/offline/snapshot_sync.dart';
 import '../../core/session.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/update/app_update.dart';
 import '../../core/widgets/common.dart';
 import '../settings/settings_models.dart';
 
@@ -48,7 +49,7 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
     final box = ref.watch(outboxProvider);
     final snap = ref.watch(snapshotSyncProvider);
     return [
-      MapEntry('Phiên bản', '$kAppVersion${const bool.fromEnvironment('PLAY_STORE') ? ' · Google Play' : ''}'),
+      MapEntry('Phiên bản', '$kAppVersion${kPlayStore ? ' · Google Play' : ''}'),
       MapEntry('Hệ điều hành', '${Platform.operatingSystem} ${Platform.operatingSystemVersion}'),
       MapEntry('Máy chủ', ref.watch(serverUrlProvider).replaceFirst(RegExp(r'^https?://'), '')),
       MapEntry('Tài khoản', user == null ? '—' : '${user.username} (${user.roleLabel})'),

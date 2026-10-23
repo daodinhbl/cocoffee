@@ -10,12 +10,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../features/settings/settings_models.dart';
+import '../app_mode.dart';
 import '../notify/new_order_watcher.dart';
 import '../session.dart';
 
-/// True in the Google Play build (`--dart-define=PLAY_STORE=true`): Play updates the app itself, so the in-app
-/// updater is off and the Settings row is hidden.
-const kPlayStore = bool.fromEnvironment('PLAY_STORE');
+/// True in the Google Play build: Play updates the app itself, so the in-app updater is off and the Settings row is
+/// hidden. `--flavor play` alone is enough (Flutter defines FLUTTER_APP_FLAVOR from it), so a Play bundle built without
+/// `--dart-define=PLAY_STORE=true` still never downloads or installs an APK, which Play policy forbids.
+const kPlayStore = bool.fromEnvironment('PLAY_STORE') || String.fromEnvironment('FLUTTER_APP_FLAVOR') == 'play';
 
 /// True for the ad-hoc iOS build (installed from the shop's /download/ios page). Such a build carries
 /// embedded.mobileprovision next to its executable; App Store / TestFlight builds do not, and Apple forbids those from
@@ -105,7 +107,9 @@ final updateCheckEnabledProvider = Provider<bool>((_) => kSelfUpdate && !Platfor
 /// Invalidate it to check again.
 final updateCheckProvider = FutureProvider<AppRelease?>((ref) async {
   if (!ref.watch(updateCheckEnabledProvider) || !(Platform.isAndroid || Platform.isIOS)) return null;
-  final server = ref.watch(serverUrlProvider);
+  final mode = ref.watch(appModeProvider);
+  // Local mode has no server of its own: new builds are published on the main site.
+  final server = mode == AppMode.server ? ref.watch(serverUrlProvider) : kDefaultServer;
   final ios = Platform.isIOS;
   try {
     final res = await Dio(BaseOptions(connectTimeout: const Duration(seconds: 8), receiveTimeout: const Duration(seconds: 8)))

@@ -52,6 +52,9 @@ function dbOf(row) {
   return { host: row.db_host, port: row.db_port, user: row.db_user, password: decrypt(row.db_password_enc), database: row.db_name };
 }
 
+/** A registry row (with its database columns) as the tenant object tenantContext.run expects. */
+const tenantOf = (row) => ({ id: row.id, slug: row.slug, name: row.name, db: dbOf(row) });
+
 // ------------------------------------------------------------------ host -> shop
 const CACHE_MS = 30 * 1000;
 const resolved = new Map();   // slug -> { at, value }
@@ -69,7 +72,7 @@ function slugOfHost(host) {
 
 /**
  * Looks a slug up: { id, slug, name, db } for an active shop, 'pending' / 'suspended' for one that cannot serve yet,
- * null when unknown. The default slug is never a tenant (it is the main database).
+ * 'deleting' for one its owner asked to delete (services/accountDeletion.js), null when unknown. The default slug is never a tenant (it is the main database).
  */
 async function resolve(slug) {
   const hit = resolved.get(slug);
@@ -77,7 +80,8 @@ async function resolve(slug) {
   const row = await tenantModel.findBySlug(slug);
   let value = null;
   if (row) {
-    if (row.status === 'active' && row.db_name) value = { id: row.id, slug: row.slug, name: row.name, db: dbOf(row) };
+    if (row.delete_after) value = 'deleting';
+    else if (row.status === 'active' && row.db_name) value = tenantOf(row);
     else value = row.status === 'suspended' ? 'suspended' : 'pending';
   }
   resolved.set(slug, { at: Date.now(), value });
@@ -211,4 +215,5 @@ async function addDatabase({ host, port, name, user, password, note }) {
 
 module.exports = {
   enabled, slugOfHost, resolve, forget, signup, provision, provisionPending, addDatabase, validateSignup, encrypt, decrypt, urlOf, RESERVED,
+  tenantOf, openConnection,
 };

@@ -1,9 +1,11 @@
 import 'package:cocoffee_mobile/app.dart';
+import 'package:cocoffee_mobile/core/app_mode.dart';
 import 'package:cocoffee_mobile/core/router.dart';
 import 'package:cocoffee_mobile/core/session.dart';
 import 'package:cocoffee_mobile/features/auth/change_password_screen.dart';
 import 'package:cocoffee_mobile/features/auth/login_screen.dart';
 import 'package:cocoffee_mobile/features/dashboard/dashboard_screen.dart';
+import 'package:cocoffee_mobile/features/onboarding/welcome_screen.dart';
 import 'package:cocoffee_mobile/features/orders/order_detail_screen.dart';
 import 'package:cocoffee_mobile/features/pos/pos_screen.dart';
 import 'package:cocoffee_mobile/features/settings/settings_screen.dart';
@@ -81,6 +83,35 @@ void main() {
       expect(startLocation(_weakAdmin), '/change-password');
     });
 
+    test('new install: the welcome page and its screens; a server install keeps /login', () {
+      for (final p in ['/', '/dashboard', '/pos', '/settings']) {
+        expect(redirectFor(null, p, mode: AppMode.unset), '/welcome', reason: p);
+      }
+      for (final p in ['/welcome', '/signup', '/local-setup', '/login']) {
+        expect(redirectFor(null, p, mode: AppMode.unset), isNull, reason: p);
+        expect(redirectFor(null, p), isNull, reason: 'server install, signed out: $p is reachable');
+      }
+      expect(startLocation(null, mode: AppMode.unset), '/welcome');
+      expect(startLocation(null), '/login');
+      expect(redirectFor(adminUser, '/welcome'), '/dashboard', reason: 'signed in: the first-run screens lead home');
+      expect(redirectFor(adminUser, '/signup'), '/dashboard');
+    });
+
+    test('local mode: setup first, then the local login, and only the screens the phone serves', () {
+      expect(redirectFor(null, '/dashboard', mode: AppMode.local), '/local-setup');
+      expect(redirectFor(null, '/login', mode: AppMode.local), '/local-setup');
+      expect(redirectFor(null, '/local-setup', mode: AppMode.local), isNull);
+      expect(redirectFor(null, '/dashboard', mode: AppMode.local, localReady: true), '/login');
+      expect(redirectFor(null, '/local-setup', mode: AppMode.local, localReady: true), '/login');
+      expect(startLocation(null, mode: AppMode.local, localReady: true), '/login');
+      for (final p in ['/dashboard', '/pos', '/orders', '/orders/3', '/menu', '/reports', '/more', '/settings']) {
+        expect(redirectFor(adminUser, p, mode: AppMode.local, localReady: true), isNull, reason: p);
+      }
+      for (final p in ['/inventory', '/inventory/2', '/tables', '/customers', '/bom', '/receiving', '/expenses', '/finance', '/zalo', '/heli', '/sync']) {
+        expect(redirectFor(adminUser, p, mode: AppMode.local, localReady: true), '/dashboard', reason: p);
+      }
+    });
+
     test('AppUser keeps must_change_password through the session cache', () {
       final u = AppUser.fromJson({'id': 1, 'username': 'admin', 'full_name': 'A', 'role': 'admin', 'must_change_password': true});
       expect(u.mustChangePassword, isTrue);
@@ -103,8 +134,9 @@ void main() {
           });
     });
 
-    Future<(ProviderContainer, _TestAuth)> pumpApp(WidgetTester tester, AuthState initial) async {
-      SharedPreferences.setMockInitialValues({});
+    // An install from before the welcome page (mode "server"), unless [prefs] says otherwise.
+    Future<(ProviderContainer, _TestAuth)> pumpApp(WidgetTester tester, AuthState initial, {Map<String, Object> prefs = const {'app_mode': 'server'}}) async {
+      SharedPreferences.setMockInitialValues(prefs);
       final store = SessionStore(await SharedPreferences.getInstance());
       final auth = _TestAuth(initial);
       final container = ProviderContainer(overrides: [
@@ -149,6 +181,26 @@ void main() {
       await go(tester, c, '/settings');
       expect(location(c), '/settings');
       expect(find.byType(SettingsScreen), findsOneWidget);
+      await unmount(tester);
+    });
+
+    testWidgets('a new install opens the welcome page; "Đăng nhập quán có sẵn" leads to /login', (tester) async {
+      final (c, _) = await pumpApp(tester, const SignedOut(), prefs: const {});
+      expect(location(c), '/welcome');
+      expect(find.byType(WelcomeScreen), findsOneWidget);
+      await go(tester, c, '/dashboard');
+      expect(location(c), '/welcome');
+
+      await tester.tap(find.byKey(const ValueKey('welcome-login')));
+      await tester.pumpAndSettle();
+      expect(location(c), '/login');
+      expect(c.read(appModeProvider), AppMode.server);
+
+      await tester.ensureVisible(find.byKey(const ValueKey('login-choose-again')));
+      await tester.tap(find.byKey(const ValueKey('login-choose-again')));
+      await tester.pumpAndSettle();
+      expect(location(c), '/welcome');
+      expect(c.read(appModeProvider), AppMode.unset);
       await unmount(tester);
     });
 

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../app_mode.dart';
 import '../nav.dart';
 import '../session.dart';
 import '../theme/app_theme.dart';
@@ -32,10 +33,20 @@ Future<void> openNavItem(BuildContext context, WidgetRef ref, NavItem item, {Sta
   }
 }
 
-List<NavGroup> visibleGroups(AppUser? user) => [
+/// The sidebar / "Menu" page for [user]; in local mode only what the phone serves alone ([kLocalNavKeys]).
+List<NavGroup> visibleGroups(AppUser? user, {bool local = false}) => [
       for (final g in navGroups)
-        NavGroup(g.heading, [for (final i in g.items) if (!i.adminOnly || (user?.isAdmin ?? false)) i]),
+        NavGroup(g.heading, [
+          for (final i in g.items)
+            if ((!i.adminOnly || (user?.isAdmin ?? false)) && (!local || kLocalNavKeys.contains(i.key))) i,
+        ]),
     ].where((g) => g.items.isNotEmpty).toList();
+
+/// Branch indexes of the bottom-bar tabs shown: all five on a server, without "Kho" in local mode.
+List<int> visibleTabs({bool local = false}) => [
+      for (var i = 0; i < bottomTabs.length; i++)
+        if (!local || kLocalNavKeys.contains(bottomTabs[i].key)) i,
+    ];
 
 class AppShell extends ConsumerWidget {
   const AppShell({super.key, required this.shell});
@@ -44,6 +55,8 @@ class AppShell extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final wide = MediaQuery.sizeOf(context).width >= kSidebarBreakpoint;
+    final tabs = visibleTabs(local: ref.watch(appModeProvider) == AppMode.local);
+    final selected = tabs.indexOf(shell.currentIndex);
     if (wide) {
       return Scaffold(
         body: Row(children: [
@@ -55,10 +68,10 @@ class AppShell extends ConsumerWidget {
     return Scaffold(
       body: Column(children: [const UpdateBanner(), const OfflineBanner(), Expanded(child: shell)]),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: shell.currentIndex,
-        onDestinationSelected: (i) => shell.goBranch(i, initialLocation: i == shell.currentIndex),
+        selectedIndex: selected < 0 ? 0 : selected,
+        onDestinationSelected: (i) => shell.goBranch(tabs[i], initialLocation: tabs[i] == shell.currentIndex),
         destinations: [
-          for (final t in bottomTabs) NavigationDestination(icon: Icon(t.icon), label: t.label),
+          for (final i in tabs) NavigationDestination(icon: Icon(bottomTabs[i].icon), label: bottomTabs[i].label),
         ],
       ),
     );
@@ -72,6 +85,7 @@ class _Sidebar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
+    final local = ref.watch(appModeProvider) == AppMode.local;
     final current = bottomTabs[shell.currentIndex].route;
     return Container(
       width: 248,
@@ -83,7 +97,7 @@ class _Sidebar extends ConsumerWidget {
           Divider(color: Palette.navyLine, height: 1),
           Expanded(
             child: ListView(padding: const EdgeInsets.symmetric(vertical: 10), children: [
-              for (final g in visibleGroups(user)) ...[
+              for (final g in visibleGroups(user, local: local)) ...[
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 12, 16, 4),
                   child: Text(g.heading.toUpperCase(),

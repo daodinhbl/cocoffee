@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../app_mode.dart';
 import '../session.dart';
 
 /// While the server is unreachable, how often it is probed again (GET /health).
@@ -51,8 +52,10 @@ class NetNotifier extends Notifier<NetState> {
     return const NetState(online: true);
   }
 
-  /// A request just failed on the network: offline until a request or a probe gets through.
+  /// A request just failed on the network: offline until a request or a probe gets through. Never in local mode:
+  /// the phone is its own server, losing Wi-Fi changes nothing (and sales must not go to the outbox).
   void markOffline() {
+    if (ref.read(appModeProvider) == AppMode.local) return;
     if (state.online) state = NetState(online: false, since: DateTime.now());
     _schedule();
   }

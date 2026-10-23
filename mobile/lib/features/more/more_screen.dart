@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/app_mode.dart';
 import '../../core/session.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/app_shell.dart';
@@ -13,6 +14,7 @@ class MoreScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
     final server = ref.watch(serverUrlProvider);
+    final local = ref.watch(appModeProvider) == AppMode.local;
     return Scaffold(
       appBar: AppBar(title: const Text('Menu')),
       body: ListView(padding: const EdgeInsets.only(bottom: 24), children: [
@@ -31,7 +33,7 @@ class MoreScreen extends ConsumerWidget {
               ),
             ),
           ),
-        for (final g in visibleGroups(user)) ...[
+        for (final g in visibleGroups(user, local: local)) ...[
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 18, 16, 6),
             child: Text(g.heading.toUpperCase(), style: context.tt.labelSmall),
@@ -63,7 +65,8 @@ class MoreScreen extends ConsumerWidget {
         ),
         Padding(
           padding: const EdgeInsets.only(top: 12),
-          child: Text('Máy chủ: ${server.replaceFirst(RegExp(r'^https?://'), '')}', textAlign: TextAlign.center, style: context.tt.bodySmall),
+          child: Text(local ? 'Dữ liệu lưu trên máy này (không có máy chủ)' : 'Máy chủ: ${server.replaceFirst(RegExp(r'^https?://'), '')}',
+              textAlign: TextAlign.center, style: context.tt.bodySmall),
         ),
       ]),
     );

@@ -18,10 +18,10 @@
 <body>
 <main>
   <h1>Chính sách quyền riêng tư</h1>
-  <p class="muted">Ứng dụng Tasotek FnB và trang quản lý của <%= shopName %> · Cập nhật 15/10/2026</p>
+  <p class="muted">Ứng dụng POS Tasotek (Google Play), Tasotek FnB (tải trực tiếp) và trang quản lý của <%= shopName %> · Cập nhật 23/10/2026</p>
 
   <h2>1. Ứng dụng này dành cho ai</h2>
-  <p>Tasotek FnB là ứng dụng nội bộ của cửa hàng dùng để bán hàng, quản lý kho và công nợ. Chỉ nhân viên và chủ quán có tài khoản do cửa hàng cấp mới đăng nhập được; ứng dụng không có đăng ký công khai và không hiển thị quảng cáo.</p>
+  <p>POS Tasotek và Tasotek FnB là cùng một ứng dụng nội bộ của cửa hàng, dùng để bán hàng, quản lý kho và công nợ. POS Tasotek là bản phát hành trên Google Play; Tasotek FnB là bản tải trực tiếp từ trang /download của máy chủ cửa hàng. Chỉ nhân viên và chủ quán có tài khoản do cửa hàng cấp mới đăng nhập được; trong ứng dụng không có đăng ký tài khoản và không hiển thị quảng cáo.</p>
 
   <h2>2. Dữ liệu được xử lý</h2>
   <ul>
@@ -30,27 +30,50 @@
     <li><b>Yêu cầu dịch vụ kỹ thuật:</b> khi khách quét mã QR của quán và để lại họ tên, số điện thoại, nhu cầu; chỉ dùng để liên hệ về yêu cầu đó. Khách nhắn Fanpage Facebook của quán thì nội dung tin nhắn đi qua Facebook Messenger theo chính sách của Facebook; số điện thoại khách gửi cho bot được lưu để liên hệ lại.</li>
     <li><b>Giao dịch:</b> đơn hàng, món, số tiền, hình thức thanh toán, thời gian.</li>
     <li><b>Kho:</b> nguyên liệu, nhập kho, điều chỉnh tồn kho.</li>
+    <li><b>Ảnh chứng từ chi phí:</b> khi bạn bấm “Chụp ảnh” hoặc “Chọn ảnh” trong phiếu chi, ảnh hóa đơn hay biên lai bạn chọn được thu nhỏ rồi gửi lên máy chủ của cửa hàng và lưu cùng phiếu chi đó. Ứng dụng không đọc thư viện ảnh của bạn; chỉ ảnh bạn tự chọn mới được gửi đi.</li>
+    <li><b>Câu hỏi cho trợ lý Heli:</b> nội dung bạn nói hoặc gõ cho Heli và câu trả lời của Heli (xem mục 4).</li>
   </ul>
 
   <h2>3. Dữ liệu lưu ở đâu</h2>
-  <p>Dữ liệu nằm trên máy chủ của cửa hàng. Để dùng khi mất mạng, ứng dụng lưu một bản sao trên điện thoại (trong vùng lưu trữ riêng của ứng dụng) và gửi lên máy chủ khi có mạng trở lại. Mã đăng nhập được giữ trong kho khóa an toàn của Android. Gỡ ứng dụng sẽ xóa bản sao này.</p>
+  <p>Dữ liệu nằm trên máy chủ của cửa hàng. Để dùng khi mất mạng, ứng dụng lưu một bản sao trên điện thoại (trong vùng lưu trữ riêng của ứng dụng) và gửi lên máy chủ khi có mạng trở lại. Bản sao này không được sao lưu lên tài khoản Google của điện thoại. Mã đăng nhập được giữ trong kho khóa an toàn của Android. Gỡ ứng dụng sẽ xóa bản sao này.</p>
+  <p>Lịch sử trò chuyện với Heli chỉ giữ tạm trong bộ nhớ máy chủ (tối đa 20 tin gần nhất cho mỗi người dùng), không ghi vào cơ sở dữ liệu, và mất khi bạn bấm làm mới cuộc trò chuyện hoặc khi máy chủ khởi động lại.</p>
 
   <h2>4. Chia sẻ dữ liệu</h2>
-  <p>Cửa hàng không bán dữ liệu và không dùng dịch vụ quảng cáo hay phân tích theo dõi người dùng. Khi khách hàng nhắn tin đặt món qua Zalo, nội dung trao đổi (đơn hàng, hóa đơn, bảng công nợ của chính khách đó) đi qua nền tảng Zalo theo chính sách của Zalo.</p>
+  <p>Cửa hàng không bán dữ liệu và không dùng dịch vụ quảng cáo hay phân tích theo dõi người dùng. Dữ liệu chỉ đi tới các bên dưới đây, và chỉ để thực hiện chức năng bạn dùng:</p>
+  <ul>
+    <li><b>Zalo:</b> khi khách hàng nhắn tin đặt món qua Zalo, nội dung trao đổi (đơn hàng, hóa đơn, bảng công nợ của chính khách đó) đi qua nền tảng Zalo theo chính sách của Zalo.</li>
+    <li><b>OpenAI (trợ lý Heli):</b> Heli chỉ hoạt động khi cửa hàng bật nó. Khi bạn hỏi Heli, máy chủ của cửa hàng gửi câu hỏi (dạng chữ), tên và vai trò của bạn sang OpenAI để soạn câu trả lời và đọc câu trả lời thành giọng nói. Với tài khoản quản trị, máy chủ có thể tra cứu dữ liệu của quán (ví dụ doanh thu, đơn hàng, tồn kho, khách hàng) bằng truy vấn chỉ-đọc và gửi kết quả cần thiết (tối đa 50 dòng mỗi lần) sang OpenAI để trả lời. OpenAI xử lý dữ liệu này với vai trò nhà cung cấp dịch vụ, theo chính sách của OpenAI. Không dùng Heli thì không có dữ liệu nào được gửi sang OpenAI.</li>
+    <li><b>Dịch vụ nhận dạng giọng nói của điện thoại:</b> khi bạn bấm nút micro của Heli, ứng dụng dùng dịch vụ nhận dạng giọng nói có sẵn trên Android (thường là của Google) để đổi lời nói thành chữ. Âm thanh do dịch vụ đó xử lý theo chính sách của nhà cung cấp; ứng dụng và máy chủ của cửa hàng chỉ nhận phần chữ, không ghi âm và không lưu âm thanh.</li>
+  </ul>
 
   <h2>5. Quyền của ứng dụng trên Android</h2>
   <ul>
-    <li><b>Internet:</b> kết nối với máy chủ của cửa hàng.</li>
-    <li><b>Thông báo:</b> báo đơn mới và bản cập nhật.</li>
-    <li><b>Cài đặt gói ứng dụng:</b> chỉ dùng khi bạn bấm “Cập nhật” trong ứng dụng; bản cập nhật tải từ máy chủ của cửa hàng và được kiểm tra mã SHA-256 trước khi cài.</li>
+    <li><b>Internet và trạng thái mạng:</b> kết nối với máy chủ của cửa hàng và biết khi nào mất mạng để chuyển sang chế độ ngoại tuyến.</li>
+    <li><b>Thông báo:</b> báo đơn mới (và, ở bản tải trực tiếp, báo có bản cập nhật).</li>
+    <li><b>Micro:</b> chỉ dùng khi bạn bấm nút micro trên màn hình Heli; ứng dụng hỏi quyền này ở lần đầu bạn bấm. Từ chối thì vẫn gõ chữ cho Heli được.</li>
+    <li><b>Máy ảnh và ảnh:</b> ứng dụng không xin quyền máy ảnh hay quyền đọc thư viện ảnh. Khi bạn chụp hoặc chọn ảnh chứng từ, ứng dụng mở máy ảnh hoặc trình chọn ảnh của Android và chỉ nhận đúng ảnh bạn chọn.</li>
+    <li><b>Bluetooth:</b> chỉ dùng để kết nối với máy in hóa đơn bạn đã ghép đôi trong cài đặt Bluetooth của điện thoại. Ứng dụng không dùng Bluetooth để xác định vị trí và không xin quyền vị trí.</li>
+    <li><b>Sinh trắc học (vân tay, khuôn mặt):</b> chỉ dùng khi bạn bật “Khóa ứng dụng”. Việc nhận dạng do Android thực hiện trên điện thoại; ứng dụng chỉ nhận kết quả đúng hay sai, không nhận và không gửi đi dữ liệu vân tay hay khuôn mặt.</li>
+    <li><b>Rung:</b> rung khi có thông báo.</li>
+    <li><b>Cài đặt gói ứng dụng:</b> <b>chỉ có ở bản Tasotek FnB tải trực tiếp</b> từ máy chủ cửa hàng, và chỉ dùng khi bạn bấm “Cập nhật” trong ứng dụng; bản cập nhật tải từ máy chủ của cửa hàng và được kiểm tra mã SHA-256 trước khi cài. Bản POS Tasotek trên Google Play không có quyền này, không tự tải hay cài bản mới; Google Play cập nhật ứng dụng.</li>
   </ul>
 
-  <h2>6. Yêu cầu truy cập, sửa hoặc xóa dữ liệu</h2>
-  <p>Khách hàng hoặc nhân viên muốn xem, sửa hoặc xóa dữ liệu của mình hãy liên hệ cửa hàng<% if (phone || address) { %>:
-    <%= [address, phone].filter(Boolean).join(' · ') %><% } %>. Cửa hàng sẽ xử lý trong thời gian hợp lý, trừ dữ liệu phải giữ theo quy định kế toán.</p>
+  <h2>6. Yêu cầu truy cập, sửa hoặc xóa dữ liệu và tài khoản</h2>
+  <p>Tài khoản nhân viên do cửa hàng cấp và xóa. Khách hàng hoặc nhân viên muốn xem, sửa hoặc xóa dữ liệu hay tài khoản của mình hãy liên hệ cửa hàng<% if (phone || address) { %>:
+    <%= [address, phone].filter(Boolean).join(' · ') %><% } %>, hoặc liên hệ theo mục 8. Cửa hàng sẽ xử lý trong thời gian hợp lý, trừ dữ liệu phải giữ theo quy định kế toán.</p>
 
   <h2>7. Thay đổi chính sách</h2>
   <p>Khi chính sách thay đổi, ngày cập nhật ở đầu trang sẽ được đổi.</p>
+
+  <h2>8. Liên hệ</h2>
+  <% const c = contact || {}; %>
+  <ul>
+    <li><b>Nhà phát triển ứng dụng:</b> Tasotek</li>
+    <% if (c.name) { %><li><b>Đơn vị vận hành:</b> <%= c.name %></li><% } %>
+    <% if (c.email) { %><li><b>Email:</b> <a href="mailto:<%= c.email %>"><%= c.email %></a></li><% } %>
+    <% if (c.phone) { %><li><b>Điện thoại:</b> <%= c.phone %></li><% } %>
+    <% if (c.address) { %><li><b>Địa chỉ:</b> <%= c.address %></li><% } %>
+  </ul>
 </main>
 </body>
 </html>

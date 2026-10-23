@@ -22,6 +22,7 @@ const mediaRoutes = require('./src/routes/mediaRoutes');
 const downloadRoutes = require('./src/routes/downloadRoutes');
 const kyThuatRoutes = require('./src/routes/kyThuatRoutes');
 const signupRoutes = require('./src/routes/signupRoutes');
+const accountDeletionRoutes = require('./src/routes/accountDeletionRoutes');
 const installRoutes = require('./src/routes/installRoutes');
 const { installGate } = require('./src/middlewares/installGate');
 const { tenantResolver } = require('./src/middlewares/tenant');
@@ -83,6 +84,9 @@ app.use('/download', downloadRoutes);
 // Shop sign-up (main site only; needs TENANT_BASE_DOMAIN): /dang-ky.
 app.use('/dang-ky', signupRoutes);
 
+// Account deletion (public; its URL is declared in the Google Play Console): explains the in-app path and takes requests.
+app.use('/xoa-tai-khoan', accountDeletionRoutes);
+
 // Technical-service QR page (public): finished jobs + request form; printed QR codes point here (routes/kyThuatRoutes.js).
 app.use('/ky-thuat', kyThuatRoutes);
 
@@ -90,7 +94,9 @@ app.use('/ky-thuat', kyThuatRoutes);
 app.get('/gioi-thieu', adminSecurity, (_req, res) => res.render('landing', { shopName: env.business.shopName, appDownload: appRelease.loginCard(), contact: env.contact }));
 
 // Privacy policy (public; store listings such as APKPure ask for its URL).
-app.get('/privacy', (_req, res) => res.render('privacy', { shopName: env.business.shopName, phone: env.business.phone, address: env.business.address }));
+app.get('/privacy', (_req, res) => res.render('privacy', { shopName: env.business.shopName, phone: env.business.phone, address: env.business.address, contact: env.contact }));
+// POS Tasotek (com.tasotek.fnb) privacy policy for the Google Play listing (public).
+app.get('/private', (_req, res) => res.render('private', { contact: env.contact }));
 
 app.use('/admin', adminRoutes);
 app.use('/api', routes);
@@ -135,6 +141,7 @@ async function start() {
     backupService.startScheduler();                     // automatic database backups (Admin > Sao lưu); never throws
     webhookGuard.ensure().catch(() => {});              // Zalo Bot Platform: re-register the webhook when its URL / secret changed; never throws, not awaited
     payonService.startRecovery();                       // PayOn: finishes claims a dead process left half-applied; never throws
+    require('./src/services/accountDeletion').startScheduler();   // purges shops whose owner asked for deletion, after the grace period; never throws
   }
 
   const isPassenger = typeof PhusionPassenger !== 'undefined'; // eslint-disable-line no-undef

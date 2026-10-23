@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/app_mode.dart';
 import '../../core/session.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common.dart';
@@ -556,20 +557,23 @@ class AppInfoCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final server = ref.watch(serverUrlProvider);
+    final local = ref.watch(appModeProvider) == AppMode.local;
     final update = ref.watch(updateCheckProvider);
     final found = update.asData?.value;
     return SectionCard(
       title: 'Ứng dụng',
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Column(children: [
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.dns_outlined),
-          title: const Text('Địa chỉ máy chủ'),
-          subtitle: Text(server.replaceFirst(RegExp(r'^https?://'), ''), style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
-          trailing: GhostAction(label: 'Đổi', icon: Icons.edit_outlined, onPressed: () => _editServer(context, ref)),
-        ),
-        const Divider(),
+        if (!local) ...[
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.dns_outlined),
+            title: const Text('Địa chỉ máy chủ'),
+            subtitle: Text(server.replaceFirst(RegExp(r'^https?://'), ''), style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
+            trailing: GhostAction(label: 'Đổi', icon: Icons.edit_outlined, onPressed: () => _editServer(context, ref)),
+          ),
+          const Divider(),
+        ],
         const ListTile(
           contentPadding: EdgeInsets.zero,
           leading: Icon(Icons.info_outline_rounded),

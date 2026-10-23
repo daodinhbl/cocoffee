@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/app_mode.dart';
 import '../../core/format.dart';
 import '../../core/session.dart';
 import '../../core/theme/app_theme.dart';
@@ -108,14 +109,16 @@ class _DashboardContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(currentUserProvider);
+    // "Dùng trên máy này": no stock, cost or debts on the phone, so no stock alerts, margins or stock charts.
+    final local = ref.watch(appModeProvider) == AppMode.local;
     final gap = width < 600 ? 16.0 : 24.0;
-    final sideBySide = width >= 1000;
+    final sideBySide = width >= 1000 && !local;
     final recent = _RecentOrders(orders: data.recentOrders);
     final low = _LowStock(data: data);
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       _Hero(data: data, name: user?.fullName ?? '', width: width),
       SizedBox(height: gap),
-      _KpiGrid(data: data, columns: width >= 1000 ? 4 : 2, gap: width < 600 ? 12 : 20),
+      _KpiGrid(data: data, columns: width >= 1000 ? 4 : 2, gap: width < 600 ? 12 : 20, local: local),
       SizedBox(height: gap),
       // The web wraps the "06:00 – 22:00" note under the title when the row is narrow.
       SectionCard(
@@ -138,13 +141,14 @@ class _DashboardContent extends ConsumerWidget {
         ])
       else ...[
         recent,
-        SizedBox(height: gap),
-        low,
+        if (!local) ...[SizedBox(height: gap), low],
       ],
-      const SizedBox(height: 32),
-      Text('Phân tích nhanh', style: context.tt.titleLarge?.copyWith(fontSize: 19)),
-      const SizedBox(height: 12),
-      _QuickCharts(data: data, columns: width >= 840 ? 2 : 1, gap: gap),
+      if (!local) ...[
+        const SizedBox(height: 32),
+        Text('Phân tích nhanh', style: context.tt.titleLarge?.copyWith(fontSize: 19)),
+        const SizedBox(height: 12),
+        _QuickCharts(data: data, columns: width >= 840 ? 2 : 1, gap: gap),
+      ],
     ]);
   }
 }
@@ -304,10 +308,11 @@ class _HeroAction extends StatelessWidget {
 // ---------------------------------------------------------------- KPI cards
 
 class _KpiGrid extends StatelessWidget {
-  const _KpiGrid({required this.data, required this.columns, required this.gap});
+  const _KpiGrid({required this.data, required this.columns, required this.gap, this.local = false});
   final DashboardData data;
   final int columns;
   final double gap;
+  final bool local;
 
   Widget _sub(BuildContext context, String text, Tone tone) => Text(
         text,
@@ -325,6 +330,25 @@ class _KpiGrid extends StatelessWidget {
     final cur = data.today;
     final c = data.counts;
     final hasRevenue = cur.revenue > 0;
+    if (local) {
+      return _grid([
+      StatCard(
+        label: 'Đơn hoàn tất',
+        icon: Icons.check_rounded,
+        tone: Tone.good,
+        value: '${cur.orders}',
+        footer: _sub(context, cur.orders > 0 ? 'TB ${money(cur.revenue / cur.orders)} / đơn' : 'Chưa có đơn hoàn tất', Tone.neutral),
+      ),
+      StatCard(
+        label: 'Đang phục vụ',
+        icon: Icons.receipt_long_outlined,
+        tone: Tone.info,
+        value: '${c.openOrders} đơn',
+        onTap: () => context.go('/orders?status=open'),
+        footer: _sub(context, 'Đơn đã giữ, chưa thanh toán', Tone.neutral),
+      ),
+      ]);
+    }
     final cards = <Widget>[
       StatCard(
         label: 'Giá vốn (COGS)',
@@ -359,6 +383,10 @@ class _KpiGrid extends StatelessWidget {
             style: context.tt.bodySmall?.copyWith(color: Palette.navyAccent, fontWeight: FontWeight.w600)),
       ),
     ];
+    return _grid(cards);
+  }
+
+  Widget _grid(List<Widget> cards) {
     return Column(children: [
       for (var r = 0; r < cards.length; r += columns) ...[
         if (r > 0) SizedBox(height: gap),

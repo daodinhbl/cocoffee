@@ -6,6 +6,8 @@
  *   node scripts/tenant.js list                                                      shops and databases
  *   node scripts/tenant.js provision [<slug>]                                        finish waiting sign-ups (all, or one)
  *   node scripts/tenant.js suspend <slug> | resume <slug>
+ *   node scripts/tenant.js delete <slug>                                             schedule a deletion (as the owner would; 30 days)
+ *   node scripts/tenant.js purge-deleted [--now <slug>]                              purge shops past their grace period (or one now)
  *
  * A database must exist (create it in hPanel > Databases) and be completely empty: provisioning builds the schema in it and
  * refuses a database that already has tables.
@@ -13,6 +15,7 @@
 require('dotenv').config();
 const tenantModel = require('../src/models/tenantModel');
 const tenantService = require('../src/services/tenantService');
+const accountDeletion = require('../src/services/accountDeletion');
 const { defaultPool } = require('../src/config/db');
 
 async function main() {
@@ -27,7 +30,7 @@ async function main() {
     if (n) console.log(`${n} waiting shop(s) were set up with it.`);
   } else if (cmd === 'list') {
     console.log('Shops:');
-    for (const t of await tenantModel.list()) console.log(`  #${t.id} ${t.slug.padEnd(24)} ${t.status.padEnd(9)} ${t.db_name || '(no database)'}  ${t.owner_email}${t.error ? `  ! ${t.error}` : ''}`);
+    for (const t of await tenantModel.list()) console.log(`  #${t.id} ${t.slug.padEnd(24)} ${t.status.padEnd(9)} ${t.db_name || '(no database)'}  ${t.owner_email}${t.delete_after ? `  (delete after ${new Date(t.delete_after).toISOString()})` : ''}${t.error ? `  ! ${t.error}` : ''}`);
     console.log('Databases:');
     for (const d of await tenantModel.listDbs()) console.log(`  #${d.id} ${d.db_name.padEnd(24)} ${d.slug ? `used by ${d.slug}` : 'free'}`);
   } else if (cmd === 'provision') {
@@ -43,8 +46,22 @@ async function main() {
     if (!t) throw new Error(`unknown shop ${a[0]}`);
     await tenantModel.setStatus(t.id, cmd === 'suspend' ? 'suspended' : 'active');
     console.log(`${t.slug}: ${cmd === 'suspend' ? 'suspended' : 'active'} (live within 30 s)`);
+  } else if (cmd === 'delete') {
+    const t = await tenantModel.findBySlug(a[0]);
+    if (!t) throw new Error(`unknown shop ${a[0]}`);
+    const r = await accountDeletion.request(t.id);
+    console.log(`${t.slug}: deletion scheduled, purge after ${r.delete_after ? new Date(r.delete_after).toISOString() : '?'}`);
+  } else if (cmd === 'purge-deleted') {
+    if (a[0] === '--now') {
+      const t = await tenantModel.findBySlug(a[1]);
+      if (!t) throw new Error(`unknown shop ${a[1]}`);
+      if (!t.delete_after) throw new Error(`${t.slug} has no deletion request: run "delete ${t.slug}" first`);
+      console.log(`${t.slug}: ${(await accountDeletion.purge(t.id)) ? 'purged' : 'not found'}`);
+    } else {
+      console.log(`${await accountDeletion.purgeDue()} shop(s) purged.`);
+    }
   } else {
-    console.log('usage: node scripts/tenant.js add-db|list|provision|suspend|resume ...');
+    console.log('usage: node scripts/tenant.js add-db|list|provision|suspend|resume|delete|purge-deleted ...');
   }
 }
 

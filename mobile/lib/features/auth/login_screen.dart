@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/app_mode.dart';
 import '../../core/session.dart';
 import '../../core/theme/app_theme.dart';
+import '../onboarding/onboarding_service.dart';
 
 /// Sign-in, styled like the web login (views/login.ejs): navy brand panel, white form card, amber button.
+/// On a server it signs in staff of an existing shop (the address under the card can be changed); in local mode it
+/// opens the shop kept on this phone with its local admin account. "Chọn cách khác" goes back to the welcome page.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -35,6 +40,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _error = null;
     });
     try {
+      if (ref.read(appModeProvider) == AppMode.unset) await ref.read(appModeProvider.notifier).set(AppMode.server);
       await ref.read(authProvider.notifier).login(_user.text, _pass.text);
     } catch (e) {
       setState(() => _error = toApiException(e).message);
@@ -68,6 +74,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     final server = ref.watch(serverUrlProvider);
+    final local = ref.watch(appModeProvider) == AppMode.local;
     final notice = _error ?? (auth is SignedOut ? auth.message : null);
     return Scaffold(
       backgroundColor: Palette.navyDarker,
@@ -88,7 +95,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const SizedBox(height: 14),
                 const Text('Tasotek FnB', style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w700)),
                 const SizedBox(height: 4),
-                const Text('Đăng nhập để quản lý quán', style: TextStyle(color: Palette.navyMuted, fontSize: 15)),
+                Text(local ? 'Đăng nhập quán lưu trên máy này' : 'Đăng nhập để quản lý quán', style: const TextStyle(color: Palette.navyMuted, fontSize: 15)),
                 const SizedBox(height: 24),
                 Card(
                   child: Padding(
@@ -144,10 +151,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
+                if (!local)
+                  TextButton.icon(
+                    onPressed: _editServer,
+                    icon: const Icon(Icons.dns_outlined, size: 18, color: Palette.navyMuted),
+                    label: Text(server.replaceFirst(RegExp(r'^https?://'), ''), style: const TextStyle(color: Palette.navyMuted)),
+                  ),
                 TextButton.icon(
-                  onPressed: _editServer,
-                  icon: const Icon(Icons.dns_outlined, size: 18, color: Palette.navyMuted),
-                  label: Text(server.replaceFirst(RegExp(r'^https?://'), ''), style: const TextStyle(color: Palette.navyMuted)),
+                  key: const ValueKey('login-choose-again'),
+                  onPressed: () async {
+                    await chooseAgain(ref);
+                    if (context.mounted) context.go('/welcome');
+                  },
+                  icon: const Icon(Icons.swap_horiz_rounded, size: 18, color: Palette.navyMuted),
+                  label: const Text('Chọn cách khác (tạo quán mới, dùng trên máy này)', style: TextStyle(color: Palette.navyMuted)),
                 ),
               ]),
             ),

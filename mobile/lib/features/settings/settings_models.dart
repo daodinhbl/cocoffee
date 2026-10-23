@@ -4,10 +4,10 @@ import 'heli_card.dart';
 import '../../core/session.dart';
 
 /// Shown under "Ứng dụng"; keep in step with `version:` in pubspec.yaml.
-const kAppVersion = '1.10.0 (12)';
+const kAppVersion = '1.10.1 (13)';
 
 /// versionCode (the number after `+` in pubspec.yaml): the OTA update compares it with the server's manifest.
-const kAppBuild = 12;
+const kAppBuild = 13;
 
 int _int(Object? v, int fallback) => v is num ? v.toInt() : int.tryParse('${v ?? ''}') ?? fallback;
 bool _bool(Object? v) => v == true || v == 1 || v == '1' || v == 'true';

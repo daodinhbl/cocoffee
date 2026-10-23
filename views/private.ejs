@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Chính sách quyền riêng tư POS Tasotek</title>
+  <meta name="description" content="Chính sách quyền riêng tư của ứng dụng POS Tasotek (com.tasotek.fnb): dữ liệu thu thập, mục đích, lưu trữ và cách yêu cầu xóa dữ liệu.">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <style>
+    /* Một cột đọc hẹp, đầu trang là thẻ định danh ứng dụng (tên, gói, ngày hiệu lực), các mục đánh số để dễ trích dẫn. */
+    :root {
+      --bg: #f5f8f9;
+      --surface: #ffffff;
+      --fg: #14232b;
+      --muted: #55666f;
+      --line: #d7e0e4;
+      --accent: #0c6a6a;
+      --accent-soft: #e1f1f0;
+      --font-body: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      color-scheme: light dark;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d171b;
+        --surface: #142228;
+        --fg: #e4edf0;
+        --muted: #93a6ae;
+        --line: #26373e;
+        --accent: #4fc0bb;
+        --accent-soft: #123234;
+      }
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.75;
+      padding-block: 32px 64px;
+      padding-left: max(16px, env(safe-area-inset-left, 0px));
+      padding-right: max(16px, env(safe-area-inset-right, 0px));
+    }
+    .page { max-width: 46rem; margin-inline: auto; display: flex; flex-direction: column; gap: 28px; min-width: 0; }
+
+    .masthead { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 24px; display: flex; flex-direction: column; gap: 14px; }
+    .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+    h1 { font-size: clamp(1.6rem, 5vw, 2.1rem); line-height: 1.25; font-weight: 700; margin: 0; text-wrap: balance; }
+    .meta { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 0; padding: 0; list-style: none; font-size: 14px; color: var(--muted); }
+    .meta li { display: flex; gap: 8px; min-width: 0; }
+    .meta strong { font-weight: 600; color: var(--fg); }
+    code { font-family: var(--font-mono); font-size: .9em; overflow-wrap: anywhere; }
+    .lead { margin: 0; color: var(--muted); }
+
+    section { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+    h2 { font-size: 1.2rem; line-height: 1.4; font-weight: 600; margin: 12px 0 0; padding-top: 20px; border-top: 1px solid var(--line); text-wrap: balance; }
+    h2 .n { font-family: var(--font-mono); font-weight: 500; color: var(--accent); margin-right: 8px; }
+    p { margin: 0; }
+    ul { margin: 0; padding-left: 1.3rem; display: flex; flex-direction: column; gap: 6px; }
+    li::marker { color: var(--accent); }
+    a { color: var(--accent); text-underline-offset: 3px; }
+    a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+
+    .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+    table { border-collapse: collapse; width: 100%; min-width: 34rem; font-size: 14.5px; line-height: 1.55; }
+    th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+    th { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); background: var(--accent-soft); }
+    tr:last-child td { border-bottom: 0; }
+
+    .callout { background: var(--accent-soft); border-radius: 6px; padding: 14px 16px; font-size: 15px; }
+    .callout ul { margin: 8px 0; }
+    .contact { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 16px 20px; display: grid; grid-template-columns: max-content 1fr; gap: 6px 20px; margin: 0; }
+    .contact dt { color: var(--muted); font-size: 14px; }
+    .contact dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+
+    @media (max-width: 480px) {
+      .masthead { padding: 18px; }
+      .contact { grid-template-columns: 1fr; gap: 0; }
+      .contact dd { margin-bottom: 10px; }
+    }
+  </style>
+</head>
+<body>
+<% const c = contact || {}; %>
+<main class="page">
+  <header class="masthead">
+    <span class="eyebrow">Chính sách quyền riêng tư</span>
+    <h1>POS Tasotek</h1>
+    <ul class="meta">
+      <li><strong>Gói ứng dụng</strong> <code>com.tasotek.fnb</code></li>
+      <li><strong>Có hiệu lực từ</strong> 23/10/2026</li>
+      <li><strong>Nền tảng</strong> Android</li>
+    </ul>
+    <p class="lead">Trang này giải thích POS Tasotek thu thập dữ liệu gì, dùng để làm gì, lưu trữ ra sao và bạn có thể yêu cầu xóa dữ liệu bằng cách nào.</p>
+  </header>
+
+  <section>
+    <h2><span class="n">1</span>Giới thiệu</h2>
+    <p>POS Tasotek là ứng dụng bán hàng (POS) dành cho nhà hàng, quán cà phê và cửa hàng ăn uống, do Tasotek phát triển (sau đây gọi là "chúng tôi"). Ứng dụng giúp chủ cửa hàng và nhân viên quản lý thực đơn, bàn, đơn hàng, kho, chi phí, công nợ và báo cáo doanh thu.</p>
+    <p>Có hai cách dùng: đăng ký quán trên máy chủ (chủ quán tạo tài khoản, rồi tạo tài khoản cho nhân viên), hoặc chế độ <strong>"Dùng trên máy này"</strong>, khi đó dữ liệu chỉ nằm trên điện thoại và không gửi lên máy chủ. Ứng dụng không hiển thị quảng cáo.</p>
+    <p>Khi cài đặt và sử dụng ứng dụng, bạn đồng ý với cách chúng tôi xử lý dữ liệu được mô tả trong chính sách này.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">2</span>Dữ liệu chúng tôi thu thập</h2>
+    <p>Chúng tôi chỉ thu thập dữ liệu cần thiết để ứng dụng hoạt động.</p>
+    <div class="table-wrap" role="region" aria-label="Bảng dữ liệu thu thập" tabindex="0">
+      <table>
+        <thead>
+          <tr><th>Dữ liệu</th><th>Mục đích</th><th>Chia sẻ với bên thứ ba</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Tài khoản chủ quán khi đăng ký: họ tên, tên quán, email, số điện thoại, tên miền phụ, tên đăng nhập. Mật khẩu chỉ lưu dạng băm, không lưu nguyên văn.</td>
+            <td>Tạo và xác thực tài khoản, hỗ trợ khách hàng</td>
+            <td>Không</td>
+          </tr>
+          <tr>
+            <td>Tài khoản nhân viên do chủ quán tạo: họ tên, tên đăng nhập, vai trò</td>
+            <td>Đăng nhập và phân quyền trong cửa hàng</td>
+            <td>Không</td>
+          </tr>
+          <tr>
+            <td>Dữ liệu kinh doanh do cửa hàng nhập: thực đơn, giá, bàn, đơn hàng, thanh toán, kho, chi phí, báo cáo</td>
+            <td>Vận hành chức năng bán hàng, in hóa đơn, lập báo cáo</td>
+            <td>Chỉ với nhà cung cấp hạ tầng máy chủ</td>
+          </tr>
+          <tr>
+            <td>Khách hàng của quán: tên, số điện thoại (nếu có), mã tài khoản Zalo (khi khách đặt món qua Zalo), ghi chú, sổ công nợ</td>
+            <td>Bán hàng, theo dõi công nợ, nhận đơn và gửi hóa đơn qua Zalo</td>
+            <td>Zalo, chỉ khi khách nhắn tin với quán qua Zalo (mục 5)</td>
+          </tr>
+          <tr>
+            <td>Ảnh chứng từ chi phí: chỉ ảnh hóa đơn, biên lai bạn tự chụp hoặc tự chọn trong phiếu chi</td>
+            <td>Lưu kèm phiếu chi trên máy chủ của cửa hàng (ảnh được thu nhỏ trước khi gửi)</td>
+            <td>Không</td>
+          </tr>
+          <tr>
+            <td>Câu hỏi cho trợ lý Heli: nội dung bạn gõ hoặc nói (dạng chữ), tên và vai trò của bạn, câu trả lời của Heli</td>
+            <td>Trả lời câu hỏi và đọc câu trả lời thành giọng nói</td>
+            <td>OpenAI, chỉ khi cửa hàng bật Heli và bạn dùng nó (mục 5)</td>
+          </tr>
+          <tr>
+            <td>Thông tin máy và nhật ký lỗi: kiểu máy, phiên bản Android, phiên bản ứng dụng, lỗi gần đây. Chỉ lưu trên điện thoại.</td>
+            <td>Màn hình Chẩn đoán, giúp hỗ trợ kỹ thuật</td>
+            <td>Không. Chỉ rời khỏi máy khi bạn tự bấm sao chép hoặc chia sẻ báo cáo chẩn đoán cho người bạn chọn.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Chúng tôi không thu thập vị trí, danh bạ, tin nhắn SMS hay thư viện ảnh của bạn, và không dùng công cụ phân tích hành vi hay theo dõi lỗi của bên thứ ba.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">3</span>Quyền truy cập trên thiết bị</h2>
+    <p>Ứng dụng có thể yêu cầu các quyền sau, và chỉ dùng cho đúng chức năng nêu bên dưới:</p>
+    <ul>
+      <li><strong>Internet và trạng thái mạng:</strong> kết nối với máy chủ của cửa hàng và biết khi nào mất mạng để chuyển sang chế độ ngoại tuyến.</li>
+      <li><strong>Thông báo:</strong> báo đơn mới. Android 13 trở lên sẽ hỏi bạn một lần.</li>
+      <li><strong>Micro:</strong> chỉ dùng khi bạn bấm nút micro trên màn hình Heli; ứng dụng hỏi quyền ở lần bấm đầu tiên. Từ chối thì vẫn gõ chữ cho Heli được.</li>
+      <li><strong>Sinh trắc học (vân tay, khuôn mặt):</strong> chỉ dùng khi bạn bật "Khóa ứng dụng". Android tự nhận dạng trên điện thoại; ứng dụng chỉ nhận kết quả đúng hay sai, không nhận và không gửi đi dữ liệu vân tay hay khuôn mặt.</li>
+      <li><strong>Bluetooth:</strong> chỉ để kết nối máy in hóa đơn đã ghép đôi trong cài đặt Bluetooth của điện thoại. Ứng dụng không dùng Bluetooth để xác định vị trí và không xin quyền vị trí.</li>
+      <li><strong>Máy ảnh và ảnh:</strong> ứng dụng không xin quyền máy ảnh hay quyền đọc thư viện ảnh. Khi bạn chụp hoặc chọn ảnh chứng từ, ứng dụng mở máy ảnh hoặc trình chọn ảnh của Android và chỉ nhận đúng ảnh bạn chọn.</li>
+    </ul>
+    <p>Bạn có thể thu hồi từng quyền bất kỳ lúc nào trong phần Cài đặt của Android. Chức năng liên quan đến quyền đó sẽ ngừng hoạt động, các chức năng còn lại không bị ảnh hưởng.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">4</span>Cách chúng tôi sử dụng dữ liệu</h2>
+    <ul>
+      <li>Cung cấp, duy trì và cải thiện các chức năng của ứng dụng.</li>
+      <li>Xác thực người dùng và bảo vệ tài khoản khỏi truy cập trái phép.</li>
+      <li>Hỗ trợ kỹ thuật và phản hồi yêu cầu của bạn.</li>
+      <li>Phát hiện lỗi, sự cố và hành vi lạm dụng.</li>
+      <li>Tuân thủ nghĩa vụ pháp lý.</li>
+    </ul>
+    <p>Chúng tôi không dùng dữ liệu của bạn để quảng cáo, không hiển thị quảng cáo của bên thứ ba và không dùng dịch vụ phân tích theo dõi người dùng.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">5</span>Chia sẻ dữ liệu</h2>
+    <p>Chúng tôi không bán dữ liệu cá nhân hay dữ liệu kinh doanh của bạn. Dữ liệu chỉ đi tới các bên dưới đây, và chỉ để thực hiện chức năng bạn dùng:</p>
+    <ul>
+      <li><strong>OpenAI (trợ lý Heli):</strong> Heli chỉ hoạt động khi cửa hàng bật nó. Khi bạn hỏi Heli, máy chủ gửi câu hỏi (dạng chữ), tên và vai trò của bạn sang OpenAI để soạn câu trả lời và đọc câu trả lời thành giọng nói. Với tài khoản quản trị, máy chủ có thể tra cứu dữ liệu của quán (doanh thu, đơn hàng, tồn kho, khách hàng…) bằng truy vấn chỉ-đọc và gửi phần kết quả cần thiết (tối đa 50 dòng mỗi lần) sang OpenAI. OpenAI xử lý dữ liệu này với vai trò nhà cung cấp dịch vụ, theo chính sách của OpenAI. Không dùng Heli thì không có dữ liệu nào được gửi sang OpenAI.</li>
+      <li><strong>Dịch vụ nhận dạng giọng nói của điện thoại:</strong> khi bạn bấm nút micro của Heli, ứng dụng dùng dịch vụ nhận dạng giọng nói có sẵn trên Android (thường là của Google) để đổi lời nói thành chữ, theo chính sách của nhà cung cấp đó. Ứng dụng và máy chủ chỉ nhận phần chữ, không ghi âm và không lưu âm thanh.</li>
+      <li><strong>Zalo:</strong> khi khách hàng nhắn tin đặt món với quán qua Zalo, nội dung trao đổi (đơn hàng, hóa đơn, bảng công nợ của chính khách đó) đi qua nền tảng Zalo theo chính sách của Zalo.</li>
+      <li><strong>Nhà cung cấp hạ tầng máy chủ:</strong> nơi đặt máy chủ và cơ sở dữ liệu, hoạt động theo hướng dẫn của chúng tôi và có nghĩa vụ bảo mật.</li>
+      <li>Khi pháp luật hoặc cơ quan nhà nước có thẩm quyền yêu cầu bằng văn bản.</li>
+      <li>Khi bạn đồng ý rõ ràng.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="n">6</span>Lưu trữ và bảo mật</h2>
+    <p>Dữ liệu được truyền giữa ứng dụng và máy chủ qua kết nối mã hóa HTTPS. Quyền truy cập dữ liệu được phân theo vai trò: chủ cửa hàng xem được toàn bộ dữ liệu cửa hàng của mình, nhân viên chỉ xem được phần được cấp quyền. Dữ liệu của mỗi cửa hàng được tách riêng với cửa hàng khác. Mật khẩu chỉ lưu dạng băm.</p>
+    <p>Để dùng khi mất mạng, ứng dụng giữ một bản sao dữ liệu trong vùng lưu trữ riêng của ứng dụng trên điện thoại và gửi lên máy chủ khi có mạng trở lại. Bản sao này không được sao lưu lên tài khoản Google của điện thoại; mã đăng nhập được giữ trong kho khóa an toàn của Android. Gỡ ứng dụng sẽ xóa bản sao này. Ở chế độ "Dùng trên máy này", toàn bộ dữ liệu chỉ nằm trên điện thoại.</p>
+    <p>Lịch sử trò chuyện với Heli chỉ giữ tạm trong bộ nhớ máy chủ (tối đa 20 tin gần nhất cho mỗi người dùng), không ghi vào cơ sở dữ liệu, và mất khi bạn làm mới cuộc trò chuyện hoặc khi máy chủ khởi động lại.</p>
+    <p>Không có hệ thống nào an toàn tuyệt đối. Chúng tôi áp dụng các biện pháp hợp lý để bảo vệ dữ liệu và sẽ thông báo cho bạn nếu xảy ra sự cố ảnh hưởng đến dữ liệu của bạn.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">7</span>Thời gian lưu trữ và xóa dữ liệu</h2>
+    <p>Chúng tôi lưu dữ liệu trong thời gian tài khoản còn hoạt động. Khi chủ quán yêu cầu xóa, quán ngừng hoạt động ngay; dữ liệu được giữ thêm 30 ngày để bạn có thể đổi ý, sau đó toàn bộ dữ liệu của quán, mọi tài khoản đăng nhập của quán và thông tin đăng ký của chủ quán bị xóa vĩnh viễn, không thể khôi phục.</p>
+    <div class="callout">
+      <strong>Cách yêu cầu xóa tài khoản và dữ liệu:</strong>
+      <ul>
+        <li>Trong ứng dụng: đăng nhập bằng tài khoản quản trị, vào <strong>Thêm › Cài đặt › Xóa tài khoản và dữ liệu</strong>.</li>
+        <li>Trên web: mở trang <a href="/xoa-tai-khoan">Xóa tài khoản và dữ liệu</a> và gửi yêu cầu bằng tên đăng nhập, mật khẩu quản trị của quán.</li>
+        <li>Hoặc gửi email đến địa chỉ ở mục 11 với tiêu đề "Yêu cầu xóa dữ liệu POS Tasotek", kèm tên quán và email hoặc số điện thoại đã đăng ký. Chúng tôi sẽ xác minh chủ tài khoản trước khi xóa.</li>
+      </ul>
+      <p>Tài khoản nhân viên do chủ quán tạo và xóa. Ở chế độ "Dùng trên máy này": vào <strong>Cài đặt › Xóa toàn bộ dữ liệu trên máy</strong>, hoặc gỡ ứng dụng.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">8</span>Quyền của bạn</h2>
+    <p>Bạn có quyền yêu cầu xem, chỉnh sửa, xuất hoặc xóa dữ liệu của mình, và rút lại sự đồng ý đã cấp. Để thực hiện, vui lòng liên hệ qua thông tin ở mục 11.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">9</span>Trẻ em</h2>
+    <p>POS Tasotek là công cụ kinh doanh, không dành cho trẻ em dưới 13 tuổi. Chúng tôi không chủ ý thu thập dữ liệu của trẻ em. Nếu phát hiện có dữ liệu như vậy, chúng tôi sẽ xóa ngay.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">10</span>Thay đổi chính sách</h2>
+    <p>Chúng tôi có thể cập nhật chính sách này khi ứng dụng thay đổi hoặc quy định pháp luật thay đổi. Ngày hiệu lực ở đầu trang luôn là ngày của phiên bản mới nhất. Với thay đổi quan trọng, chúng tôi sẽ thông báo trong ứng dụng hoặc qua email.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">11</span>Liên hệ</h2>
+    <dl class="contact">
+      <dt>Nhà phát triển</dt>
+      <dd>Tasotek</dd>
+      <dt>Ứng dụng</dt>
+      <dd>POS Tasotek (<code>com.tasotek.fnb</code>)</dd>
+      <% if (c.email) { %><dt>Email</dt>
+      <dd><a href="mailto:<%= c.email %>"><%= c.email %></a></dd><% } %>
+      <% if (c.phone) { %><dt>Điện thoại</dt>
+      <dd><%= c.phone %></dd><% } %>
+    </dl>
+  </section>
+</main>
+</body>
+</html>

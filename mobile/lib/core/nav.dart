@@ -57,6 +57,9 @@ const bottomTabs = <NavItem>[
   NavItem(key: 'more', label: 'Menu', icon: Icons.menu_rounded, route: '/more'),
 ];
 
+/// Navigation items that work in local mode ("Dùng trên máy này"); the others need a server and are hidden.
+const kLocalNavKeys = {'dashboard', 'pos', 'orders', 'menu', 'reports', 'more', 'settings', 'diagnostics'};
+
 int? branchOf(String route) {
   final i = bottomTabs.indexWhere((t) => t.route == route);
   return i < 0 ? null : i;

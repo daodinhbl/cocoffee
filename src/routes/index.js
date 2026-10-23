@@ -15,6 +15,8 @@ const menu = require('../controllers/menuController');
 const inventory = require('../controllers/inventoryController');
 const orders = require('../controllers/orderController');
 const shell = require('../controllers/api/shellApi');
+const account = require('../controllers/api/accountApi');
+const signupApiRoutes = require('./signupApiRoutes');
 const pos = require('../controllers/api/posApi');
 
 const router = express.Router();
@@ -33,6 +35,7 @@ router.post('/ngrok/claim', rateLimit({ windowMs: 60 * 60 * 1000, max: 20 }), as
     return res.json({ domain: r.domain, authtoken: r.authtoken });
   } catch (err) { return next(err); }
 });
+router.use('/signup', signupApiRoutes);                                  // the app's "Tạo quán mới" (main site, multi-shop mode only)
 router.post('/auth/login', rateLimit({ windowMs: 15 * 60 * 1000, max: 60 }), rateLimit({ windowMs: 15 * 60 * 1000, max: 8, key: rateLimit.accountKey }), auth.login);
 
 // ---- everything below needs a bearer token ----------------------------------
@@ -40,6 +43,8 @@ router.post('/auth/login', rateLimit({ windowMs: 15 * 60 * 1000, max: 60 }), rat
 router.use(requireAuth);
 router.get('/auth/me', auth.me);
 router.post('/auth/change-password', rateLimit({ windowMs: 15 * 60 * 1000, max: 10, key: (req) => `pw:${req.user.id}` }), auth.changePassword);
+router.get('/account', account.info);                                      // Cài đặt > Xóa tài khoản (shops created by sign-up)
+router.post('/account/delete', rateLimit({ windowMs: 15 * 60 * 1000, max: 5, key: (req) => `del:${req.user.id}` }), account.remove);
 
 // app shell + POS (any staff). /zalo/status and /zalo/drafts fall through the public webhook router above.
 router.get('/zalo/status', shell.status);

@@ -8,6 +8,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 
 import 'api/api_client.dart';
+import 'app_mode.dart';
+import 'local/local_api_client.dart';
+import 'local/local_backend.dart';
+import 'local/local_db.dart';
 import 'offline/connectivity.dart';
 import 'offline/local_store.dart';
 import 'offline/offline_db.dart';
@@ -122,8 +126,10 @@ final sessionStoreProvider = Provider<SessionStore>((ref) => throw Unimplemented
 final serverUrlProvider = NotifierProvider<ServerUrlNotifier, String>(ServerUrlNotifier.new);
 
 class ServerUrlNotifier extends Notifier<String> {
+  /// In local mode the app's "server" is the phone ([kLocalServer]): carts, caches and links stay apart from any
+  /// server account. The saved server address is kept for when the user goes back to a server.
   @override
-  String build() => ref.read(sessionStoreProvider).serverUrl;
+  String build() => ref.watch(appModeProvider) == AppMode.local ? kLocalServer : ref.read(sessionStoreProvider).serverUrl;
 
   Future<void> set(String url) async {
     await ref.read(sessionStoreProvider).setServerUrl(url);
@@ -145,14 +151,26 @@ final localStoreProvider = Provider<LocalStore>((ref) {
 final offlineDbProvider = Provider<OfflineDb>((ref) {
   final dir = ref.watch(appDirProvider);
   final user = ref.watch(accountIdProvider);
-  if (dir == null || user == null) return OfflineDb.disabled();
+  if (dir == null || user == null || ref.watch(appModeProvider) == AppMode.local) return OfflineDb.disabled();
   final server = ref.watch(serverUrlProvider);
   final tag = server.codeUnits.fold<int>(7, (h, c) => (h * 31 + c) & 0x7fffffff).toRadixString(36);
   final db = OfflineDb(() => OfflineDb.openAt(databaseFactory, '${dir.path}${Platform.pathSeparator}offline_${tag}_u$user.db'));
   return db;
 });
 
+/// The shop of "Dùng trên máy này" (SQLite file in the app directory; tests override it with an in-memory one).
+final localDbProvider = Provider<LocalDb>((ref) {
+  final dir = ref.watch(appDirProvider);
+  final path = dir == null ? inMemoryDatabasePath : '${dir.path}${Platform.pathSeparator}${LocalDb.fileName}';
+  final db = LocalDb(databaseFactory, path);
+  ref.onDispose(db.close);
+  return db;
+});
+
+/// The data source of the screens: the server ([ApiClient]) or, in local mode, the phone ([LocalApiClient] over
+/// [LocalBackend]). Both speak the same paths and JSON, so no screen needs to know which one it talks to.
 final apiProvider = Provider<ApiClient>((ref) {
+  if (ref.watch(appModeProvider) == AppMode.local) return LocalApiClient(LocalBackend(ref.watch(localDbProvider)));
   final store = ref.watch(sessionStoreProvider);
   final server = ref.watch(serverUrlProvider);
   // Cached answers are per account (a cashier and an admin do not see the same screens); rebuilt on sign-in/out.

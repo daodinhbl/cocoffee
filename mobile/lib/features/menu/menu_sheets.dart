@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/api/api_client.dart';
+import '../../core/app_mode.dart';
 import '../../core/session.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/widgets/common.dart';
@@ -113,9 +114,11 @@ class _ProductFormState extends ConsumerState<ProductForm> {
   Widget build(BuildContext context) {
     final p = widget.product;
     final itemIds = widget.items.map((i) => i.id).toSet();
+    // "Dùng trên máy này": no stock and no Zalo chatbot, the code (SKU) is optional.
+    final local = ref.watch(appModeProvider) == AppMode.local;
     return FormSheet(
       formKey: _form,
-      title: _editing ? 'Sửa ${p!.name}' : 'Thêm hàng bán lẻ',
+      title: _editing ? 'Sửa ${p!.name}' : (local ? 'Thêm món' : 'Thêm hàng bán lẻ'),
       busy: _busy,
       error: _error,
       onSubmit: _submit,
@@ -149,7 +152,7 @@ class _ProductFormState extends ConsumerState<ProductForm> {
                 buildCounter: _noCounter,
                 textCapitalization: TextCapitalization.characters,
                 style: const TextStyle(fontFamily: 'monospace'),
-                validator: (v) => !_editing && (v ?? '').trim().isEmpty ? 'Nhập mã SKU' : null,
+                validator: (v) => !_editing && !local && (v ?? '').trim().isEmpty ? 'Nhập mã SKU' : null,
               ),
             ),
           ),
@@ -181,7 +184,7 @@ class _ProductFormState extends ConsumerState<ProductForm> {
             validator: (v) => v == null ? 'Chọn nhóm món' : null,
           ),
         ),
-        if (p == null || !p.isBom)
+        if (!local && (p == null || !p.isBom))
           LabeledField(
             label: 'Hàng trong kho (chỉ hàng bán lẻ)',
             hint: 'Hàng bán lẻ trừ kho 1:1 theo mặt hàng này. Đồ uống pha chế bỏ qua ô này.',
@@ -197,7 +200,8 @@ class _ProductFormState extends ConsumerState<ProductForm> {
               validator: (v) => v == null && (p == null || p.inventoryItemId == null) ? 'Chọn hàng trong kho cho hàng bán lẻ' : null,
             ),
           ),
-        LabeledField(
+        if (!local)
+          LabeledField(
           label: 'Từ khóa đặt món qua Zalo',
           hint: 'Tên món luôn là một từ khóa. Mỗi từ khóa chỉ thuộc về một món.',
           child: TextFormField(

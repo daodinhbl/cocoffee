@@ -27,7 +27,11 @@ import '../features/reports/reports_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/sync/sync_screen.dart';
 import '../features/tables/tables_screen.dart';
+import '../features/onboarding/local_setup_screen.dart';
+import '../features/onboarding/signup_screen.dart';
+import '../features/onboarding/welcome_screen.dart';
 import '../features/zalo/zalo_screen.dart';
+import 'app_mode.dart';
 import 'session.dart';
 import 'widgets/app_shell.dart';
 
@@ -41,41 +45,70 @@ final _orderDetail = RegExp(r'^/orders/\d+$');
 /// adds the order page (GET /api/orders/:id is open to any staff), Cài đặt (own password, app info) and the offline sync screen.
 bool cashierAllowed(String path) => path == '/pos' || path == '/settings' || path == '/sync' || path == '/diagnostics' || path == '/heli' || _orderDetail.hasMatch(path);
 
-/// The router's guard as a pure function of the signed-in [user] and the requested [path] (no query string).
-/// Returns where to go instead, or null to stay.
-///  - signed out: only /login;
+/// The first-run screens: the welcome page with its three choices, "Tạo quán mới" and "Dùng trên máy này".
+const onboardingPaths = {'/welcome', '/signup', '/local-setup'};
+
+/// What "Dùng trên máy này" serves (core/local/local_backend.dart): the menu, selling, orders and revenue. Stock,
+/// recipes, tables, customers, expenses, Zalo, Heli and offline sync need a server.
+bool localAllowed(String path) =>
+    const {'/dashboard', '/orders', '/reports', '/more', '/pos', '/menu', '/settings', '/diagnostics'}.contains(path) || _orderDetail.hasMatch(path);
+
+/// The router's guard as a pure function of the signed-in [user], the requested [path] (no query string), how the
+/// phone is used ([mode]) and whether a local shop exists ([localReady]). Returns where to go instead, or null to stay.
+///  - signed out, nothing chosen yet (new install): the welcome page (and the screens it leads to, /login included);
+///  - signed out on a server: /login (the welcome page and "Tạo quán mới" stay reachable from it);
+///  - signed out in local mode: /local-setup until the local shop exists, then /login (its local admin account);
 ///  - "must change password" (admin with a factory / short password): only /change-password, like the web's
 ///    /admin/settings/password gate (every other API call answers 403 MUST_CHANGE_PASSWORD);
-///  - /login, / and a finished /change-password lead to the account's home: /dashboard (admin), /pos (cashier);
+///  - /login, /, the first-run screens and a finished /change-password lead to the account's home: /dashboard
+///    (admin), /pos (cashier);
+///  - in local mode, a screen that needs a server leads home;
 ///  - a cashier asking for any other screen (the bottom-bar sections, management screens) goes to /pos.
-String? redirectFor(AppUser? user, String path) {
-  if (user == null) return path == '/login' ? null : '/login';
+String? redirectFor(AppUser? user, String path, {AppMode mode = AppMode.server, bool localReady = false}) {
+  if (user == null) {
+    if (mode == AppMode.local) {
+      if (!localReady) return path == '/local-setup' || path == '/welcome' ? null : '/local-setup';
+      return path == '/login' || path == '/welcome' ? null : '/login';
+    }
+    if (path == '/login' || onboardingPaths.contains(path)) return null;
+    return mode == AppMode.unset ? '/welcome' : '/login';
+  }
   if (user.mustChangePassword) return path == '/change-password' ? null : '/change-password';
-  if (path == '/login' || path == '/' || path.isEmpty || path == '/change-password') return user.home;
+  if (path == '/login' || path == '/' || path.isEmpty || path == '/change-password' || onboardingPaths.contains(path)) return user.home;
+  if (mode == AppMode.local && !localAllowed(path)) return user.home;
   if (!user.isAdmin && !cashierAllowed(path)) return '/pos';
   return null;
 }
 
 /// First location for [user] (the redirect would get there too; this avoids building the dashboard for a cashier).
-String startLocation(AppUser? user) => user == null ? '/login' : (user.mustChangePassword ? '/change-password' : user.home);
+String startLocation(AppUser? user, {AppMode mode = AppMode.server, bool localReady = false}) => user == null
+    ? redirectFor(null, '/', mode: mode, localReady: localReady) ?? '/login'
+    : (user.mustChangePassword ? '/change-password' : user.home);
 
 /// Routes mirror the Web Admin URLs (/admin/... without the prefix). The five bottom-bar sections are branches
 /// of a StatefulShellRoute (each keeps its own stack); everything else is pushed above the shell.
 final routerProvider = Provider<GoRouter>((ref) {
   final refresh = ValueNotifier<int>(0);
   ref.listen(authProvider, (_, _) => refresh.value++);
+  ref.listen(appModeProvider, (_, _) => refresh.value++);
+  ref.listen(localReadyProvider, (_, _) => refresh.value++);
 
   // Read authProvider itself, not currentUserProvider: the redirect runs inside the authProvider notification,
   // before derived providers have caught up.
   AppUser? user() => switch (ref.read(authProvider)) { SignedIn(:final user) => user, SignedOut() => null };
+  AppMode mode() => ref.read(appModeProvider);
+  bool localReady() => ref.read(localReadyProvider);
   ref.onDispose(refresh.dispose);
 
   return GoRouter(
     navigatorKey: _rootKey,
-    initialLocation: startLocation(user()),
+    initialLocation: startLocation(user(), mode: mode(), localReady: localReady()),
     refreshListenable: refresh,
-    redirect: (context, state) => redirectFor(user(), state.uri.path),
+    redirect: (context, state) => redirectFor(user(), state.uri.path, mode: mode(), localReady: localReady()),
     routes: [
+      GoRoute(path: '/welcome', builder: (_, _) => const WelcomeScreen()),
+      GoRoute(path: '/signup', builder: (_, _) => const SignupScreen()),
+      GoRoute(path: '/local-setup', builder: (_, _) => const LocalSetupScreen()),
       GoRoute(path: '/login', builder: (_, _) => const LoginScreen()),
       GoRoute(path: '/change-password', builder: (_, _) => const ChangePasswordScreen()),
       StatefulShellRoute.indexedStack(
