@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>POS Tasotek – feature graphic</title>
+<link rel="stylesheet" href="common.css">
+<style>
+  /* Play feature graphic 1024 x 500. Keep text inside the middle-left safe area: Play may crop the edges or lay a play button over the centre. */
+  .canvas { width: 1024px; height: 500px; }
+  .left { position: absolute; left: 60px; top: 0; bottom: 0; width: 470px; display: flex; flex-direction: column; justify-content: center; z-index: 3; }
+  .brand { display: flex; align-items: center; gap: 18px; }
+  .tile { width: 92px; height: 92px; border-radius: 22px; background: #fff; display: grid; place-items: center; box-shadow: 0 12px 30px rgba(0,0,0,.35); flex: none; }
+  .tile img { width: 78px; }
+  .name { font-size: 50px; font-weight: 800; line-height: 1; letter-spacing: -.01em; }
+  .name small { display: block; font-size: 17px; font-weight: 600; color: var(--amber); letter-spacing: .16em; margin-top: 8px; }
+  h2 { font-size: 31px; line-height: 1.25; font-weight: 700; margin-top: 30px; }
+  .chips { display: flex; gap: 8px; margin-top: 22px; flex-wrap: wrap; }
+  .chips span { font-size: 15px; font-weight: 600; padding: 7px 13px; border-radius: 999px; background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.18); color: var(--navy-soft); }
+  .chips span b { color: var(--amber); }
+  .tab {
+    position: absolute; left: 560px; top: 70px; z-index: 2; width: 640px; height: 380px;
+    background: #0B0F1A; border-radius: 26px; padding: 13px;
+    transform: perspective(1400px) rotateY(-14deg) rotateZ(-2deg); transform-origin: left center;
+    box-shadow: 0 0 0 2px #2A3350, 0 40px 80px rgba(0,0,0,.6);
+  }
+  .tab img { width: 614px; height: 354px; border-radius: 14px; object-fit: cover; object-position: left top; display: block; }
+</style>
+</head>
+<body>
+<div class="canvas">
+  <div class="left">
+    <div class="brand"><div class="tile"><img src="assets/mark.png"></div>
+      <div class="name">POS Tasotek<small>F&amp;B · CÀ PHÊ · TRÀ SỮA</small></div></div>
+    <h2>Bán hàng, kho và công nợ<br>cho quán <span class="hl">trong một ứng dụng</span></h2>
+    <div class="chips"><span><b>●</b> Đơn Zalo OA</span><span><b>●</b> Bán khi mất mạng</span><span><b>●</b> VietQR</span></div>
+  </div>
+  <div class="tab"><img src="assets/tablet-pos.jpg"></div>
+</div>
+</body>
+</html>

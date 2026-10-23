@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>POS Tasotek – thiệp mời thử nghiệm</title>
+<link rel="stylesheet" href="common.css">
+<style>
+  /* 1080 x 1350 (4:5): fits Zalo, Facebook and Messenger previews without cropping */
+  .canvas { width: 1080px; height: 1350px; padding: 80px 80px 0; }
+  .brand { position: relative; z-index: 2; display: flex; align-items: center; gap: 22px; }
+  .tile { width: 104px; height: 104px; border-radius: 26px; background: #fff; display: grid; place-items: center; box-shadow: 0 12px 30px rgba(0,0,0,.35); }
+  .tile img { width: 88px; }
+  .brand b { font-size: 50px; font-weight: 800; display: block; line-height: 1.05; }
+  .brand small { font-size: 20px; color: var(--amber); letter-spacing: .14em; font-weight: 700; }
+  h1 { position: relative; z-index: 2; font-size: 66px; line-height: 1.12; font-weight: 800; margin-top: 56px; }
+  .lead { position: relative; z-index: 2; font-size: 28px; line-height: 1.45; color: var(--navy-soft); margin-top: 20px; font-weight: 500; }
+  .steps { position: relative; z-index: 2; display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 52px; }
+  .step { background: #fff; color: var(--ink); border-radius: 30px; padding: 30px 28px 28px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+  .n { display: inline-flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 800; color: var(--navy); letter-spacing: .06em; text-transform: uppercase; }
+  .n i { font-style: normal; width: 38px; height: 38px; border-radius: 50%; background: var(--amber); color: var(--ink); display: grid; place-items: center; font-size: 21px; }
+  .step h3 { font-size: 30px; font-weight: 800; margin-top: 14px; }
+  .step img { width: 330px; height: 330px; margin-top: 18px; }
+  .step p { font-size: 19px; line-height: 1.4; color: var(--ink-2); margin-top: 14px; }
+  .url { font: 600 15px ui-monospace, Consolas, monospace; color: var(--navy-accent); margin-top: 12px; overflow-wrap: anywhere; }
+  .note { position: relative; z-index: 2; font-size: 21px; color: var(--navy-muted); text-align: center; margin-top: 34px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="canvas">
+  <div class="brand"><div class="tile"><img src="assets/mark.png"></div>
+    <div><b>POS Tasotek</b><small>BÁN HÀNG · KHO · CÔNG NỢ</small></div></div>
+  <h1>Mời bạn <span class="hl">dùng thử</span><br>trên Google Play</h1>
+  <p class="lead">Ứng dụng quản lý quán cà phê đang thử nghiệm kín. Quét 2 mã theo thứ tự bằng camera điện thoại Android.</p>
+  <div class="steps">
+    <div class="step"><span class="n"><i>1</i>Bước 1</span><h3>Tham gia thử nghiệm</h3>
+      <img src="../invite/qr-tham-gia-thu-nghiem.svg">
+      <p>Đăng nhập Google, bấm <b>Trở thành người thử nghiệm</b></p>
+      <div class="url">play.google.com/apps/testing<wbr>/com.tasotek.fnb</div></div>
+    <div class="step"><span class="n"><i>2</i>Bước 2</span><h3>Cài ứng dụng</h3>
+      <img src="../invite/qr-google-play.svg">
+      <p>Mở trang ứng dụng trên Google Play, bấm <b>Cài đặt</b></p>
+      <div class="url">play.google.com/store/apps/details<wbr>?id=com.tasotek.fnb</div></div>
+  </div>
+  <p class="note">Chỉ tài khoản Google đã được mời mới tham gia được.<br>Vui lòng giữ ứng dụng trên máy ít nhất 14 ngày.</p>
+</div>
+</body>
+</html>

@@ -1,0 +1,56 @@
+/* Shared look of the Play Store graphics: brand navy + amber (mobile/lib/core/theme/app_theme.dart Palette). */
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@500;600;700;800&family=Noto+Serif:wght@400;500;600;700&display=block');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,500,1,0&display=block');
+
+:root {
+  --navy-darker: #0F172A;
+  --navy-dark: #172554;
+  --navy: #1E3A8A;
+  --navy-accent: #1D4ED8;
+  --navy-muted: #94A3B8;
+  --navy-soft: #CBD5E1;
+  --amber: #FBBF24;
+  --amber-pressed: #F59E0B;
+  --ink: #1F2123;
+  --ink-2: #4A5056;
+  --milk50: #FAF8F5;
+  --milk100: #F4F1EC;
+  --milk200: #E8E3DA;
+  --milk300: #D6CFC3;
+  --milk500: #8C8478;
+  --good: #047857; --good-tint: #D1FAE5;
+  --warn: #B45309; --warn-tint: #FEF3C7;
+  --bad: #B91C1C; --bad-tint: #FEE2E2;
+  --info: #1D4ED8; --info-tint: #DBEAFE;
+  --zalo: #0057D9; --zalo-tint: #D9E8FF;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: var(--navy-darker); overflow: hidden; }
+body { font-family: 'Be Vietnam Pro', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+
+.ms {
+  font-family: 'Material Symbols Rounded';
+  font-weight: normal; font-style: normal; line-height: 1;
+  letter-spacing: normal; text-transform: none; white-space: nowrap;
+  font-feature-settings: 'liga'; -webkit-font-feature-settings: 'liga';
+  display: inline-block; vertical-align: middle;
+}
+
+/* Marketing canvas: deep navy with a soft amber glow */
+.canvas {
+  position: relative; overflow: hidden;
+  background:
+    radial-gradient(900px 700px at 85% 8%, rgba(251,191,36,.22), transparent 60%),
+    radial-gradient(1000px 900px at 0% 100%, rgba(29,78,216,.45), transparent 65%),
+    linear-gradient(160deg, #0F172A 0%, #172554 55%, #1E3A8A 100%);
+  color: #fff;
+}
+.canvas::after { /* faint grid texture */
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background-image: linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(180deg, #000 0%, transparent 70%);
+}
+.eyebrow { color: var(--amber); font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.hl { color: var(--amber); }

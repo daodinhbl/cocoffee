@@ -29,3 +29,6 @@ README.md        export-ignore
 # CI workflows are not part of the server deploy archive
 .github/         export-ignore
 /desktop export-ignore
+
+# Google Play store graphics and testers' invite (CHPlay/README.md): not part of the server
+/CHPlay export-ignore

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>POS Tasotek – tablet screenshot</title>
+<link rel="stylesheet" href="common.css">
+<style>
+  .canvas { width: 1920px; height: 1080px; }
+  .cap { position: absolute; left: 0; right: 0; top: 52px; text-align: center; z-index: 2; }
+  .cap .eyebrow { font-size: 22px; }
+  .cap h1 { font-size: 60px; line-height: 1.15; font-weight: 800; margin-top: 10px; letter-spacing: -.01em; }
+  .cap p { font-size: 26px; color: var(--navy-soft); margin-top: 10px; font-weight: 500; }
+  /* Real captures from the app on an Android tablet: 1600 x 894 */
+  .tab {
+    position: absolute; left: 50%; top: 262px; z-index: 2;
+    width: 1404px; height: 804px; margin-left: -702px;
+    background: #0B0F1A; border-radius: 44px; padding: 22px;
+    box-shadow: 0 0 0 3px #2A3350, 0 50px 110px rgba(0,0,0,.55), 0 0 160px rgba(251,191,36,.12);
+  }
+  .tab img { width: 1360px; height: 760px; border-radius: 22px; display: block; object-fit: cover; object-position: top; }
+</style>
+</head>
+<body>
+<div class="canvas">
+  <div class="cap"><div class="eyebrow" id="eyebrow"></div><h1 id="headline"></h1><p id="sub"></p></div>
+  <div class="tab"><img id="shot"></div>
+</div>
+<script>
+const SHOTS = {
+  pos: ['Bán hàng POS', 'Màn hình bán hàng <span class="hl">rộng rãi cho máy tính bảng</span>',
+        'Chọn món theo ảnh, giỏ hàng luôn hiện bên phải, thanh toán một chạm.'],
+  dashboard: ['Tổng quan', 'Doanh thu, giá vốn, lãi gộp <span class="hl">trong một màn hình</span>',
+        'Số liệu cập nhật theo từng đơn bán, kể cả đơn Zalo chờ thu.'],
+  orders: ['Đơn hàng', 'Mọi đơn POS và Zalo <span class="hl">ở cùng một nơi</span>',
+        'Lọc theo ngày, kênh, trạng thái; thu tiền, in hóa đơn hoặc hủy ngay trên đơn.'],
+  inventory: ['Kho nguyên liệu', 'Tồn kho <span class="hl">tự trừ theo công thức</span>',
+        'Giá vốn bình quân, cảnh báo dưới mức tối thiểu, nhập kho và kiểm kê.'],
+  reports: ['Báo cáo', 'Báo cáo lãi gộp <span class="hl">theo ngày, theo món</span>',
+        'Biết món nào bán chạy, ngày nào đông khách, kênh nào mang lại doanh thu.'],
+};
+const key = location.hash.slice(1) || 'pos';
+const [e, h, p] = SHOTS[key];
+document.getElementById('eyebrow').textContent = e;
+document.getElementById('headline').innerHTML = h;
+document.getElementById('sub').textContent = p;
+document.getElementById('shot').src = `assets/tablet-${key}.jpg`;
+</script>
+</body>
+</html>
