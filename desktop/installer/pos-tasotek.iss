@@ -1,7 +1,7 @@
 ; Inno Setup 6 script of the one-click installer. Built by scripts\build-windows-installer.ps1:
-;   ISCC /DAppVersion=1.2.0 /DStageDir=<dist\win\POS-Tasotek-Server> /DOutDir=<dist\win> pos-tasotek.iss
+;   ISCC /DAppVersion=1.2 /DStageDir=<dist\win\POS-Tasotek-Server> /DOutDir=<dist\win> pos-tasotek.iss
 #ifndef AppVersion
-  #define AppVersion "1.2.0"
+  #define AppVersion "1.2"
 #endif
 #ifndef StageDir
   #define StageDir "..\..\dist\win\POS-Tasotek-Server"

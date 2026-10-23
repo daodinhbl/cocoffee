@@ -29,6 +29,8 @@ $desktop = Join-Path $root 'desktop'
 $out = Join-Path $root 'dist\win'
 $stage = Join-Path $out 'POS-Tasotek-Server'
 if (-not $Version) { $Version = ((Select-String -Path (Join-Path $desktop 'pubspec.yaml') -Pattern '^version:\s*(\S+)').Matches[0].Groups[1].Value -split '\+')[0] }
+# the release is named without a zero patch (pubspec 1.2.0 -> Setup-1.2.exe); the manager's updater compares 1.2 == 1.2.0
+$Version = $Version -replace '^(\d+\.\d+)\.0$', '$1'
 
 function Step($m) { Write-Host "==> $m" -ForegroundColor Cyan }
 
