@@ -9,14 +9,14 @@ test('only https play.google.com addresses are accepted', () => {
   for (const bad of ['http://play.google.com/x', 'https://play.google.com.evil.test/x', 'https://evil.test/play.google.com', 'https://u:p@play.google.com/x', 'javascript:alert(1)', '', null]) {
     assert.equal(googlePlay.safeUrl(bad), null, String(bad));
   }
-  assert.equal(googlePlay.url(), 'https://play.google.com/store/apps/details?id=com.tasotek.fnb');
+  assert.equal(googlePlay.url(), 'https://play.google.com/apps/testing/com.tasotek.fnb');
 });
 
 test('login page shows the Google Play card and its QR code is served', async (t) => {
   const fx = await start();
   t.after(() => fx.stop());
   const html = await (await fx.client().get('/admin/login')).text();
-  assert.match(html, /href="https:\/\/play\.google\.com\/store\/apps\/details\?id=com\.tasotek\.fnb"/);
+  assert.match(html, /href="https:\/\/play\.google\.com\/apps\/testing\/com\.tasotek\.fnb"/);
   assert.match(html, /\/download\/play\/qr\.svg/);
   assert.match(html, /Google Play/);
   assert.match(html, /người thử nghiệm/);

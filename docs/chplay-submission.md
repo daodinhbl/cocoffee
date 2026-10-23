@@ -107,7 +107,10 @@ không có chức năng đó).
 - VI: Thông báo đơn mới từ Zalo; cơ sở dữ liệu ngoại tuyến: xem, tìm kiếm, bán hàng, ghi sổ khi mất mạng và tự đồng bộ khi có mạng; thu ngân chỉ dùng màn POS.
 - EN: New-order notifications from Zalo; offline database: browse, search, sell and keep the books without a connection, synced when it returns; cashiers limited to the POS screen.
 
-## 6. Đồ họa cần chuẩn bị (bạn làm)
+## 6. Đồ họa
+
+Bộ đồ họa đã dựng sẵn trong `CHPlay/` (biểu tượng, hình ảnh nổi bật, 8 ảnh điện thoại, 5 ảnh máy tính bảng); cách
+tạo lại và lưu ý xem `CHPlay/README.md`.
 
 | Mục | Yêu cầu của Play |
 |---|---|
