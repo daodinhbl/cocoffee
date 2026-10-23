@@ -4,6 +4,7 @@ const rateLimit = require('../middlewares/rateLimit');
 const appRelease = require('../services/appRelease');
 const iosApp = require('../services/iosApp');
 const apkpure = require('../services/apkpure');
+const googlePlay = require('../services/googlePlay');
 const iosRelease = require('../services/iosRelease');
 const windowsRelease = require('../services/windowsRelease');
 const env = require('../config/env');
@@ -98,10 +99,10 @@ async function sendQr(req, res, next, pagePath) {
 
 router.get('/qr.svg', pageLimit, (req, res, next) => sendQr(req, res, next, '/download'));
 
-// QR code of the app's APKPure page (a third row of the app card on the login page).
-router.get('/apkpure/qr.svg', pageLimit, async (req, res, next) => {
+// QR codes of the app's Google Play and APKPure pages (rows of the app card on the login page).
+const sendStoreQr = (storeUrl) => async (req, res, next) => {
   try {
-    const svg = await appRelease.qrSvg(apkpure.url());
+    const svg = await appRelease.qrSvg(storeUrl());
     res.set({
       'Content-Type': 'image/svg+xml; charset=utf-8',
       'Cache-Control': 'public, max-age=3600',
@@ -110,7 +111,9 @@ router.get('/apkpure/qr.svg', pageLimit, async (req, res, next) => {
     });
     res.send(svg);
   } catch (err) { next(err); }
-});
+};
+router.get('/play/qr.svg', pageLimit, sendStoreQr(googlePlay.url));
+router.get('/apkpure/qr.svg', pageLimit, sendStoreQr(apkpure.url));
 
 router.get('/ios', pageLimit, adminSecurity, async (req, res, next) => {
   try {

@@ -83,6 +83,7 @@ module.exports = {
   // IOS_APP_URL= (empty) switches it off, a stored value in Cài đặt always wins.
   iosAppUrl: process.env.IOS_APP_URL === undefined ? 'https://testflight.apple.com/join/REY5t43E' : optional('IOS_APP_URL'),
   apkpureUrl: optional('APKPURE_URL'),          // optional override of the APKPure page shown on the login page (services/apkpure.js)
+  googlePlayUrl: optional('GOOGLE_PLAY_URL'),   // optional override of the Google Play page shown on the login page (services/googlePlay.js)
   // Where Web Admin > Sao lưu keeps its .sql.gz files. A redeploy replaces the app folder, so the default is a
   // sibling folder OUTSIDE it (<app>/../cocoffee-backups); backupService falls back to <app>/backups (with a
   // warning) when that folder cannot be created. Set BACKUP_DIR to choose another place.
