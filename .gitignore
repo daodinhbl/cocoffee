@@ -48,3 +48,8 @@ mobile/ios/build/
 # Third-party store APK kept for the APKPure submission (61 MB) and private reports: not source code
 /apkpure-release/
 /docs/*.docx
+
+# Local copies of the release keystore, license private key and database dumps: secrets, never committed
+/FNB-db-backups/
+/FNB-keystore-backup/
+/FNB-secrets/
